@@ -1,0 +1,33 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Backend specific
+backend/utils/__pycache__/
+
+# Environment variables
+.env
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# Node / Frontend
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
