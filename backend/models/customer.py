@@ -14,7 +14,7 @@ class Customer(Base):
     phone_number:Mapped[int]=mapped_column(String, nullable=False)
     hashed_password : Mapped[str]=mapped_column(String, nullable=False)
     address:Mapped[str]=mapped_column(String,nullable=False)
-    payment:Mapped[str]=mapped_column(String,nullable=False,defaulted="Cash on delivery")
+    payment:Mapped[str]=mapped_column(String,nullable=False,defaulted="None")
     created_at : Mapped[DateTime]=mapped_column(DateTime, default=datetime.utcnow)
     updated_at : Mapped[DateTime]=mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

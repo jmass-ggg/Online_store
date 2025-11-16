@@ -8,12 +8,12 @@ from backend.models.order_iteam import OrderItem
 from backend.models.product import Product
 from backend.schemas.order import OrderCreate, OrderRead
 from backend.schemas.order_iteam import OrderItemCreate, OrderItemRead
-from backend.models.customer import User
+from backend.models.customer import Customer
 
 def order_the_product(
     order_in: OrderCreate,
     db: Session,
-    current_user: User
+    current_user: case
 ) -> Order:
     """
     Create a new order for the current user with multiple items.

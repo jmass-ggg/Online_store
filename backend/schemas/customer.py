@@ -1,13 +1,13 @@
 from pydantic import BaseModel, EmailStr, constr,validator,Field
 import re
 from datetime import datetime
-
 class CustomerBase(BaseModel):
-    
     username:str 
     email: EmailStr=Field(...,description="Valid emial address of the user")
     phone_number:str=Field(...,description="")
-    
+    address:str=Field(...,description="The address of the user")
+    payment:str=Field(default="Cash on delivery",description="The payment method of the user")
+    role_name:str=Field(default="Customer",description="The role of the user")
     class Config:
         orm_mode = True
         from_attributes = True
@@ -26,7 +26,6 @@ class CustomerCreate(CustomerBase):
 
 class CustomerRead(CustomerBase):
     id:int=Field(...,description="The unique Id of user")
-    role_id:int=Field(...,description="User role")
     
     class Config:
         orm_mode = True

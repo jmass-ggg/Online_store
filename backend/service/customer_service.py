@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-
+from datetime import datetime
 from backend.database import get_db
 from backend.models.customer import Customer
 from backend.models.role import Roles
@@ -16,7 +16,8 @@ from backend.utils.hashed import hashed_password, verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 
-def create_customer(db: Session, username: str, email: str, password: str,phone_number:str) -> CustomerRead:
+def create_customer(db: Session, username: str, email: str, 
+                    password: str,phone_number:str,address:str,) -> CustomerRead:
     """Register a new user with hashed password and unique username/email."""
 
     if db.query(Customer).filter(Customer.username == username).first():
@@ -30,6 +31,9 @@ def create_customer(db: Session, username: str, email: str, password: str,phone_
         email=email,
         hashed_password=hashed_password(password),
         phone_number=phone_number,
+        address=address,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
 
     db.add(new_user)
@@ -50,11 +54,11 @@ def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> TokenRe
     return {"access_token": token, "token_type": "Bearer"}
 
 def customer_info_update(
-    db: Session, user_id: int, user_update: CustomerUpdate
+    db: Session,  user_update: CustomerUpdate,current_user
 ) -> CustomerRead:
     """Update user details (self-profile edit)."""
 
-    user = db.query(Customer).filter(Customer.id == user_id).first()
+    user = db.query(Customer).filter(Customer.id == current_user).first()
     if not user:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
 
