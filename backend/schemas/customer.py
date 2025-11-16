@@ -1,6 +1,13 @@
 from pydantic import BaseModel, EmailStr, constr,validator,Field
 import re
 from datetime import datetime
+from enum import Enum
+
+class CustomerStatus(str,Enum):
+    active="active"
+    inactive="inactive"
+    suspended="suspended"
+
 class CustomerBase(BaseModel):
     username:str 
     email: EmailStr=Field(...,description="Valid emial address of the user")
@@ -15,6 +22,7 @@ class CustomerBase(BaseModel):
     
 class CustomerCreate(CustomerBase):
     password: str=Field(...,min_length=6,max_length=30,description="Valid and Strong password")
+    status:str=Field(default=CustomerStatus.active,description="The status of the user")
     @validator('password')
     def strong_password(cls,v):
         if not re.search("[A-Z]",v):

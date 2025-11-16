@@ -1,3 +1,24 @@
+# 🛍️ Online Store Frontend
+
+### 💡 Overview  
+This is the **frontend** of the full-stack **Online Store** application, built with **React.js** and connected to a **FastAPI backend**.  
+It provides users with a modern and responsive interface for exploring products, managing their cart, placing orders, and leaving reviews.
+
+---
+
+## ⚙️ Tech Stack
+| Technology | Purpose |
+|-------------|----------|
+| **React.js** | Component-based UI framework |
+| **React Router DOM** | Client-side routing |
+| **Axios / Fetch API** | Communication with FastAPI backend |
+| **Context API / Redux** | State management |
+| **Tailwind CSS / Bootstrap** | Styling and responsive layout |
+| **React Icons** | Modern icons for UI |
+
+---
+
+## 🧱 Project Structure
 📦 project-root
 ├── 📁backend
 │   ├── main.py
@@ -97,3 +118,41 @@
         │
         └── 📁styles
             └── App.css
+
+---
+
+## 🚀 Key Features
+✅ **User Authentication** — Login & register with JWT tokens  
+✅ **Product Management** — Browse, filter, and view products  
+✅ **Shopping Cart** — Add, remove, and update products  
+✅ **Order Management** — Place and track orders  
+✅ **Review System** — Add reviews and ratings  
+✅ **Responsive Design** — Works on mobile and desktop  
+
+---
+
+## 🧰 Installation & Setup
+
+### 1️⃣ Clone the Repository
+```bash
+git clone <repo-url>
+cd frontend
+2️⃣ Install Dependencies
+bash
+Copy code
+npm install
+3️⃣ Start the Development Server
+bash
+Copy code
+npm start
+The app will run at:
+👉 http://localhost:3000
+
+🔗 Backend Integration
+Ensure the FastAPI backend is running (default: http://localhost:8000).
+
+Set the backend base URL in your .env file:
+
+env
+Copy code
+REACT_APP_API_URL=http://localhost:8000
