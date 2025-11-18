@@ -1,4 +1,4 @@
-from .customer import User, Roles
+from .customer import Customer
 from .product import Product
 from .order import Order
 from .order_iteam import OrderItem

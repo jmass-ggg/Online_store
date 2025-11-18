@@ -43,8 +43,7 @@ class CustomerRead(CustomerBase):
 class CustomerUpdate(BaseModel):   
     username : constr(min_length=5,max_length=15)=Field(...,description="Update username")
     email : EmailStr=Field(...,description="Update email")
-    phone_number:int=Field(...,description="")
-    
+    phone_number:str=Field(...,description="")
     class Config:
         orm_mode = True
         from_attributes = True

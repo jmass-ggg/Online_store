@@ -13,7 +13,7 @@ from backend.models.customer import Customer
 def order_the_product(
     order_in: OrderCreate,
     db: Session,
-    current_user: case
+    current_user: Customer
 ) -> Order:
     """
     Create a new order for the current user with multiple items.
@@ -67,7 +67,7 @@ def order_the_product(
 def view_the_order(
     order_id: int,
     db: Session,
-    current_user: User
+    current_user: Customer
 ) -> Order:
     """
     Retrieve a specific order for the current user.

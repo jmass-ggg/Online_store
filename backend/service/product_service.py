@@ -6,7 +6,7 @@ import shutil
 
 from backend.database import get_db
 from backend.models.product import Product
-from backend.models.customer import User
+from backend.models.customer import Customer
 from backend.schemas.product import Product_create, Product_read, Product_update
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
@@ -19,7 +19,7 @@ def add_product_by_seller(
     description: str,
     image: UploadFile,
     db: Session,
-    current_user: User,
+    current_user: Customer,
     UPLOAD_FOLDER: str
 ) -> Product_create:
     """
@@ -56,7 +56,7 @@ def edit_product_by_seller(
     db: Session,
     product_id: int,
     product_update: Product_update,
-    current_user: User
+    current_user: Customer
 ) -> Product_update:
     """
     Edit a product by seller. Sellers can edit their own products or admins can edit any.
@@ -83,7 +83,7 @@ def edit_product_by_seller(
 def delete_product_by_admin(
     db: Session,
     product_id: int,
-    current_user: User
+    current_user: Customer
 ) -> dict:
     """
     Allow admin to delete any product.
@@ -116,7 +116,7 @@ def delete_product_by_seller(
 def veiw_product(
     db: Session,
     product_id: int,
-    current_user: User
+    current_user: Customer
 ) -> Product_read:
     """
     Retrieve details of a single product.

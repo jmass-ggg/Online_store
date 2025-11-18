@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.database import get_db
-from backend.models.customer import User
+from backend.models.customer import Customer
 from backend.utils.auth import auth2_schema
 from backend.core.error_handler import error_handler
 from pydantic import BaseSettings
@@ -42,7 +42,7 @@ def verify_token(Token:str):
 
 def get_current_user(token:str=Depends(auth2_schema),db:Session=Depends(get_db)):
     email=verify_token(token)
-    user=db.query(User).filter(User.email == email).first()
+    user=db.query(Customer).filter(Customer.email == email).first()
     if not user:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED,"User not found")
+        raise error_handler(status.HTTP_401_UNAUTHORIZED,"Customer not found")
     return user

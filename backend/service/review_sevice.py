@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.customer import User
+from backend.models.customer import Customer
 from backend.models.product import Product
 from backend.models.review import Review
 from backend.schemas.review import Review_read, Review_create, Review_update
@@ -13,7 +13,7 @@ def reveiw_the_product(
     product_id: int,
     add_review: Review_create,
     db: Session,
-    current_user: User
+    current_user: Customer
 ) -> Review_read:
     """
     Add a review for a product by the current user.
@@ -42,7 +42,7 @@ def update_product_review(
     product_id: int,
     update_review: Review_update,
     db: Session,
-    current_user: User
+    current_user: Customer
 ) -> Review_read:
     """
     Update an existing review for a product by the current user.
@@ -68,7 +68,7 @@ def update_product_review(
 def get_reviews(
     product_id: int,
     db: Session,
-    current_user: User
+    current_user: Customer
 ) -> list[Review_read]:
     """
     Retrieve all reviews for a specific product.
@@ -85,7 +85,7 @@ def get_reviews(
 def review_delete_by_customer(
     review_id: int,
     db: Session,
-    current_user: User
+    current_user: Customer
 ) -> dict:
     """
     Allow a customer to delete their own review.
