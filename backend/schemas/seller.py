@@ -31,7 +31,7 @@ class SellerApplicationCreate(SellerBase):
 
     business_license_number: Optional[str] = None
     business_license_url: Optional[str] = None
-
+    
     bank_account_name: Optional[str] = None
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None
