@@ -43,7 +43,7 @@ class Seller(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-
+    status: Mapped[str] = mapped_column(str, default="REJECTED")
     # Relationships
     products: Mapped[list["Product"]] = relationship(
         "Product", back_populates="seller", cascade="all, delete-orphan"

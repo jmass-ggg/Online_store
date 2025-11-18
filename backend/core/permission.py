@@ -9,6 +9,7 @@ def check_permission(user,action:str):
         1: {  # Admin
             "delete_other_account":True,
             "delete_any_product": True,
+            "verify_seller": True,
             "list_users": True,
             "change_user_role": True,
         },
@@ -17,12 +18,13 @@ def check_permission(user,action:str):
             "edit_own_product": True,
             "delete_own_product": True,
             "view_own_orders": True,
+            "view_orders":True
         },
         3: {  # Customer
             "browse_products": True,
             "place_order": True,
             "view_own_orders": True,
-            "review_the_prduct":True,
+            "review_the_product":True,
             "delete_the_review":True
         }
     }
