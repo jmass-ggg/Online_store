@@ -1,17 +1,19 @@
-from __future__ import annotations
 from datetime import datetime
-from sqlalchemy import Integer, String, Float, ForeignKey, DateTime,Column
-from sqlalchemy.orm import relationship,Mapped
+from sqlalchemy import (
+    Column, Integer, String, Text, Float, DateTime, ForeignKey
+)
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from backend.database import Base
 
+
 class Roles(Base):
-    
-    __tablename__="roles"
-    id=Column(Integer,index=True,primary_key=True,nullable=False)
-    role_name=Column(String,unique=True,nullable=False)
-    descripted=Column(String)
-    
-    users :Mapped[list["User"]]=relationship("User",back_populates="role")
-    
-    def __repr__(self)->str:
-        return f"<Role(id={self.id},role_name={self.role_name})>"
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    role_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    descripted: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    users: Mapped[list["Customer"]] = relationship("Customer", back_populates="role")
+    admins: Mapped[list["Admin"]] = relationship("Admin", back_populates="roles")
+    def __repr__(self):
+        return f"<Role(id={self.id}, role_name={self.role_name})>"

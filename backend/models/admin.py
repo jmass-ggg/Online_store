@@ -17,7 +17,7 @@ class Admin(Base):
 
     role_name : Mapped[int] = mapped_column(ForeignKey("roles.role_name"), default="Admin")
     
-    role : Mapped["Roles"]=relationship("Roles",back_populates="admins")
+    roles : Mapped["Roles"]=relationship("Roles",back_populates="admin")
     
     def __repr__(self)->str:
         return f"<Admin(username={self.username},email={self.email})>"

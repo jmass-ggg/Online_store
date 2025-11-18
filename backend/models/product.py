@@ -7,25 +7,23 @@ from backend.database import Base
 class Product(Base):
     __tablename__ = "product"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
     product_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     product_category: Mapped[str] = mapped_column(String, nullable=False)
-    stock: Mapped[int] = mapped_column(Integer, default=0, index=True)
-    price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    stock: Mapped[int] = mapped_column(Integer, default=0)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"), nullable=False)
+    seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("seller.id"), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    
-    order_items: Mapped[list["OrderItem"]] = relationship(
-        "OrderItem", back_populates="product", cascade="all, delete-orphan"
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    user: Mapped["Customer"] = relationship("User", back_populates="products")
-    reviews: Mapped[list["Review"]] = relationship("Review", back_populates="product")
 
-    def __repr__(self) -> str:
-        return f"<Product(id={self.id}, name={self.product_name}, category={self.product_category}, seller_id={self.seller_id})>"
+    seller: Mapped["Seller"] = relationship("Seller", back_populates="products")
+
+    def __repr__(self):
+        return f"<Product(name={self.product_name}, price={self.price})>"
