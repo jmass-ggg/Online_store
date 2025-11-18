@@ -27,9 +27,9 @@ Base.metadata.create_all(bind=engine)
 
 # Routers
 app.include_router(customer.router)
-# app.include_router(product.router)
-# app.include_router(order.router)
-# app.include_router(review.router)
+app.include_router(product.router)
+app.include_router(order.router)
+app.include_router(review.router)
 
 @app.get("/")
 def hello_world():
