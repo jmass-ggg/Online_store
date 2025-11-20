@@ -7,19 +7,18 @@ from backend.schemas.seller import (
     SellerResponse,
     SellerReviewUpdate,
 )
-from backend.service import seller_service as SellerService
-from backend.core.auth import get_current_user
-from backend.core.exceptions import DomainError
-
+from backend.service.seller_service import (
+    create_seller_application,
+    seller_login,
+    update_seller_profile
+)
+from backend.utils.jwt import get_current_user
+from backend.core.error_handler import error_handler
 router=APIRouter(prefix="/sellers",tags=["Seller Management"] )
 
 @router.post("/apply", response_model=SellerResponse, status_code=201)
 def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
-    try:
-        seller = SellerService.create(db, data)
-        return seller
-    except DomainError as e:
-        raise e.to_http()   # convert domain error → HTTPException
+    return create_seller_application(db,data)
 
 
 # ---------------------------------------------------------

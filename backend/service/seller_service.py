@@ -77,32 +77,6 @@ def seller_login(db: Session, email: str, password: str):
     return {"access_token": token, "token_type": "Bearer"}
 
 
-def review_seller_application(
-    db: Session,
-    seller_id: int,
-    data: SellerReviewUpdate,
-    current_user,
-):
-    """Admin updates status of seller application."""
-
-    if not check_permission(current_user, "review_seller"):
-        raise error_handler(401, "Unauthorized access")
-
-    seller = db.query(Seller).filter(Seller.id == seller_id).first()
-    if not seller:
-        raise error_handler(404, "Seller not found")
-
-    seller.status = data.status
-    seller.is_verified = True if data.status == "APPROVED" else False
-    seller.updated_at = datetime.utcnow()
-
-    db.commit()
-    db.refresh(seller)
-
-    return SellerResponse.from_orm(seller)
-
-
-
 def update_seller_profile(
     db: Session,
     seller_update: SellerUpdate,
