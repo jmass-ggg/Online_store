@@ -18,10 +18,7 @@ class SellerBase(BaseModel):
 # 1) SELLER APPLICATION (SUBMISSION)
 # -----------------------------
 class SellerApplicationCreate(SellerBase):
-    """
-    Seller submits this application.
-    Status will be PENDING until admin reviews.
-    """
+   
     password: str
 
     # Optional documents

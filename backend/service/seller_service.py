@@ -11,8 +11,9 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate
 )
+from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.jwt import create_token, verify_token
-from backend.utils.hashed import hashed_password, verify_password
+from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 
@@ -30,7 +31,7 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
         username=data.username,
         email=data.email,
         phone_number=data.phone_number,
-        hashed_password=hashed_password(data.password),
+        hashed_password=hashed_pwd(data.password),
 
         business_name=data.business_name,
         business_type=data.business_type,
@@ -39,7 +40,6 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
         status="PENDING",
         is_verified=False,
 
-        # KYC
         kyc_document_type=data.kyc_document_type,
         kyc_document_number=data.kyc_document_number,
         kyc_document_url=data.kyc_document_url,
@@ -65,9 +65,6 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
     return SellerResponse.from_orm(seller)
 
 
-# ------------------------------------------------------
-# 2) SELLER LOGIN
-# ------------------------------------------------------
 def seller_login(db: Session, email: str, password: str):
     """Seller logs in using email & password."""
 
@@ -78,7 +75,6 @@ def seller_login(db: Session, email: str, password: str):
 
     token = create_token({"email": seller.email})
     return {"access_token": token, "token_type": "Bearer"}
-
 
 
 def review_seller_application(

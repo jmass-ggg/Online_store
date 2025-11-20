@@ -12,7 +12,8 @@ from backend.schemas.customer import (
     CustomerUpdate,
 )
 from backend.utils.jwt import create_token, verify_token
-from backend.utils.hashed import hashed_password, verify_password
+from backend.utils.hashed import  verify_password
+from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 
@@ -29,7 +30,7 @@ def create_customer(db: Session, username: str, email: str,
     new_user = Customer(
         username=username,
         email=email,
-        hashed_password=hashed_password(password),
+        hashed_password=hashed_pwd(password),
         phone_number=phone_number,
         address=address,
         created_at=datetime.utcnow(),
