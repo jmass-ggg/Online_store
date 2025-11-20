@@ -17,32 +17,159 @@ from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 
 
-def seller_application(
-    db:Session,
-) -> SellerResponse:
-    """Allow a customer to apply for a seller account."""
+def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
+    """Seller submits application. Default status = PENDING."""
 
-    existing_application = db.query(Seller).filter(Seller.id == current_user.id).first()
-    if existing_application:
-        raise error_handler(status.HTTP_302_FOUND, "Seller application already exists")
+    if db.query(Seller).filter(Seller.username == data.username).first():
+        raise error_handler(302, "Username already exists")
 
-    new_application = Seller(
-        
+    if db.query(Seller).filter(Seller.email == data.email).first():
+        raise error_handler(302, "Email already registered")
+
+    seller = Seller(
+        username=data.username,
+        email=data.email,
+        phone_number=data.phone_number,
+        hashed_password=hashed_password(data.password),
+
+        business_name=data.business_name,
+        business_type=data.business_type,
+        business_address=data.business_address,
+
+        status="PENDING",
+        is_verified=False,
+
+        # KYC
+        kyc_document_type=data.kyc_document_type,
+        kyc_document_number=data.kyc_document_number,
+        kyc_document_url=data.kyc_document_url,
+
+        # Business Docs
+        business_license_number=data.business_license_number,
+        business_license_url=data.business_license_url,
+
+        # Banking
+        bank_account_name=data.bank_account_name,
+        bank_account_number=data.bank_account_number,
+        bank_name=data.bank_name,
+        bank_branch=data.bank_branch,
 
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
-        kyc_document_type=application_data.kyc_document_type,
-        kyc_document_number=application_data.kyc_document_number,
-        kyc_document_url=application_data.kyc_document_url,
-        business_license_number=application_data.business_license_number,
-        bank_account_number=application_data.bank_account_number,
-        bank_account_name=application_data.bank_account_name,
-        bank_name=application_data.bank_name,
-        bank_branch=application_data.bank_branch
     )
 
-    db.add(new_application)
+    db.add(seller)
     db.commit()
-    db.refresh(new_application)
+    db.refresh(seller)
 
-    return SellerResponse.from_orm(new_application)
+    return SellerResponse.from_orm(seller)
+
+
+# ------------------------------------------------------
+# 2) SELLER LOGIN
+# ------------------------------------------------------
+def seller_login(db: Session, email: str, password: str):
+    """Seller logs in using email & password."""
+
+    seller = db.query(Seller).filter(Seller.email == email).first()
+
+    if not seller or not verify_password(password, seller.hashed_password):
+        raise error_handler(400, "Invalid credentials")
+
+    token = create_token({"email": seller.email})
+    return {"access_token": token, "token_type": "Bearer"}
+
+
+
+def review_seller_application(
+    db: Session,
+    seller_id: int,
+    data: SellerReviewUpdate,
+    current_user,
+):
+    """Admin updates status of seller application."""
+
+    if not check_permission(current_user, "review_seller"):
+        raise error_handler(401, "Unauthorized access")
+
+    seller = db.query(Seller).filter(Seller.id == seller_id).first()
+    if not seller:
+        raise error_handler(404, "Seller not found")
+
+    seller.status = data.status
+    seller.is_verified = True if data.status == "APPROVED" else False
+    seller.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(seller)
+
+    return SellerResponse.from_orm(seller)
+
+
+
+def update_seller_profile(
+    db: Session,
+    seller_update: SellerUpdate,
+    current_user,
+) -> SellerResponse:
+    """Seller updates own profile."""
+
+    seller = db.query(Seller).filter(Seller.id == current_user).first()
+    if not seller:
+        raise error_handler(404, "Seller not found")
+
+    for key, value in seller_update.model_dump(exclude_unset=True).items():
+        setattr(seller, key, value)
+
+    seller.updated_at = datetime.utcnow()
+
+    if (
+        seller_update.kyc_document_type
+        or seller_update.kyc_document_number
+        or seller_update.kyc_document_url
+        or seller_update.business_license_number
+        or seller_update.business_license_url
+    ):
+        seller.is_verified = False
+        seller.status = "PENDING"
+
+    db.commit()
+    db.refresh(seller)
+
+    return SellerResponse.from_orm(seller)
+
+
+def delete_seller_account(db: Session, current_user) -> dict:
+    """Seller deletes own account."""
+
+    seller = db.query(Seller).filter(Seller.id == current_user.id).first()
+    if not seller:
+        raise error_handler(404, "Seller not found")
+
+    db.delete(seller)
+    db.commit()
+
+    return {"message": "Your seller account has been deleted successfully."}
+
+
+def delete_seller_by_admin(
+    db: Session, seller_id: int, current_user
+) -> dict:
+
+    if not check_permission(current_user, "delete_seller_account"):
+        raise error_handler(401, "Unauthorized access")
+
+    seller = db.query(Seller).filter(Seller.id == seller_id).first()
+    if not seller:
+        raise error_handler(404, "Seller not found")
+
+    db.delete(seller)
+    db.commit()
+
+    return {"message": f"Seller '{seller.username}' has been deleted."}
+
+
+def get_seller_from_token(token: str):
+    """Decode JWT and return seller identity."""
+    seller_email = verify_token(token)
+    return {"email": seller_email}
