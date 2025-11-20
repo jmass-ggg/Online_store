@@ -10,7 +10,8 @@ from backend.schemas.seller import (
 from backend.service.seller_service import (
     create_seller_application,
     seller_login,
-    update_seller_profile
+    update_seller_profile,
+    delete_seller_account
 )
 from backend.utils.jwt import get_current_user
 from backend.core.error_handler import error_handler
@@ -24,17 +25,29 @@ def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
 # ---------------------------------------------------------
 # 2) Approve/Reject Seller (Admin Only)
 # ---------------------------------------------------------
-@router.put("/{seller_id}/review", response_model=SellerResponse)
-def review_seller(
-    seller_id: int,
-    review: SellerReviewUpdate,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    # check_permission happens inside get_current_user or middleware
-    try:
-        seller = SellerService.approve(db, seller_id) if review.status == "APPROVED" else None
-        # you can also add reject() method in service if needed
-        return seller
-    except DomainError as e:
-        raise e.to_http()
+# @router.put("/{seller_id}/review", response_model=SellerResponse)
+# def review_seller(
+#     seller_id: int,
+#     review: SellerReviewUpdate,
+#     db: Session = Depends(get_db),
+#     current_user=Depends(get_current_user),
+# ):
+#     # check_permission happens inside get_current_user or middleware
+#     try:
+#         seller = SellerService.approve(db, seller_id) if review.status == "APPROVED" else None
+#         # you can also add reject() method in service if needed
+#         return seller
+#     except DomainError as e:
+#         raise e.to_http()
+
+# @router.delete("/admin/{seller_id}/delete",status_code=status.HTTP_200_OK)
+# def delete_seller_account(seller_id:int,
+#                           db:Session=Depends(get_db),
+#                           current_user=Depends(get_current_user)):
+    
+
+
+@router.delete("/delete/by_own",status_code=status.HTTP_200_OK)
+def delete_own_seller_account(db:Session=Depends(get_db),
+                          current_user=Depends(get_current_user)):
+    return delete_own_seller_account(db,current_user)
