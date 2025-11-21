@@ -11,6 +11,7 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate
 )
+from backend.schemas.customer import TokenResponse
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.jwt import create_token, verify_token
 from backend.utils.hashed import  verify_password
@@ -65,13 +66,13 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
     return SellerResponse.from_orm(seller)
 
 
-def seller_login(db: Session, email: str, password: str):
+def seller_login(db: Session, form_data: OAuth2PasswordRequestForm)->TokenResponse:
     """Seller logs in using email & password."""
 
-    seller = db.query(Seller).filter(Seller.email == email).first()
+    seller = db.query(Seller).filter(Seller.email == form_data.username).first()
 
-    if not seller or not verify_password(password, seller.hashed_password):
-        raise error_handler(400, "Invalid credentials")
+    if not seller :
+        raise error_handler(status.HTTP_400_BAD_REQUEST, "Invalid credentials")
 
     token = create_token({"email": seller.email})
     return {"access_token": token, "token_type": "Bearer"}

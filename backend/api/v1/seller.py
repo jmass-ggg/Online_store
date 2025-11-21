@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-
+from fastapi.security import OAuth2PasswordRequestForm
+from backend.database import get_db
 from backend.database import get_db
 from backend.schemas.seller import (
     SellerApplicationCreate,
     SellerResponse,
     SellerReviewUpdate,
 )
+from backend.schemas.customer import TokenResponse
 from backend.service.seller_service import (
     create_seller_application,
     seller_login,
@@ -21,6 +23,9 @@ router=APIRouter(prefix="/sellers",tags=["Seller Management"] )
 def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
     return create_seller_application(db,data)
 
+@router.post("/login",response_model=TokenResponse)
+def login_seller(form_data:OAuth2PasswordRequestForm=Depends(),db:Session=Depends(get_db)):
+    return seller_login(db,form_data)
 
 # ---------------------------------------------------------
 # 2) Approve/Reject Seller (Admin Only)
@@ -45,7 +50,7 @@ def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
 #                           db:Session=Depends(get_db),
 #                           current_user=Depends(get_current_user)):
     
-@app.
+
 
 @router.delete("/delete/by_own",status_code=status.HTTP_200_OK)
 def delete_own_seller_account(db:Session=Depends(get_db),
