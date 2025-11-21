@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models.customer import Customer
+from backend.models.seller import Seller
 from backend.utils.auth import auth2_schema
 from backend.core.error_handler import error_handler
 from pydantic import BaseSettings
@@ -46,3 +47,9 @@ def get_current_user(token:str=Depends(auth2_schema),db:Session=Depends(get_db))
     if not user:
         raise error_handler(status.HTTP_401_UNAUTHORIZED,"Customer not found")
     return user
+def get_current_seller(token:str=Depends(auth2_schema),db:Session=Depends(get_db)):
+    email=verify_token(token)
+    seller=db.query(Seller).filter(Seller.email == email).first()
+    if not seller:
+        raise error_handler(status.HTTP_401_UNAUTHORIZED,"Customer not found")
+    return seller
