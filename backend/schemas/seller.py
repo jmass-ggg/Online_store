@@ -3,9 +3,6 @@ from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 
 
-# -----------------------------
-# SHARED BASE
-# -----------------------------
 class SellerBase(BaseModel):
     username: str
     email: EmailStr
@@ -14,9 +11,6 @@ class SellerBase(BaseModel):
     business_type: Optional[str] = "Individual"
     business_address: str
 
-# -----------------------------
-# 1) SELLER APPLICATION (SUBMISSION)
-# -----------------------------
 class SellerApplicationCreate(SellerBase):
    
     password: str
@@ -35,9 +29,6 @@ class SellerApplicationCreate(SellerBase):
     bank_branch: Optional[str] = None
 
 
-# -----------------------------
-# 2) APPLICATION REVIEW (ADMIN ACTION)
-# -----------------------------
 class SellerReviewUpdate(BaseModel):
     """
     Admin updates the seller application status.
@@ -45,10 +36,6 @@ class SellerReviewUpdate(BaseModel):
     status: str            # "APPROVED" | "REJECTED"
     
 
-
-# -----------------------------
-# 3) INTERNAL SELLER MODEL RESPONSE
-# -----------------------------
 class SellerResponse(BaseModel):
     id: int
     username: str
@@ -59,7 +46,6 @@ class SellerResponse(BaseModel):
     business_type: str
     business_address: str
 
-    # Status managed by admin
     status: str                   # PENDING, APPROVED, REJECTED
     is_verified: bool
 
@@ -87,10 +73,6 @@ class SellerResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
-# -----------------------------
-# 4) SELLER UPDATE PROFILE (POST-APPROVAL)
-# -----------------------------
 class SellerUpdate(BaseModel):
     """
     Seller can update some info.

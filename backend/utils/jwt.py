@@ -39,7 +39,7 @@ def verify_token(Token:str):
             raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid token")
         return user_email 
     except JWTError:
-            raise error_handler(status.HTTP_401_UNAUTHORIZED,"Invalid or expired token")
+        raise error_handler(status.HTTP_401_UNAUTHORIZED,"Invalid or expired token")
 #Get current user
 def get_current_user(token:str=Depends(auth2_schema),db:Session=Depends(get_db)):
     email=verify_token(token)

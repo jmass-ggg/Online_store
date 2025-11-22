@@ -48,7 +48,7 @@ def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> TokenRe
 
     user = db.query(Customer).filter(Customer.email == form_data.username).first()
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not verify_password(form_data.password, user.hashed_password):
         raise error_handler(status.HTTP_400_BAD_REQUEST, "Invalid credentials")
 
     token = create_token({"email": user.email})
@@ -72,11 +72,11 @@ def customer_info_update(
 
 
 
-def delete_account_by_owner(db: Session, current_user: Customer) -> dict:
+def delete_account_by_owner(db: Session, current_user: Customer):
     """Allow a user to delete their own account."""
 
     user = db.query(Customer).filter(Customer.id == current_user.id).first()
-    if not user:
+    if not user :
         raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
 
     db.delete(user)
@@ -85,14 +85,14 @@ def delete_account_by_owner(db: Session, current_user: Customer) -> dict:
     return {"message": "Your account has been deleted successfully."}
 
 def delete_account_by_admin(
-    user_id: int, db: Session, current_user: Customer
+    customer_id: int, db: Session, current_user: Customer
 ) -> dict:
     """Allow an admin to delete another user's account."""
 
     if not check_permission(current_user,"delete_other_account"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized access")
 
-    user = db.query(Customer).filter(Customer.id == user_id).first()
+    user = db.query(Customer).filter(Customer.id == customer_id).first()
     if not user:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
 
