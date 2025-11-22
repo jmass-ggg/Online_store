@@ -12,9 +12,9 @@ class Seller(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     # Authentication
-    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
-    phone_number: Mapped[str] = mapped_column(String, nullable=False)
+    phone_number: Mapped[str] = mapped_column(String, nullable=False,unique=True)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
 
     # Business Info
@@ -28,17 +28,19 @@ class Seller(Base):
 
     # Banking
     bank_account_name: Mapped[str] = mapped_column(String, nullable=True)
-    bank_account_number: Mapped[str] = mapped_column(String, nullable=True)
-    bank_name: Mapped[int] = mapped_column(Integer, nullable=True)
+    bank_account_number: Mapped[int] = mapped_column(Integer, nullable=True)
+    bank_name: Mapped[str] = mapped_column(String, nullable=True)
     bank_branch: Mapped[str] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    
     status: Mapped[str] = mapped_column(String, default="REJECTED")
-    # Relationships
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    
     role_name: Mapped[str] = mapped_column(
         ForeignKey("roles.role_name"),
         default="Seller"

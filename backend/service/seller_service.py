@@ -27,34 +27,23 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
 
     if db.query(Seller).filter(Seller.email == data.email).first():
         raise error_handler(302, "Email already registered")
-    password=data.password
+    
     seller = Seller(
         username=data.username,
         email=data.email,
         phone_number=data.phone_number,
-        hashed_password=password,
+        hashed_password=hashed_pwd(data.password),
 
         business_name=data.business_name,
         business_type=data.business_type,
         business_address=data.business_address,
 
-        status="PENDING",
-        is_verified=False,
-
         kyc_document_type=data.kyc_document_type,
         kyc_document_number=data.kyc_document_number,
-        kyc_document_url=data.kyc_document_url,
-
-        # Business Docs
-        business_license_number=data.business_license_number,
-        business_license_url=data.business_license_url,
-
-        # Banking
         bank_account_name=data.bank_account_name,
         bank_account_number=data.bank_account_number,
         bank_name=data.bank_name,
         bank_branch=data.bank_branch,
-
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )

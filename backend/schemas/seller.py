@@ -15,28 +15,29 @@ class SellerApplicationCreate(SellerBase):
    
     password: str
 
+    business_name: str 
+    business_type:str
+    business_address:str
     # Optional documents
     kyc_document_type: str
     kyc_document_number: int
-    kyc_document_url: str 
-
-    
-    bank_account_name: str 
-    business_type:str
-    business_address:str
 
     bank_account_name:str
     bank_account_number: int 
     bank_name: str 
     bank_branch: str 
-
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 class SellerReviewUpdate(BaseModel):
     """
     Admin updates the seller application status.
     """
     status: str            # "APPROVED" | "REJECTED"
-    
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 class SellerResponse(BaseModel):
     id: int
@@ -44,18 +45,12 @@ class SellerResponse(BaseModel):
     email: EmailStr
     phone_number: str
 
-    business_name: str
-    business_type: str
-    business_address: str
-
     status: str                   # PENDING, APPROVED, REJECTED
     is_verified: bool
 
     kyc_document_type: str
     kyc_document_number: int
-    kyc_document_url: str 
 
-    
     bank_account_name: str 
     business_type:str
     business_address:str
@@ -69,6 +64,7 @@ class SellerResponse(BaseModel):
     updated_at: datetime
 
     class Config:
+        orm_mode = True
         from_attributes = True
 
 class SellerUpdate(BaseModel):
