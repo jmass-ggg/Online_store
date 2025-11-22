@@ -16,7 +16,7 @@ from backend.service.customer_service import (
 )
 from backend.utils.auth import auth2_schema
 
-router=APIRouter(prefix="/user",tags=["Authentication"] )
+router=APIRouter(prefix="/user",tags=["Customer"] )
 
 @router.post("/register",response_model=CustomerRead)
 def register(user:CustomerCreate,db:Session = Depends(get_db)):
@@ -42,6 +42,8 @@ def delete_act_by_admin(user_id:int,
                         current_user:Customer=Depends(get_current_user)):
     
     return delete_account_by_admin(user_id,db,current_user)
+
+
 
 @router.get("/me")
 def get_current_user(token:str=Depends(auth2_schema)):
