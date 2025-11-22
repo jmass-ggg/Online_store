@@ -43,8 +43,16 @@ class Seller(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    status: Mapped[str] = mapped_column(str, default="REJECTED")
+    status: Mapped[str] = mapped_column(String, default="REJECTED")
     # Relationships
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    role_name: Mapped[str] = mapped_column(
+        ForeignKey("roles.role_name"),
+        default="Seller"
+    )
+
+    # relationship to Roles
+    role = relationship("Roles", back_populates="sellers")
     products: Mapped[list["Product"]] = relationship(
         "Product", back_populates="seller", cascade="all, delete-orphan"
     )

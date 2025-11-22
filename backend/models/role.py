@@ -13,7 +13,17 @@ class Roles(Base):
     role_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     descripted: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    users: Mapped[list["Customer"]] = relationship("Customer", back_populates="role")
-    admins: Mapped[list["Admin"]] = relationship("Admin", back_populates="roles")
+    admin: Mapped[list["Admin"]] = relationship(
+    "Admin",
+    back_populates="roles"
+    )
+
+    users: Mapped[list["Customer"]] = relationship(
+        "Customer",
+        back_populates="role"
+    )
+
+    sellers = relationship("Seller", back_populates="role")
+
     def __repr__(self):
         return f"<Role(id={self.id}, role_name={self.role_name})>"

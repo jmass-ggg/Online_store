@@ -1,54 +1,82 @@
-from pydantic import BaseModel, EmailStr, constr,validator,Field
+from pydantic import BaseModel, EmailStr, constr, Field, validator
 import re
-from datetime import datetime
 from enum import Enum
 
-class CustomerStatus(str,Enum):
-    active="active"
-    inactive="inactive"
-    suspended="suspended"
+# -------------------------
+# ENUM
+# -------------------------
+class CustomerStatus(str, Enum):
+    active = "active"
+    inactive = "inactive"
+    suspended = "suspended"
 
+
+# -------------------------
+# BASE MODEL (only user input fields)
+# -------------------------
 class CustomerBase(BaseModel):
-    username:str 
-    email: EmailStr=Field(...,description="Valid emial address of the user")
-    phone_number:str=Field(...,description="")
-    address:str=Field(...,description="The address of the user")
-    payment:str=Field(default="Cash on delivery",description="The payment method of the user")
-    role_name:str=Field(default="Customer",description="The role of the user")
+    username: str
+    email: EmailStr=Field(..., description="Valid email address")
+    phone_number: str=Field(..., description="Contact phone number")
+    address: str=Field(..., description="Residential address")
+    
+
     class Config:
         orm_mode = True
         from_attributes = True
 
-    
+
+# -------------------------
+# CREATE MODEL (used for registration)
+# Note: role_name REMOVED (only server sets it)
+# -------------------------
 class CustomerCreate(CustomerBase):
-    password: str=Field(...,min_length=6,max_length=30,description="Valid and Strong password")
-    status:str=Field(default=CustomerStatus.active,description="The status of the user")
+    password: str = Field(..., min_length=6, max_length=30)
+
     @validator('password')
-    def strong_password(cls,v):
-        if not re.search("[A-Z]",v):
-            raise ValueError("The password should contain Uppercase")
-        if not re.search("[a-z]",v):
-            raise ValueError("The password should contain lowercase")
+    def strong_password(cls, v):
+        if not re.search("[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search("[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
         return v
-    
 
-class CustomerRead(CustomerBase):
-    id:int=Field(...,description="The unique Id of user")
-    
+
+# -------------------------
+# READ MODEL (response sent to client)
+# role_name is shown, but cannot be changed
+# -------------------------
+class CustomerRead(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    phone_number: str
+    address: str
+    role_name: str = "Customer"
+    status: CustomerStatus
+
     class Config:
         orm_mode = True
         from_attributes = True
-        
 
-class CustomerUpdate(BaseModel):   
-    username : constr(min_length=5,max_length=15)=Field(...,description="Update username")
-    email : EmailStr=Field(...,description="Update email")
-    phone_number:str=Field(...,description="")
+
+# -------------------------
+# UPDATE MODEL (user can update limited fields)
+# NO role_name, NO password
+# -------------------------
+class CustomerUpdate(BaseModel):
+    username: constr(min_length=5, max_length=15)
+    email: EmailStr
+    phone_number: str
+
     class Config:
         orm_mode = True
         from_attributes = True
-    
+
+
+# -------------------------
+# TOKEN RESPONSE MODEL
+# -------------------------
 class TokenResponse(BaseModel):
-    access_token: str=Field(...,description="JWT access token")
-    token_type: str=Field(...,description="The token type")
-    
+    access_token: str
+    token_type: str

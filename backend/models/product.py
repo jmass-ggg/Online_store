@@ -22,8 +22,8 @@ class Product(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-
+    order_items = relationship("OrderItem", back_populates="product")
     seller: Mapped["Seller"] = relationship("Seller", back_populates="products")
-
+    reviews = relationship("Review", back_populates="product")
     def __repr__(self):
         return f"<Product(name={self.product_name}, price={self.price})>"

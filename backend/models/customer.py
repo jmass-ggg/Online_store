@@ -20,7 +20,7 @@ class Customer(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    status: Mapped[bool] = mapped_column(String, default=True)
+    status: Mapped[str] = mapped_column(String, default="active")
 
     role_name: Mapped[str] = mapped_column(
         ForeignKey("roles.role_name"), default="Customer"
