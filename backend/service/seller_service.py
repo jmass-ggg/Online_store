@@ -27,12 +27,12 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
 
     if db.query(Seller).filter(Seller.email == data.email).first():
         raise error_handler(302, "Email already registered")
-
+    password=data.password
     seller = Seller(
         username=data.username,
         email=data.email,
         phone_number=data.phone_number,
-        hashed_password=hashed_pwd(data.password),
+        hashed_password=password,
 
         business_name=data.business_name,
         business_type=data.business_type,

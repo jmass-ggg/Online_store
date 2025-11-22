@@ -16,17 +16,19 @@ class SellerApplicationCreate(SellerBase):
     password: str
 
     # Optional documents
-    kyc_document_type: Optional[str] = None
-    kyc_document_number: Optional[str] = None
-    kyc_document_url: Optional[str] = None
+    kyc_document_type: str
+    kyc_document_number: int
+    kyc_document_url: str 
 
-    business_license_number: Optional[str] = None
-    business_license_url: Optional[str] = None
     
-    bank_account_name: Optional[str] = None
-    bank_account_number: Optional[str] = None
-    bank_name: Optional[str] = None
-    bank_branch: Optional[str] = None
+    bank_account_name: str 
+    business_type:str
+    business_address:str
+
+    bank_account_name:str
+    bank_account_number: int 
+    bank_name: str 
+    bank_branch: str 
 
 
 class SellerReviewUpdate(BaseModel):
@@ -49,23 +51,19 @@ class SellerResponse(BaseModel):
     status: str                   # PENDING, APPROVED, REJECTED
     is_verified: bool
 
-    # KYC
-    kyc_document_type: Optional[str]
-    kyc_document_number: Optional[str]
-    kyc_document_url: Optional[str]
+    kyc_document_type: str
+    kyc_document_number: int
+    kyc_document_url: str 
 
-    # Business Documents
-    business_license_number: Optional[str]
-    business_license_url: Optional[str]
+    
+    bank_account_name: str 
+    business_type:str
+    business_address:str
 
-    # Banking
-    bank_account_name: Optional[str]
-    bank_account_number: Optional[str]
-    bank_name: Optional[str]
-    bank_branch: Optional[str]
-
-    rating: float
-    total_sales: int
+    bank_account_name:str
+    bank_account_number: int 
+    bank_name: str 
+    bank_branch: str
 
     created_at: datetime
     updated_at: datetime

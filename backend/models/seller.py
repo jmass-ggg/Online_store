@@ -23,22 +23,15 @@ class Seller(Base):
     business_address: Mapped[str] = mapped_column(String, nullable=False)
 
     # KYC
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    kyc_document_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    kyc_document_number: Mapped[str | None] = mapped_column(String, nullable=True)
-    kyc_document_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    kyc_document_type: Mapped[str] = mapped_column(String, nullable=True)
+    kyc_document_number: Mapped[int] = mapped_column(Integer, nullable=True)
 
     # Banking
-    bank_account_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    bank_account_number: Mapped[str | None] = mapped_column(String, nullable=True)
-    bank_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    bank_branch: Mapped[str | None] = mapped_column(String, nullable=True)
+    bank_account_name: Mapped[str] = mapped_column(String, nullable=True)
+    bank_account_number: Mapped[str] = mapped_column(String, nullable=True)
+    bank_name: Mapped[int] = mapped_column(Integer, nullable=True)
+    bank_branch: Mapped[str] = mapped_column(String, nullable=True)
 
-    # Stats
-    rating: Mapped[float] = mapped_column(Float, default=0.0)
-    total_sales: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
