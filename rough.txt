@@ -1,1 +1,229 @@
 docker-compose up --build
+psql -h localhost -p 5434 -U postgres -d store
+
+
+1) Define your service boundaries (very important)
+
+Before writing new code, decide how you will split backend responsibilities.
+
+Create these modules/services next:
+
+Product Catalog
+
+Inventory
+
+Cart
+
+Order/Checkout
+
+Payment integration
+
+Fulfillment / Shipping
+
+Notifications
+
+You do not build all at once. You build in the correct order below.
+
+2) Step-by-step roadmap (this is your correct next step)
+Step 1 — Product Catalog (your immediate next task)
+
+You already have users. They need products to interact with.
+
+Create:
+
+Product: id, title, description, price, category
+
+Seller-product mapping: which seller owns which product
+
+Product images (store file path/S3 URL)
+
+Product approval system: seller uploads → admin approves → visible
+
+Product search + filters (simple at first)
+
+APIs you must add:
+
+POST /seller/products
+
+PUT /seller/products/:id
+
+GET /products (public)
+
+GET /products/:id
+
+PUT /admin/products/:id/approve
+
+Catalog must be done before anything else.
+
+Step 2 — Inventory system
+
+Inventory is separate from product catalog.
+
+You need:
+
+SKU (unique stock keeping unit)
+
+Stock count per product
+
+Reserve stock during checkout
+
+Release stock on cancel
+
+APIs:
+
+POST /seller/products/:id/inventory
+
+PATCH /inventory/:sku (increase/decrease)
+
+Automatic reduction after order creation
+
+Step 3 — Cart Service
+
+Cart must be isolated because it changes frequently.
+
+Your cart should support:
+
+Add to cart
+
+Remove from cart
+
+Update quantity
+
+Calculate totals using product price (live)
+
+Store in Redis or DB
+
+APIs:
+
+GET /cart
+
+POST /cart/items
+
+PATCH /cart/items/:id
+
+DELETE /cart/items/:id
+
+Step 4 — Checkout + Order System
+
+This is where real-world applications become complex.
+Implement:
+
+Validate cart items + prices
+
+Validate inventory (reserve stock)
+
+Create order: status: PENDING_PAYMENT
+
+User selects address + payment method
+
+APIs:
+
+POST /checkout
+
+POST /orders
+
+GET /orders/:id
+
+GET /user/orders
+
+Order model:
+
+order_id
+
+customer_id
+
+list of items
+
+final_price
+
+payment_status
+
+order_status
+
+timestamps
+
+Step 5 — Payment Integration (dummy + real)
+
+Start with a fake payment service.
+Then integrate:
+
+Stripe
+
+Khalti
+
+eSewa
+(depending on region)
+
+Process:
+
+Create order
+
+Redirect to payment
+
+Receive success/failure webhook
+
+Update order status
+
+Confirm or cancel inventory reservation
+
+APIs:
+
+/payment/initiate
+
+/payment/webhook
+
+Step 6 — Fulfillment / Shipping
+
+Required features:
+
+Shipping address verified at checkout
+
+Assign order to courier (manual or auto)
+
+Track order status:
+
+CONFIRMED
+
+PACKING
+
+SHIPPED
+
+OUT_FOR_DELIVERY
+
+DELIVERED
+
+Step 7 — Notifications
+
+Add:
+
+Email on: order created, payment success, order shipped
+
+SMS/Push notifications (optional)
+
+Use message queue or direct call.
+
+3) Minimum realistic architecture after next steps
+
+By following this roadmap, you end up with features similar to large production systems:
+
+Customer Service (done)
+
+Seller Service (done)
+
+Admin Panel (done)
+
+Product Catalog
+
+Inventory
+
+Cart
+
+Order/Checkout
+
+Payment
+
+Fulfillment
+
+Notifications
+
+At that point your backend resembles Amazon’s e-commerce pipeline.

@@ -11,11 +11,12 @@ from backend.schemas.customer import (
     TokenResponse,
     CustomerUpdate,
 )
-from backend.utils.jwt import create_token, verify_token
+from backend.utils.jwt import create_token, verify_token,create_refresh_token
 from backend.utils.hashed import  verify_password
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
+from backend.models.refresh_token import RefreshToken
 
 def create_customer(db: Session, username: str, email: str, 
                     password: str,phone_number:str,address:str,) -> CustomerRead:
@@ -51,8 +52,20 @@ def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> TokenRe
     if not verify_password(form_data.password, user.hashed_password):
         raise error_handler(status.HTTP_400_BAD_REQUEST, "Invalid credentials")
 
-    token = create_token({"email": user.email})
-    return {"access_token": token, "token_type": "Bearer"}
+    access_token = create_token({"email": user.email})
+    refresh_token, exp = create_refresh_token()
+    db_refresh = RefreshToken(
+    token=refresh_token,
+    user_id=user.id,    # for seller use seller_id instead
+    expires_at=exp
+    )
+    db.add(db_refresh)
+    db.commit()
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }
 
 def customer_info_update(
     db: Session,  user_update: CustomerUpdate,current_user

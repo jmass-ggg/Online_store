@@ -9,7 +9,8 @@ from backend.models.seller import Seller
 from backend.utils.auth import auth2_schema
 from backend.core.error_handler import error_handler
 from pydantic import BaseSettings
-
+import secrets
+from backend.models.refresh_token import RefreshToken
 class Settings(BaseSettings):
     SECRET_KEY : str
     ALGORITHM : str
@@ -40,17 +41,34 @@ def verify_token(Token:str):
         return user_email 
     except JWTError:
         raise error_handler(status.HTTP_401_UNAUTHORIZED,"Invalid or expired token")
-#Get current user
-def get_current_user(token:str=Depends(auth2_schema),db:Session=Depends(get_db)):
-    email=verify_token(token)
-    user=db.query(Customer).filter(Customer.email == email).first()
-    if not user:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED,"Customer not found")
-    return user
-# Get current seller
-def get_current_seller(token:str=Depends(auth2_schema),db:Session=Depends(get_db)):
-    email=verify_token(token)
-    seller=db.query(Seller).filter(Seller.email == email).first()
-    if not seller:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED,"Customer not found")
-    return seller
+
+def create_refresh_token():
+    token = secrets.token_hex(40)
+    expire = datetime.utcnow() + timedelta(days=30)
+    return token, expire
+
+
+
+def verify_refresh_token(refresh_token: str, db: Session):
+    token_obj = db.query(RefreshToken).filter(
+        RefreshToken.token == refresh_token,
+        RefreshToken.revoked == False
+    ).first()
+    if not token_obj or token_obj.expires_at < datetime.utcnow():
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+
+    return token_obj
+
+def get_customer_from_refresh(refresh_token: str, db: Session):
+    token_obj = verify_refresh_token(refresh_token, db)
+
+    if token_obj.user_id:
+        return db.query(Customer).filter(Customer.id == token_obj.user_id).first()
+    return None
+
+def get_seller_from_refresh(refresh_token: str, db: Session):
+    token_obj = verify_refresh_token(refresh_token, db)
+
+    if token_obj.user_id:
+        return db.query(Seller).filter(Seller.id == token_obj.user_id).first()
+    return None

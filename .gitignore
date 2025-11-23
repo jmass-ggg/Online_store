@@ -9,7 +9,7 @@ __pycache__/
 
 # Backend specific
 backend/utils/__pycache__/
-
+rough.txt
 project.txt
 # Environment variables
 .env

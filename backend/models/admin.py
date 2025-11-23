@@ -14,7 +14,7 @@ class Admin(Base):
     hashed_password : Mapped[str]=mapped_column(String, nullable=False)
     created_at : Mapped[DateTime]=mapped_column(DateTime, default=datetime.utcnow)
     updated_at : Mapped[DateTime]=mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    
     role_name : Mapped[int] = mapped_column(ForeignKey("roles.role_name"), default="Admin")
     
     roles : Mapped["Roles"]=relationship("Roles",back_populates="admin")
