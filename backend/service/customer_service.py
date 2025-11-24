@@ -56,7 +56,7 @@ def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> TokenRe
     refresh_token, exp = create_refresh_token()
     db_refresh = RefreshToken(
     token=refresh_token,
-    user_id=user.id,    # for seller use seller_id instead
+    user_id=user.id,   
     expires_at=exp
     )
     db.add(db_refresh)

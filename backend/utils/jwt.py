@@ -47,8 +47,6 @@ def create_refresh_token():
     expire = datetime.utcnow() + timedelta(days=30)
     return token, expire
 
-
-
 def verify_refresh_token(refresh_token: str, db: Session):
     token_obj = db.query(RefreshToken).filter(
         RefreshToken.token == refresh_token,
@@ -59,16 +57,25 @@ def verify_refresh_token(refresh_token: str, db: Session):
 
     return token_obj
 
-def get_customer_from_refresh(refresh_token: str, db: Session):
-    token_obj = verify_refresh_token(refresh_token, db)
+def get_customer_from_refresh(
+    refresh_token: str = Depends(auth2_schema),
+    db: Session = Depends(get_db)
+) -> Customer:
+    refresh = verify_refresh_token(refresh_token, db)
 
-    if token_obj.user_id:
-        return db.query(Customer).filter(Customer.id == token_obj.user_id).first()
-    return None
+    user = db.query(Customer).filter(Customer.id == refresh.user_id).first()
+    if not user:
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "User not found")
 
-def get_seller_from_refresh(refresh_token: str, db: Session):
-    token_obj = verify_refresh_token(refresh_token, db)
+    return user
+def get_seller_from_refresh(
+    refresh_token: str = Depends(auth2_schema),
+    db: Session = Depends(get_db)
+) -> Seller:
+    refresh = verify_refresh_token(refresh_token, db)
 
-    if token_obj.user_id:
-        return db.query(Seller).filter(Seller.id == token_obj.user_id).first()
-    return None
+    seller = db.query(Seller).filter(Seller.id == refresh.user_id).first()
+    if not seller:
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "User not found")
+
+    return seller

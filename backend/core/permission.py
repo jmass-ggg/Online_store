@@ -1,5 +1,4 @@
 from fastapi import Depends, HTTPException, status, Security
-from backend.utils.jwt import get_current_user
 from backend.database import get_db
 from backend.utils.auth import auth2_schema
 
@@ -32,15 +31,3 @@ def check_permission(user,action:str):
     }
     role_permission=permission.get(role,{})
     return role_permission.get(action,False)
-
-def require_permission(action: str):
-    def dependency(token: str = Security(auth2_schema), db=Depends(get_db)):
-        current_user = get_current_user(token, db)
-        if not check_permission(current_user, action):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to perform this action"
-            )
-        return current_user
-
-    return dependency

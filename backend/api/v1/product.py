@@ -5,8 +5,7 @@ from typing import List
 from backend.database import get_db
 from backend.schemas.product import Product_create, Product_read, Product_update
 from backend.models.customer import Customer
-from backend.utils.jwt import get_current_user
-from backend.core.permission import require_permission
+from backend.utils.jwt import get_seller_from_refresh
 from backend.service.product_service import (
     add_product_by_seller,
     edit_product_by_seller,
@@ -38,7 +37,7 @@ def product_edit(
     product_id: int,
     product_update: Product_update,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_user)
+    current_user: Customer = Depends(get)
 ):
     
     return edit_product_by_seller(db,product_id,product_update,current_user)
