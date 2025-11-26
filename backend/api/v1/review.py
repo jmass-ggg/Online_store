@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from backend.database import get_db
 from backend.schemas.review import Review_read, Review_create, Review_update
-from backend.utils.jwt import get_current_user
+from backend.utils.jwt import get_customer_from_refresh
 from backend.models.customer import Customer
 
 from backend.service.review_sevice import (
@@ -20,23 +20,23 @@ router=APIRouter(prefix="/review",tags=["Product review"])
 def give_product_review(product_id:int,
                         add_review:Review_create,
                         db:Session=Depends(get_db),
-                        current_user:Customer=Depends(get_current_user)):
+                        current_user:Customer=Depends(get_customer_from_refresh)):
     return reveiw_the_product(product_id,add_review,db,current_user)
 
 @router.patch("/{product_id}/change_review",response_model=Review_read)
 def update_review(product_id:int,update_review:Review_update,
                         db:Session=Depends(get_db),
-                        current_user:Customer=Depends(get_current_user)):
+                        current_user:Customer=Depends(get_customer_from_refresh)):
     return update_product_review(product_id,update_review,db,current_user)
 
 @router.delete("/{review_id}/delete",status_code=status.HTTP_200_OK)
 def delete_review(review_id:int,
                   db:Session=Depends(get_db)
-                  ,current_user:Customer=Depends(get_current_user)):
+                  ,current_user:Customer=Depends(get_customer_from_refresh)):
     return review_delete_by_customer(review_id,db,current_user)
 
 @router.get("/{product_id}/change_review",response_model=Review_read)
 def get_review(product_id:int,
                         db:Session=Depends(get_db),
-                        current_user:Customer=Depends(get_current_user)):
+                        current_user:Customer=Depends(get_customer_from_refresh)):
     return get_reviews(product_id,db,current_user)

@@ -10,6 +10,9 @@ class SellerBase(BaseModel):
     business_name: str
     business_type: Optional[str] = "Individual"
     business_address: str
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 class SellerApplicationCreate(SellerBase):
    
@@ -86,3 +89,6 @@ class SellerUpdate(BaseModel):
 
     business_license_number: Optional[str] = None
     business_license_url: Optional[str] = None
+    class Config:
+        orm_mode = True
+        from_attributes = True

@@ -12,6 +12,9 @@ class OrderStatus(str,Enum):
 class OrderBase(BaseModel):
     total_price: float = Field(default=0.0, ge=0, description="Total price of the order")
     order_status: str = Field(default=OrderStatus.pending, description="Current status of the order")
+    class Config:
+        orm_mode = True
+        from_attributes = True
     
 class OrderCreate(BaseModel):
     items: List[OrderItemCreate] = Field(..., description="List of items in the order")

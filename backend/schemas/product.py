@@ -1,10 +1,13 @@
 from pydantic import BaseModel,constr,Field
 from datetime import datetime
 from typing import Optional
-
+from backend.schemas.seller import SellerBase
 class ProductBase(BaseModel):
     product_name: constr(min_length=3, max_length=100) = Field(..., description="Name of the product")
     product_category: Optional[str] = Field(None, description="Category of the product")
+    class Config:
+        orm_mode = True
+        from_attributes = True
     
 
 class Product_create(ProductBase):
@@ -22,7 +25,7 @@ class Product_read(ProductBase):
     price: float
     description: Optional[str] = None
     image_url:str
-
+    seller:SellerBase
     class Config:
         orm_mode = True
         from_attributes = True
