@@ -22,6 +22,12 @@ router=APIRouter(prefix="/user",tags=["Customer"] )
 def register(user:CustomerCreate,db:Session = Depends(get_db)):
     return create_customer(db,user.username,user.email,user.password,user.phone_number,user.address)
 
+
+@router.post("/login",response_model=CustomerRead)
+def login_user(form_data:OAuth2PasswordRequestForm=Depends(),db:Session=Depends(get_db)):
+    return customer_login(db,form_data)
+
+
 @router.patch("/update", response_model=CustomerRead)
 def update_user(
     user_update: CustomerUpdate,

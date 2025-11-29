@@ -15,7 +15,6 @@ from backend.service.seller_service import (
     update_seller_profile,
     delete_seller_account
 )
-from backend.utils.jwt import get_current_seller
 from backend.core.error_handler import error_handler
 router=APIRouter(prefix="/sellers",tags=["Seller Management"] )
 
@@ -52,7 +51,7 @@ def login_seller(form_data:OAuth2PasswordRequestForm=Depends(),db:Session=Depend
     
 
 
-@router.delete("/delete/by_own",status_code=status.HTTP_200_OK)
-def delete_own_seller_account(db:Session=Depends(get_db),
-                          current_user=Depends(get_current_seller)):
-    return delete_own_seller_account(db,current_user)
+# @router.delete("/delete/by_own",status_code=status.HTTP_200_OK)
+# def delete_own_seller_account(db:Session=Depends(get_db),
+#                           current_user=Depends(get)):
+#     return delete_own_seller_account(db,current_user)

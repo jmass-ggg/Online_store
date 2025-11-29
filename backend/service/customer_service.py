@@ -10,6 +10,7 @@ from backend.schemas.customer import (
     CustomerRead,
     TokenResponse,
     CustomerUpdate,
+    LoginResponse
 )
 from backend.utils.jwt import create_token, verify_token,create_refresh_token
 from backend.utils.hashed import  verify_password
@@ -44,12 +45,11 @@ def create_customer(db: Session, username: str, email: str,
 
     return CustomerRead.from_orm(new_user)
 
-def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> TokenResponse:
+def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> LoginResponse:
     """Authenticate user and return JWT access token."""
 
     user = db.query(Customer).filter(Customer.email == form_data.username).first()
-
-    if not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user.hashed_password):
         raise error_handler(status.HTTP_400_BAD_REQUEST, "Invalid credentials")
 
     access_token = create_token({"email": user.email})
@@ -59,12 +59,14 @@ def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> TokenRe
     user_id=user.id,   
     expires_at=exp
     )
+
     db.add(db_refresh)
     db.commit()
 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token
+        
     }
 
 def customer_info_update(

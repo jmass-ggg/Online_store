@@ -28,7 +28,8 @@ def product_add(
     description: str = Form(...),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Seller = get_seller_from_refresh):
+    current_user: Seller = Depends(get_seller_from_refresh)
+):
     return add_product_by_seller(product_name,product_category,stock,price,description,image,db,current_user,UPLOAD_FOLDER)
 
 @router.patch("/{product_id}", response_model=Product_read)

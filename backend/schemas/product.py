@@ -25,7 +25,7 @@ class Product_read(ProductBase):
     price: float
     description: Optional[str] = None
     image_url:str
-    seller:SellerBase
+    
     class Config:
         orm_mode = True
         from_attributes = True

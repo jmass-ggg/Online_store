@@ -43,6 +43,11 @@ class CustomerRead(BaseModel):
         orm_mode = True
         from_attributes = True
 
+class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+
+
 # -------------------------
 class CustomerUpdate(BaseModel):
     username: constr(min_length=5, max_length=15)
