@@ -47,7 +47,7 @@ import secrets
 
 REFRESH_TOKEN_EXPIRE_DAYS = 7  
 
-def create_refresh_token(db: Session, user: Customer) -> str:
+def create_refresh_token(db: Session, user) -> str:
     token = secrets.token_urlsafe(32)  # secure random token
     expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     refresh_token = RefreshToken(
@@ -61,7 +61,18 @@ def create_refresh_token(db: Session, user: Customer) -> str:
     db.refresh(refresh_token)
     return token
 
-def verify_refresh_token(db: Session, token: str) -> Customer:
+def verify_refresh_token_customer(db: Session, token: str) -> Customer:
+    refresh_token = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+    if not refresh_token:
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+
+    if refresh_token.expires_at < datetime.utcnow():
+        db.delete(refresh_token)
+        db.commit()
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Refresh token expired")
+
+    return refresh_token.user_id
+def verify_refresh_token_seller(db: Session, token: str) -> Seller:
     refresh_token = db.query(RefreshToken).filter(RefreshToken.token == token).first()
     if not refresh_token:
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
@@ -82,5 +93,12 @@ def get_current_customer(token: str = Depends(access_schema), db: Session = Depe
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-
+def get_current_seller(token: str = Depends(access_schema), db: Session = Depends(get_db)):
+    email = verify_token(token)
+    if email is None:
+        raise HTTPException(status_code=401, detail="Access token expired")
+    user = db.query(Seller).filter(Seller.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 

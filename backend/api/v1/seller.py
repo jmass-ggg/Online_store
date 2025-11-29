@@ -8,7 +8,7 @@ from backend.schemas.seller import (
     SellerResponse,
     SellerReviewUpdate,
 )
-from backend.schemas.customer import TokenResponse
+from backend.schemas.seller import TokenResponse
 from backend.service.seller_service import (
     create_seller_application,
     seller_login,

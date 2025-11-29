@@ -45,39 +45,41 @@ def create_customer(db: Session, username: str, email: str,
 
     return CustomerRead.from_orm(new_user)
 
-def customer_login(db: Session, email: str, password: str) -> LoginResponse:
-    # Find user by email
-    user = db.query(Customer).filter(Customer.email == email).first()
+def customer_login(db: Session, form_data) -> LoginResponse:
+    user = db.query(Customer).filter(Customer.email == form_data.username).first()
     if not user:
-        raise error_handler(status.HTTP_404_NOT_FOUND, "User not found")
-    
-    # Verify password
-    if not verify_password(password, user.hashed_password):
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Incorrect password")
-    
-    # Create access token
+        raise error_handler(404, "User not found")
+
+    if not verify_password(form_data.password, user.hashed_password):
+        raise error_handler(401, "Incorrect password")
+
     access_token = create_token({"email": user.email})
-    
-    # Create refresh token
-    refresh_token = create_refresh_token(db, user)
-    
-    # Return both tokens
+    refresh_token = create_refresh_token(db, user)  # pass instance
     return LoginResponse(access_token=access_token, refresh_token=refresh_token)
 
 def customer_info_update(
-    db: Session,  user_update: CustomerUpdate,current_user:Customer
+    db: Session,  user_update: CustomerUpdate,user_id
 ) -> CustomerRead:
     """Update user details (self-profile edit)."""
 
-    user = db.query(Customer).filter(Customer.id == current_user.id).first()
+    user = db.query(Customer).filter(Customer.id == user_id).first()
     if not user:
-        raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
+        raise error_handler(status.HTTP_404_NOT_FOUND, "User not found")
 
-    for key, value in user_update.dict(exclude_unset=True).items():
-        setattr(user, key, value)
+    # Optional: check for email or username conflicts
+    if db.query(Customer).filter(Customer.email == user_update.email, Customer.id != user_id).first():
+        raise error_handler(status.HTTP_400_BAD_REQUEST, "Email already in use")
 
+    if db.query(Customer).filter(Customer.username == user_update.username, Customer.id != user_id).first():
+        raise error_handler(status.HTTP_400_BAD_REQUEST, "Username already in use")
+
+    # Update fields
+    user.username = user_update.username
+    user.email = user_update.email
+    user.phone_number = user_update.phone_number
     db.commit()
     db.refresh(user)
+
     return CustomerRead.from_orm(user)
 
 
@@ -94,22 +96,22 @@ def delete_account_by_owner(db: Session, current_user: Customer):
 
     return {"message": "Your account has been deleted successfully."}
 
-def delete_account_by_admin(
-    customer_id: int, db: Session, current_user: Customer
-) -> dict:
-    """Allow an admin to delete another user's account."""
+# def delete_account_by_admin(
+#     customer_id: int, db: Session, current_user: Customer
+# ) -> dict:
+#     """Allow an admin to delete another user's account."""
 
-    if not check_permission(current_user,"delete_other_account"):
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized access")
+#     if not check_permission(current_user,"delete_other_account"):
+#         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized access")
 
-    user = db.query(Customer).filter(Customer.id == customer_id).first()
-    if not user:
-        raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
+#     user = db.query(Customer).filter(Customer.id == customer_id).first()
+#     if not user:
+#         raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
 
-    db.delete(user)
-    db.commit()
+#     db.delete(user)
+#     db.commit()
 
-    return {"message": f"Customer '{user.username}' has been deleted."}
+#     return {"message": f"Customer '{user.username}' has been deleted."}
 
 def get_user(token: str) -> dict:
     """Decode JWT and return user identity."""

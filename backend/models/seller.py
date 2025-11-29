@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, Float, Boolean,
-    DateTime, ForeignKey
+    DateTime, ForeignKey,BigInteger
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from backend.database import Base
@@ -24,11 +24,11 @@ class Seller(Base):
 
     # KYC
     kyc_document_type: Mapped[str] = mapped_column(String, nullable=True)
-    kyc_document_number: Mapped[int] = mapped_column(Integer, nullable=True)
+    kyc_document_number: Mapped[int] = mapped_column(BigInteger, nullable=True)
 
     # Banking
     bank_account_name: Mapped[str] = mapped_column(String, nullable=True)
-    bank_account_number: Mapped[int] = mapped_column(Integer, nullable=True)
+    bank_account_number: Mapped[int] = mapped_column(BigInteger, nullable=True)
     bank_name: Mapped[str] = mapped_column(String, nullable=True)
     bank_branch: Mapped[str] = mapped_column(String, nullable=True)
 

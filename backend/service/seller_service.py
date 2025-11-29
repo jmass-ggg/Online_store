@@ -11,13 +11,14 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate
 )
-from backend.schemas.customer import TokenResponse
+from backend.schemas.customer import LoginResponse
+from backend.schemas.seller import TokenResponse
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.jwt import create_token, verify_token
 from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
-
+from backend.utils.jwt import create_token, verify_token,create_refresh_token
 
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
     """Seller submits application. Default status = PENDING."""
@@ -55,16 +56,22 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
     return SellerResponse.from_orm(seller)
 
 
-def seller_login(db: Session, form_data: OAuth2PasswordRequestForm)->TokenResponse:
-    """Seller logs in using email & password."""
-
+def seller_login(db: Session, form_data) -> TokenResponse:
     seller = db.query(Seller).filter(Seller.email == form_data.username).first()
+    if not seller:
+        raise error_handler(400, "Invalid credentials")
 
-    if not seller :
-        raise error_handler(status.HTTP_400_BAD_REQUEST, "Invalid credentials")
+    if not verify_password(form_data.password, seller.hashed_password):
+        raise error_handler(401, "Incorrect password")
 
-    token = create_token({"email": seller.email})
-    return {"access_token": token, "token_type": "Bearer"}
+    access_token = create_token({"email": seller.email})
+    refresh_token = create_refresh_token(db, seller)
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer"  # <- required field
+    )
 
 
 def update_seller_profile(
@@ -133,3 +140,43 @@ def get_seller_from_token(token: str):
     """Decode JWT and return seller identity."""
     seller_email = verify_token(token)
     return {"email": seller_email}
+# {
+#   "username": "johndoe",
+#   "email": "joh_doe@example.com",
+#   "phone_number": "876543210",
+#   "password": "StrongPass123", 
+
+#   "business_name": "John's Electronics",
+#   "business_type": "Individual",
+#   "business_address": "123 Main Street, Kathmandu, Nepal",
+
+#   "kyc_document_type": "Passport",
+#   "kyc_document_number": 12356789,
+
+#   "bank_account_name": "John De",
+#   "bank_account_number": 987654210,
+#   "bank_name": "Nepal Bank",
+#   "bank_branch": "Thamel Branch",
+
+#   "status": "REJECTED",
+#   "is_verified": false,
+#   "role_name": "Seller"
+# }
+# {
+#   "id": 2,
+#   "username": "asdasd",
+#   "email": "asdasd@example.com",
+#   "phone_number": "8743210",
+#   "status": "REJECTED",
+#   "is_verified": false,
+#   "kyc_document_type": "Passport",
+#   "kyc_document_number": 123789,
+#   "bank_account_name": "John sdfs",
+#   "business_type": "Individual",
+#   "business_address": "123 Main Street, Kathmandu, Nepal",
+#   "bank_account_number": 9876210,
+#   "bank_name": "Nepal Bank",
+#   "bank_branch": "Thamel Branch",
+#   "created_at": "2025-11-29T13:20:49.393242",
+#   "updated_at": "2025-11-29T13:20:49.393249"
+# }

@@ -32,6 +32,10 @@ class SellerApplicationCreate(SellerBase):
     class Config:
         orm_mode = True
         from_attributes = True
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str  # <-- required
 
 class SellerReviewUpdate(BaseModel):
     """
