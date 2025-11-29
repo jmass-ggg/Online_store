@@ -45,36 +45,31 @@ def create_customer(db: Session, username: str, email: str,
 
     return CustomerRead.from_orm(new_user)
 
-def customer_login(db: Session, form_data: OAuth2PasswordRequestForm) -> LoginResponse:
-    """Authenticate user and return JWT access token."""
-
-    user = db.query(Customer).filter(Customer.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise error_handler(status.HTTP_400_BAD_REQUEST, "Invalid credentials")
-
+def customer_login(db: Session, email: str, password: str) -> LoginResponse:
+    # Find user by email
+    user = db.query(Customer).filter(Customer.email == email).first()
+    if not user:
+        raise error_handler(status.HTTP_404_NOT_FOUND, "User not found")
+    
+    # Verify password
+    if not verify_password(password, user.hashed_password):
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Incorrect password")
+    
+    # Create access token
     access_token = create_token({"email": user.email})
-    refresh_token, exp = create_refresh_token()
-    db_refresh = RefreshToken(
-    token=refresh_token,
-    user_id=user.id,   
-    expires_at=exp
-    )
-
-    db.add(db_refresh)
-    db.commit()
-
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token
-        
-    }
+    
+    # Create refresh token
+    refresh_token = create_refresh_token(db, user)
+    
+    # Return both tokens
+    return LoginResponse(access_token=access_token, refresh_token=refresh_token)
 
 def customer_info_update(
-    db: Session,  user_update: CustomerUpdate,current_user
+    db: Session,  user_update: CustomerUpdate,current_user:Customer
 ) -> CustomerRead:
     """Update user details (self-profile edit)."""
 
-    user = db.query(Customer).filter(Customer.id == current_user).first()
+    user = db.query(Customer).filter(Customer.id == current_user.id).first()
     if not user:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
 

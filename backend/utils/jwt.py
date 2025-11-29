@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models.customer import Customer
 from backend.models.seller import Seller
-from backend.utils.auth import auth2_schema
+from backend.utils.auth import access_schema,refresh_schema
 from backend.core.error_handler import error_handler
 from pydantic import BaseSettings
 import secrets
@@ -42,40 +42,45 @@ def verify_token(Token:str):
     except JWTError:
         raise error_handler(status.HTTP_401_UNAUTHORIZED,"Invalid or expired token")
 
-def create_refresh_token():
-    token = secrets.token_hex(40)
-    expire = datetime.utcnow() + timedelta(days=30)
-    return token, expire
 
-def verify_refresh_token(refresh_token: str, db: Session):
-    token_obj = db.query(RefreshToken).filter(
-        RefreshToken.token == refresh_token,
-        RefreshToken.revoked == False
-    ).first()
-    if not token_obj or token_obj.expires_at < datetime.utcnow():
+import secrets
+
+REFRESH_TOKEN_EXPIRE_DAYS = 7  
+
+def create_refresh_token(db: Session, user: Customer) -> str:
+    token = secrets.token_urlsafe(32)  # secure random token
+    expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = RefreshToken(
+        token=token,
+        user_id=user.id,
+        expires_at=expires_at
+    )
+
+    db.add(refresh_token)
+    db.commit()
+    db.refresh(refresh_token)
+    return token
+
+def verify_refresh_token(db: Session, token: str) -> Customer:
+    refresh_token = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+    if not refresh_token:
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
 
-    return token_obj
+    if refresh_token.expires_at < datetime.utcnow():
+        db.delete(refresh_token)
+        db.commit()
+        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Refresh token expired")
 
-def get_customer_from_refresh(
-    refresh_token: str = Depends(auth2_schema),
-    db: Session = Depends(get_db)
-) -> Customer:
-    refresh = verify_refresh_token(refresh_token, db)
+    return refresh_token.user_id
 
-    user = db.query(Customer).filter(Customer.id == refresh.user_id).first()
+def get_current_customer(token: str = Depends(access_schema), db: Session = Depends(get_db)):
+    email = verify_token(token)
+    if email is None:
+        raise HTTPException(status_code=401, detail="Access token expired")
+    user = db.query(Customer).filter(Customer.email == email).first()
     if not user:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "User not found")
-
+        raise HTTPException(status_code=404, detail="User not found")
     return user
-def get_seller_from_refresh(
-    refresh_token: str = Depends(auth2_schema),
-    db: Session = Depends(get_db)
-) -> Seller:
-    refresh = verify_refresh_token(refresh_token, db)
 
-    seller = db.query(Seller).filter(Seller.id == refresh.user_id).first()
-    if not seller:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "User not found")
 
-    return seller
+

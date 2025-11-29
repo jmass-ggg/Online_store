@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status, Security
 from backend.database import get_db
-from backend.utils.auth import auth2_schema
+
 
 def check_permission(user,action:str):
     role=user.role_name
