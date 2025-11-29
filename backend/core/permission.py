@@ -11,7 +11,8 @@ def check_permission(user,action:str):
             "verify_seller": True,
             "list_users": True,
             "change_user_role": True,
-            "approved_application":True
+            "approved_application":True,
+            
         },
         "Customer": 
         {  # Customer
