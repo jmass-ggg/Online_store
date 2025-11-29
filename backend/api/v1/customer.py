@@ -34,8 +34,6 @@ def update_user(
 ):
     return customer_info_update(db, user_update, current_user.id)
 
-
-
 @router.delete("/delete",status_code=status.HTTP_200_OK)
 def delete_own_account(db:Session=Depends(get_db),current_user:Customer=Depends(get_current_customer)):
     return delete_account_by_owner(db,current_user)

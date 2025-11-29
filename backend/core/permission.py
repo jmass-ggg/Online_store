@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status, Security
 from backend.database import get_db
-
+from backend.utils.jwt import get_current_customer,get_current_seller
 
 def check_permission(user,action:str):
     role=user.role_name
@@ -31,3 +31,19 @@ def check_permission(user,action:str):
     }
     role_permission=permission.get(role,{})
     return role_permission.get(action,False)
+
+def require_permission(action: str, get_user=Depends):
+    """
+    Dependency factory for permissions.
+    Example:
+        Depends(require_permission("delete_other_account", get_current_customer))
+        Depends(require_permission("add_product", get_current_seller))
+    """
+    def dependency(current_user = Depends(get_user)):
+        if not check_permission(current_user, action):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied for action: {action}"
+            )
+        return current_user
+    return dependency
