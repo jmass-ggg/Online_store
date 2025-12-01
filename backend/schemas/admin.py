@@ -19,3 +19,8 @@ class AdminRead(BaseModel):
     class Config:
         orm_mdoe=True
         from_orm=True
+        
+class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
