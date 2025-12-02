@@ -1,5 +1,9 @@
-
 from fastapi.security import OAuth2PasswordBearer
 
-access_schema = OAuth2PasswordBearer(tokenUrl="user/login")
-refresh_schema = OAuth2PasswordBearer(tokenUrl="user/refresh")
+customer_schema = OAuth2PasswordBearer(tokenUrl="/user/login")
+
+admin_schema = OAuth2PasswordBearer(tokenUrl="/admin/login")
+
+seller_schema = OAuth2PasswordBearer(tokenUrl="/seller/login")
+
+refresh_schema = OAuth2PasswordBearer(tokenUrl="/user/refresh")

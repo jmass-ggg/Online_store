@@ -1,17 +1,24 @@
-from fastapi import APIRouter, Depends, status,Form
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from backend.database import get_db
-from backend.schemas.admin import AdminLogin,LoginResponse
-from backend.utils.jwt import get_current_customer,create_refresh_token
+from backend.utils.jwt import create_token, create_refresh_token
 from backend.models.admin import Admin
-from backend.service.admin_service import(
-    admin_login
-)
+from backend.utils.hashed import verify_password
+from backend.schemas.admin import LoginResponse
+from backend.
+router = APIRouter(prefix="/admin", tags=["Admin Authentication"])
 
+@router.post("/login", response_model=LoginResponse)
+def admin_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    admin = db.query(Admin).filter(Admin.email == form.username).first()
+    if not admin:
+        raise eror(status_code=404)
 
-router=APIRouter(prefix="/admin",tags="Admin Authanization")
+    if not verify_password(form.password, admin.hashed_password):
+        raise HTTPException(status_code=401)
 
-@router.post("/login",response_model=LoginResponse)
-def login_admin(form_data: OAuth2PasswordRequestForm,db: Session):
-    return admin_login(db,form_data)
+    access = create_token({"email": admin.email})
+    refresh = create_refresh_token(db, admin)
+
+    return LoginResponse(access_token=access, refresh_token=refresh)

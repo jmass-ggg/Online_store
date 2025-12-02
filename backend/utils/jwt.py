@@ -7,7 +7,10 @@ from backend.database import get_db
 from backend.models.customer import Customer
 from backend.models.admin import Admin
 from backend.models.seller import Seller
-from backend.utils.auth import access_schema,refresh_schema
+from backend.utils.auth import (
+    customer_schema,admin_schema,seller_schema,refresh_schema
+)
+
 from backend.core.error_handler import error_handler
 from pydantic import BaseSettings
 import secrets
@@ -85,27 +88,32 @@ def verify_refresh_token_seller(db: Session, token: str) -> Seller:
 
     return refresh_token.user_id
 
-def get_current_customer(token: str = Depends(access_schema), db: Session = Depends(get_db)):
+def get_current_customer(
+    token: str = Depends(customer_schema),
+    db: Session = Depends(get_db)
+):
     email = verify_token(token)
-    if email is None:
-        raise HTTPException(status_code=401, detail="Access token expired")
     user = db.query(Customer).filter(Customer.email == email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise error_handler(404, "Customer not found")
     return user
 
-def get_current_seller(token: str = Depends(access_schema), db: Session = Depends(get_db)):
+
+def get_current_seller(
+    token: str = Depends(seller_schema),
+    db: Session = Depends(get_db)
+):
     email = verify_token(token)
-    if email is None:
-        raise HTTPException(status_code=401, detail="Access token expired")
     user = db.query(Seller).filter(Seller.email == email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise error_handler(404, "Seller not found")
     return user
 
-def get_current_admin(token: str = Depends(access_schema), db: Session = Depends(get_db)):
+
+def get_current_admin(token: str = Depends(admin_schema),
+    db: Session = Depends(get_db)):
     email = verify_token(token)
     user = db.query(Admin).filter(Admin.email == email).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin not found")
+        raise error_handler(401, "Admin not found")
     return user
