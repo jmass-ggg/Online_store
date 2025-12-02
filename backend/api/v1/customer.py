@@ -14,7 +14,7 @@ from backend.service.customer_service import (
     # delete_account_by_admin,
     get_user
 )
-from backend.utils.auth import access_schema
+from backend.utils.auth import customer_schema
 
 router=APIRouter(prefix="/user",tags=["Customer"] )
 
@@ -48,7 +48,7 @@ def delete_own_account(db:Session=Depends(get_db),current_user:Customer=Depends(
 
 
 @router.get("/me")
-def get_current_user(token:str=Depends(access_schema)):
+def get_current_user(token:str=Depends(customer_schema)):
     return get_user(token)
 
 from backend.utils.jwt import create_token,refresh_schema,verify_refresh_token_customer

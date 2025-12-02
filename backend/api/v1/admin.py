@@ -6,17 +6,17 @@ from backend.utils.jwt import create_token, create_refresh_token
 from backend.models.admin import Admin
 from backend.utils.hashed import verify_password
 from backend.schemas.admin import LoginResponse
-from backend.
+from backend.core.error_handler import error_handler
 router = APIRouter(prefix="/admin", tags=["Admin Authentication"])
 
 @router.post("/login", response_model=LoginResponse)
 def admin_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     admin = db.query(Admin).filter(Admin.email == form.username).first()
     if not admin:
-        raise eror(status_code=404)
+        raise error_handler(404)
 
     if not verify_password(form.password, admin.hashed_password):
-        raise HTTPException(status_code=401)
+        raise error_handler(401)
 
     access = create_token({"email": admin.email})
     refresh = create_refresh_token(db, admin)

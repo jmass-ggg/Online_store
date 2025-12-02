@@ -25,7 +25,7 @@ from backend.service.seller_service import (
     delete_seller_account
 )
 from backend.models.seller import Seller
-from backend.utils.auth import seller_access_schema, seller_refresh_schema
+from backend.utils.auth import seller_schema
 
 from backend.core.error_handler import error_handler
 router=APIRouter(prefix="/sellers",tags=["Seller Management"] )
