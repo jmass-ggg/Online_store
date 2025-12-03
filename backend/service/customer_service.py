@@ -96,22 +96,6 @@ def delete_account_by_owner(db: Session, current_user: Customer):
 
     return {"message": "Your account has been deleted successfully."}
 
-# def delete_account_by_admin(
-#     customer_id: int, db: Session, current_user: Customer
-# ) -> dict:
-#     """Allow an admin to delete another user's account."""
-
-#     if not check_permission(current_user,"delete_other_account"):
-#         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized access")
-
-#     user = db.query(Customer).filter(Customer.id == customer_id).first()
-#     if not user:
-#         raise error_handler(status.HTTP_404_NOT_FOUND, "Customer not found")
-
-#     db.delete(user)
-#     db.commit()
-
-#     return {"message": f"Customer '{user.username}' has been deleted."}
 
 def get_user(token: str) -> dict:
     """Decode JWT and return user identity."""
