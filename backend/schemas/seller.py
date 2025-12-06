@@ -100,7 +100,7 @@ class SellerUpdate(BaseModel):
 
 class SellerVerificationUpdate(BaseModel):
     status:str
-    is_verified:str
+    is_verified:bool
     class Config:
         orm_mode = True
         from_attributes = True

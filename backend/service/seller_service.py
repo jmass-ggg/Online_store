@@ -73,18 +73,24 @@ def seller_login(db: Session, form_data) -> TokenResponse:
     )
 
 
-def admin_approve_account(db:Session,seller_id:int,seller_approved=SellerVerificationUpdate):
-    seller=db.query(Seller).filter(Seller.id == seller_id).first()
+def admin_approve_account(
+    db: Session,
+    seller_id: int,
+    seller_approved: SellerVerificationUpdate
+):
+    seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
-        raise error_handler(status.HTTP_404_NOT_FOUND,"Seller not found")
-    
-    seller.status=seller_approved.status,
-    seller.is_verified=seller_approved.is_verified
-    seller.updated_at=datetime.utcnow()
-    
+        raise error_handler(404, "Seller not found")
+
+    # Make sure these are the correct types
+    seller.status = seller_approved.status
+    seller.is_verified = seller_approved.is_verified
+    seller.updated_at = datetime.utcnow()
+
     db.commit()
-    db.refresh(Seller)
+    db.refresh(seller)
     return SellerResponse.from_orm(seller)
+
     
 
 
