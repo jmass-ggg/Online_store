@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from backend.api.v1 import customer,product,order,review,seller,admin
+from backend.api.v1 import customer,product,order,review,seller,admin,login
 from backend.database import Base, engine
 
 app = FastAPI()
@@ -26,6 +26,7 @@ Base.metadata.create_all(bind=engine)
 
 
 # Routers
+app.include_router(login.router)
 app.include_router(customer.router)
 app.include_router(product.router)
 app.include_router(order.router)
