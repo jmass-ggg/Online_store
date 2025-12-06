@@ -22,6 +22,7 @@ class Product_create(ProductBase):
     
     
 class Product_read(ProductBase):
+    id:int
     stock: int
     price: float
     description: Optional[str] = None
