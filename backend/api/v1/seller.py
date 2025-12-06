@@ -6,14 +6,14 @@ from backend.database import get_db
 from backend.schemas.seller import (
     SellerApplicationCreate,
     SellerResponse,
-    SellerReviewUpdate,
+    SellerReviewUpdate,SellerVerificationUpdate
 )
 from backend.utils.jwt import create_token,create_refresh_token
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from backend.database import get_db
-from backend.utils.jwt import create_token, create_refresh_token
+from backend.utils.jwt import create_token, create_refresh_token,get_current_seller,get_current_admin
 from backend.models.seller import Seller
 from backend.utils.hashed import verify_password
 from backend.schemas.customer import LoginResponse
@@ -22,7 +22,8 @@ from backend.service.seller_service import (
     create_seller_application,
     seller_login,
     update_seller_profile,
-    delete_seller_account
+    delete_seller_account,
+    admin_approve_account
 )
 from backend.models.seller import Seller
 from backend.utils.auth import oauth2_scheme
@@ -49,32 +50,12 @@ def seller_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depe
 
 
 
-# ---------------------------------------------------------
-# 2) Approve/Reject Seller (Admin Only)
-# ---------------------------------------------------------
-# @router.put("/{seller_id}/review", response_model=SellerResponse)
-# def review_seller(
-#     seller_id: int,
-#     review: SellerReviewUpdate,
-#     db: Session = Depends(get_db),
-#     current_user=Depends(get_current_user),
-# ):
-#     # check_permission happens inside get_current_user or middleware
-#     try:
-#         seller = SellerService.approve(db, seller_id) if review.status == "APPROVED" else None
-#         # you can also add reject() method in service if needed
-#         return seller
-#     except DomainError as e:
-#         raise e.to_http()
 
-# @router.delete("/admin/{seller_id}/delete",status_code=status.HTTP_200_OK)
-# def delete_seller_account(seller_id:int,
-#                           db:Session=Depends(get_db),
-#                           current_user=Depends(get_current_user)):
-    
-
-
-# @router.delete("/delete/by_own",status_code=status.HTTP_200_OK)
-# def delete_own_seller_account(db:Session=Depends(get_db),
-#                           current_user=Depends(get)):
-#     return delete_own_seller_account(db,current_user)
+@router.put("/{seller_id}/approved", response_model=SellerResponse)
+def review_seller(
+    seller_id: int,
+    seller_approved:SellerVerificationUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_admin),
+):
+    return admin_approve_account(db,seller_id,seller_approved)

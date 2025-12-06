@@ -32,6 +32,7 @@ class SellerApplicationCreate(SellerBase):
     class Config:
         orm_mode = True
         from_attributes = True
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -93,6 +94,13 @@ class SellerUpdate(BaseModel):
 
     business_license_number: Optional[str] = None
     business_license_url: Optional[str] = None
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+class SellerVerificationUpdate(BaseModel):
+    status:str
+    is_verified:str
     class Config:
         orm_mode = True
         from_attributes = True

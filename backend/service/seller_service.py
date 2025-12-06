@@ -9,7 +9,7 @@ from backend.schemas.seller import (
    SellerApplicationCreate,
    SellerReviewUpdate,
    SellerResponse,
-   SellerUpdate
+   SellerUpdate,SellerVerificationUpdate
 )
 from backend.schemas.customer import LoginResponse
 from backend.schemas.seller import TokenResponse
@@ -55,7 +55,6 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
 
     return SellerResponse.from_orm(seller)
 
-
 def seller_login(db: Session, form_data) -> TokenResponse:
     seller = db.query(Seller).filter(Seller.email == form_data.username).first()
     if not seller:
@@ -72,6 +71,22 @@ def seller_login(db: Session, form_data) -> TokenResponse:
         refresh_token=refresh_token,
         token_type="bearer"  # <- required field
     )
+
+
+def admin_approve_account(db:Session,seller_id:int,seller_approved=SellerVerificationUpdate):
+    seller=db.query(Seller).filter(Seller.id == seller_id).first()
+    if not seller:
+        raise error_handler(status.HTTP_404_NOT_FOUND,"Seller not found")
+    
+    seller.status=seller_approved.status,
+    seller.is_verified=seller_approved.is_verified
+    seller.updated_at=datetime.utcnow()
+    
+    db.commit()
+    db.refresh(Seller)
+    return SellerResponse.from_orm(seller)
+    
+
 
 
 def update_seller_profile(
