@@ -38,31 +38,31 @@ def product_edit(
     product_id: int,
     product_update: Product_update,
     db: Session = Depends(get_db),
-    current_user: Seller = Depends(get_current_seller)
+    current_user: Seller = Depends(verify_seller_or_not)
 ):
     
     return edit_product_by_seller(db,product_id,product_update,current_user)
 
 @router.delete("/{product_id}/admin",status_code=status.HTTP_200_OK)
 def delete_product(product_id:int,db:Session=Depends(get_db),
-                current_user:Seller=Depends(get_current_seller)
+                current_user:Seller=Depends(verify_seller_or_not)
 ):
     return delete_product_by_admin(db,product_id,current_user)
 
 @router.delete("/{product_id}/seller",status_code=status.HTTP_200_OK)
 def delete_product(product_id:int,db:Session=Depends(get_db),
-                current_user:Seller=Depends(get_current_seller)
+                current_user:Seller=Depends(verify_seller_or_not)
 ):
     return delete_product_by_seller(db,product_id)
 
 @router.get("/{product_id}",response_model=Product_read)
 def get_product(product_id:int,db:Session=Depends(get_db),
-                current_user:Seller=Depends(get_current_seller)
+                current_user:Seller=Depends(verify_seller_or_not)
 ):
     return veiw_product(db,product_id,current_user)
 
 @router.get("/",response_model=List[Product_read])
 def get_all_product(db:Session=Depends(get_db)
-                    ,current_user:Seller=Depends(get_current_seller)
+                    ,current_user:Seller=Depends(verify_seller_or_not)
 ):
     return view_all_product(db)
