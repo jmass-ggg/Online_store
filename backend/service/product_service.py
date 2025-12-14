@@ -115,7 +115,7 @@ def delete_product_by_seller(
 def veiw_product(
     db: Session,
     product_id: int,
-    current_user: Seller
+    
 ) -> Product_read:
     """
     Retrieve details of a single product.
