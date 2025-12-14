@@ -29,7 +29,7 @@ from backend.models.seller import Seller
 from backend.utils.auth import oauth2_scheme
 
 from backend.core.error_handler import error_handler
-router=APIRouter(prefix="/sellers",tags=["Seller Management"] )
+router=APIRouter(prefix="/sellers",tags=["Seller "] )
 
 @router.post("/apply", response_model=SellerResponse, status_code=201)
 def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
