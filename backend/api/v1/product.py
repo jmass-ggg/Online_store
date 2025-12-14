@@ -63,6 +63,6 @@ def get_product(product_id:int,db:Session=Depends(get_db),
 
 @router.get("/",response_model=List[Product_read])
 def get_all_product(db:Session=Depends(get_db)
-                    ,current_user:Seller=Depends(verify_seller_or_not)
+                    
 ):
     return view_all_product(db)
