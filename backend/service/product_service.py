@@ -25,9 +25,6 @@ def add_product_by_seller(
     """
     Allow a seller to add a new product with image upload.
     """
-    if not check_permission(current_user, "add_product"):
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
-
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     file_location = os.path.join(UPLOAD_FOLDER, image.filename)
 
@@ -64,12 +61,6 @@ def edit_product_by_seller(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-
-    can_edit_any = check_permission(current_user, "edit_any_product")
-    can_edit_own = check_permission(current_user, "edit_own_product") and product.seller_id == current_user.id
-
-    if not (can_edit_any or can_edit_own):
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
     update_data = product_update.dict(exclude_unset=True)
     for key, value in update_data.items():

@@ -21,7 +21,13 @@ from backend.core.error_handler import error_handler
 from backend.utils.jwt import create_token, verify_token,create_refresh_token,get_current_seller
 
 
-def verify_seller_or_not(seller:Seller=Depends(get_current_seller)):
-    if seller.is_verified == "REJECTED" or seller.status != False:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED,"Not authorized")
+def verify_seller_or_not(
+    seller: Seller = Depends(get_current_seller)
+):
+    if seller.status == "REJECTED":
+        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller rejected")
+
+    if not seller.is_verified:
+        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
+
     return seller

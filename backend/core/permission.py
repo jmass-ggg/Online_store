@@ -3,7 +3,7 @@ from backend.database import get_db
 from backend.utils.jwt import get_current_customer,get_current_seller
 
 def check_permission(user,action:str):
-    role=user.role_name
+    roles=user.role_name
     permission={
         "Admin": {  # Admin
             "delete_other_account":True,
@@ -30,7 +30,7 @@ def check_permission(user,action:str):
             "view_orders":True
         }
     }
-    role_permission=permission.get(role,{})
+    role_permission=permission.get(roles,{})
     return role_permission.get(action,False)
 
 def require_permission(action: str, get_user=Depends):

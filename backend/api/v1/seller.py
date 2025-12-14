@@ -53,4 +53,4 @@ def seller_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depe
 
 @router.get("/me")
 def get_current_user(token:str=Depends(oauth2_scheme)):
-    return get_seller_from_token(token)
+    return get(token)

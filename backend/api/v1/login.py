@@ -30,7 +30,7 @@ def unified_login(
     if admin:
         if not verify_password(password, admin.hashed_password):
             raise error_handler(401, "Invalid password")
-        access = create_token({"role": "admin", "email": admin.email})
+        access = create_token(email=admin.email, role="Admin")
         refresh = create_refresh_token(db, admin)
         return LoginResponse(access_token=access, refresh_token=refresh)
 
@@ -39,7 +39,7 @@ def unified_login(
     if seller:
         if not verify_password(password, seller.hashed_password):
             raise error_handler(401, "Invalid password")
-        access = create_token({"role": "seller", "email": seller.email})
+        access = create_token(email=seller.email, role="Seller")
         refresh = create_refresh_token(db, seller)
         return LoginResponse(access_token=access, refresh_token=refresh)
 
@@ -48,7 +48,7 @@ def unified_login(
     if customer:
         if not verify_password(password, customer.hashed_password):
             raise error_handler(401, "Invalid password")
-        access = create_token({"role": "customer", "email": customer.email})
+        access = create_token(email=customer.email, role="Customer")
         refresh = create_refresh_token(db, customer)
         return LoginResponse(access_token=access, refresh_token=refresh)
 

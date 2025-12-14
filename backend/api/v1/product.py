@@ -29,9 +29,9 @@ def product_add(
     description: str = Form(...),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_seller: Seller = Depends(verify_seller_or_not)
+    current_seller: Seller = Depends(get_current_seller)
 ):
-    return add_product_by_seller(product_name,product_category,stock,price,description,image,db,UPLOAD_FOLDER)
+    return add_product_by_seller(product_name,product_category,stock,price,description,image,db,current_seller,UPLOAD_FOLDER)
 
 @router.patch("/{product_id}", response_model=Product_read)
 def product_edit(
