@@ -23,7 +23,8 @@ from backend.service.seller_service import (
     seller_login,
     update_seller_profile,
     delete_seller_account,
-    admin_approve_account
+    admin_approve_account,
+    get_seller_from_token
 )
 from backend.models.seller import Seller
 from backend.utils.auth import oauth2_scheme
@@ -49,3 +50,7 @@ def seller_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depe
     return LoginResponse(access_token=access, refresh_token=refresh)
 
 
+
+@router.get("/me")
+def get_current_user(token:str=Depends(oauth2_scheme)):
+    return get_seller_from_token(token)

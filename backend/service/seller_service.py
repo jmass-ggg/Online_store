@@ -92,9 +92,6 @@ def admin_approve_account(
     return SellerResponse.from_orm(seller)
 
     
-
-
-
 def update_seller_profile(
     db: Session,
     seller_update: SellerUpdate,
@@ -158,6 +155,6 @@ def delete_seller_by_admin(
 
 
 def get_seller_from_token(token: str):
-    """Decode JWT and return seller identity."""
+    
     seller_email = verify_token(token)
     return {"email": seller_email}
