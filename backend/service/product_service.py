@@ -83,7 +83,6 @@ def edit_product_by_seller(
 def delete_product_by_admin(
     db: Session,
     product_id: int,
-    current_user: Seller
 ) -> dict:
     """
     Allow admin to delete any product.

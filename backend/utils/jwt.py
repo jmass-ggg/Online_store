@@ -126,6 +126,7 @@ def get_current_seller(
     return person
 
 
+
 def get_current_admin(
     user=Depends(get_current_user),
     db: Session = Depends(get_db)
