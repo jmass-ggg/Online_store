@@ -49,8 +49,6 @@ def seller_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depe
     return LoginResponse(access_token=access, refresh_token=refresh)
 
 
-
-
 @router.put("/{seller_id}/approved", response_model=SellerResponse)
 def review_seller(
     seller_id: int,

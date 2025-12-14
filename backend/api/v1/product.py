@@ -6,6 +6,7 @@ from backend.database import get_db
 from backend.schemas.product import Product_create, Product_read, Product_update
 from backend.models.seller import Seller
 from backend.utils.jwt import get_current_seller
+from backend.utils.verifyied import verify_seller_or_not
 from backend.service.product_service import (
     add_product_by_seller,
     edit_product_by_seller,
@@ -28,9 +29,9 @@ def product_add(
     description: str = Form(...),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Seller = Depends(get_current_seller)
+    current_seller: Seller = Depends(verify_seller_or_not)
 ):
-    return add_product_by_seller(product_name,product_category,stock,price,description,image,db,current_user,UPLOAD_FOLDER)
+    return add_product_by_seller(product_name,product_category,stock,price,description,image,db,UPLOAD_FOLDER)
 
 @router.patch("/{product_id}", response_model=Product_read)
 def product_edit(
