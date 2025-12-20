@@ -3,8 +3,10 @@ import "./Login.css";
 import backgroundImage from "../assests/images/qq.jpg";
 
 const Login = ({ switchPage, handleLogin }) => {
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -16,65 +18,56 @@ const Login = ({ switchPage, handleLogin }) => {
   };
 
   return (
-    <div className="page" style={{ backgroundImage: `url(${backgroundImage})` }}>
-      <div className="login-card">
-        <h1>JAMES</h1>
-        <form onSubmit={onSubmit}>
-          <div className="form-group">
-            <label>Email</label>
-            <div className="input-wrapper">
-              <span className="icon">👤</span>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-          </div>
+    <div
+      className="page"
+      style={{ backgroundImage: `url(${backgroundImage})` }}
+    >
+      <div className="overlay" />
 
-          <div className="form-group">
-            <label>Password</label>
-            <div className="input-wrapper">
-              <span className="icon">🔒</span>
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-              />
-              <span
-                className="eye"
-                role="button"
-                tabIndex={0}
-                onClick={() => setShowPassword(!showPassword)}
-                onKeyDown={(e) => e.key === "Enter" && setShowPassword(!showPassword)}
-              >
-                👁
-              </span>
-            </div>
-          </div>
+      <header className="top-bar">
+        <span className="logo">JAMES</span>
+        <div className="top-actions">
+          <button onClick={switchPage}>Sign Up</button>
+          <button className="link">Log In</button>
+        </div>
+      </header>
 
-          <div className="options">
-            <label className="remember">
-              <input type="checkbox" />
-              Remember me
-            </label>
-          </div>
+      <div className="login-container">
+        <form className="login-card" onSubmit={onSubmit}>
+          <h1 className="login">LOGIN</h1>
+          <input
+            type="email"
+            name="email"
+            placeholder="username"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
 
+          <input
+            type="password"
+            name="password"
+            placeholder="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
+          
           <button type="submit" className="login-btn">
-            LOGIN
+            Log In
           </button>
-        </form>
 
-        <button className="signup" onClick={switchPage}>
-          Don't have an account? Register
-        </button>
+          <p className="footer-text" onClick={switchPage}>
+            Don’t have an account?
+          </p>
+        </form>
       </div>
+
+      <footer className="footer-links">
+        <span>About</span>
+        <span>Help</span>
+        <span>Privacy & Terms</span>
+      </footer>
     </div>
   );
 };

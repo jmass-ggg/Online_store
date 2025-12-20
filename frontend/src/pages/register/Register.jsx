@@ -10,7 +10,6 @@ const Register = ({ switchPage, handleRegister }) => {
     password: "",
     address: "",
   });
-  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -22,110 +21,87 @@ const Register = ({ switchPage, handleRegister }) => {
   };
 
   return (
-    <div className="page" style={{ backgroundImage: `url(${backgroundImage})` }}>
-      <div className="login-card">
-        <h1>JAMES</h1>
-        <form onSubmit={onSubmit}>
-          <div className="form-group">
-            <label>Username</label>
-            <div className="input-wrapper">
-              <span className="icon">👤</span>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                placeholder="Enter username"
-                required
-              />
-            </div>
-          </div>
+    <div
+      className="page"
+      style={{ backgroundImage: `url(${backgroundImage})` }}
+    >
+      <div className="overlay" />
 
-          <div className="form-group">
-            <label>Email</label>
-            <div className="input-wrapper">
-              <span className="icon">📧</span>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter email"
-                required
-              />
-            </div>
-          </div>
+      {/* HEADER */}
+      <header className="top-bar">
+        <span className="logo">JAMES</span>
+        <div className="top-actions">
+          <button className="link">Sign Up</button>
+          <button onClick={switchPage}>Log In</button>
+        </div>
+      </header>
 
-          <div className="form-group">
-            <label>Phone Number</label>
-            <div className="input-wrapper">
-              <span className="icon">📞</span>
-              <input
-                type="tel"
-                name="phone_number"
-                value={formData.phone_number}
-                onChange={handleChange}
-                placeholder="Enter phone number"
-                required
-              />
-            </div>
-          </div>
+      {/* REGISTER FORM */}
+      <div className="register-container">
+        
+        <form className="register-card" onSubmit={onSubmit}>
+          <h1 className="Register">REGISTER</h1>
+          <input
+            type="text"
+            name="username"
+            placeholder="username"
+            value={formData.username}
+            onChange={handleChange}
+            required
+          />
 
-          <div className="form-group">
-            <label>Password</label>
-            <div className="input-wrapper">
-              <span className="icon">🔒</span>
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter password"
-                required
-              />
-              <span
-                className="eye"
-                role="button"
-                tabIndex={0}
-                onClick={() => setShowPassword(!showPassword)}
-                onKeyDown={(e) => e.key === "Enter" && setShowPassword(!showPassword)}
-              >
-                👁
-              </span>
-            </div>
-          </div>
+          <input
+            type="email"
+            name="email"
+            placeholder="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
 
-          <div className="form-group">
-            <label>Address</label>
-            <div className="input-wrapper">
-              <span className="icon">🏠</span>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="Enter address"
-                required
-              />
-            </div>
-          </div>
+          <input
+            type="tel"
+            name="phone_number"
+            placeholder="phone number"
+            value={formData.phone_number}
+            onChange={handleChange}
+            required
+          />
 
-          <div className="options">
-            <label className="remember">
-              <input type="checkbox" required />
-              I agree to the terms & conditions
-            </label>
-          </div>
+          <input
+            type="password"
+            name="password"
+            placeholder="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
 
-          <button type="submit" className="login-btn">
-            REGISTER
+          <input
+            type="text"
+            name="address"
+            placeholder="address"
+            value={formData.address}
+            onChange={handleChange}
+            required
+          />
+
+          <button type="submit" className="register-btn">
+            Register
           </button>
-        </form>
 
-        <button className="signup" onClick={switchPage}>
-          Already have an account? Login
-        </button>
+          <p className="footer-text" onClick={switchPage}>
+            Already have an account?
+          </p>
+        </form>
       </div>
+
+      {/* FOOTER */}
+      <footer className="footer-links">
+        <span>About</span>
+        <span>Help</span>
+        <span>Privacy & Terms</span>
+      </footer>
     </div>
   );
 };
