@@ -1,6 +1,7 @@
 from pydantic import BaseModel,Field
 from backend.schemas.product import Product_read
 from decimal import Decimal
+
 class OrderItemBase(BaseModel):
     product_id: int=Field(...,description="Id of the product being order")
     quantity: int=Field(...,description="Quantity of the order product")

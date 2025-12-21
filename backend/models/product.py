@@ -1,8 +1,16 @@
 from __future__ import annotations
 from datetime import datetime
-from sqlalchemy import Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Integer, String, Float, ForeignKey, DateTime,Numeric
+from decimal import Decimal
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
+from enum import Enum as PyEnum
+
+class ProductCategory(PyEnum):
+    CLOTHES = "Clothes"
+    ACCESSORIES = "Accessories"
+    FOOTWEAR = "Footwear"
+    JEWELRY = "Jewelry"
 
 class Product(Base):
     __tablename__ = "product"
@@ -10,10 +18,10 @@ class Product(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     product_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    product_category: Mapped[str] = mapped_column(String, nullable=False)
+    product_category: Mapped[str] = mapped_column(PyEnum(ProductCategory),nullable=False)
     stock: Mapped[int] = mapped_column(Integer, default=0)
-    price: Mapped[float] = mapped_column(Float, nullable=False)
-    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    price: Mapped[Decimal] = mapped_column(Numeric(10,2))
+    description: Mapped[str | None] = mapped_column(String)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("seller.id"), nullable=False)
