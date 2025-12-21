@@ -3,11 +3,13 @@ from datetime import datetime
 from typing import Optional
 from backend.schemas.seller import SellerBase
 from decimal import Decimal
+
 class ProductBase(BaseModel):
+
     product_name: constr(min_length=3, max_length=100) = Field(..., description="Name of the product")
     product_category: str = Field(None, description="Category of the product")
     @validator("product_category")
-    def check_category(cls,v);
+    def check_category(cls,v):
         valid_categories=["Clothes", "Accessories", "Footwear", "Jewelry"]
         if v not in valid_categories:
             raise ValueError("Invalid category")

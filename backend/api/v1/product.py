@@ -5,7 +5,7 @@ from typing import List
 from backend.database import get_db
 from backend.schemas.product import Product_create, Product_read, Product_update
 from backend.models.seller import Seller
-from backend.utils.jwt import get_current_seller
+from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.utils.verifyied import verify_seller_or_not
 from backend.service.product_service import (
     add_product_by_seller,
@@ -44,13 +44,13 @@ def product_edit(
     return edit_product_by_seller(db,product_id,product_update,current_user)
 
 @router.delete("/{product_id}/admin",status_code=status.HTTP_200_OK)
-def delete_product(product_id:int,db:Session=Depends(get_db),
-                current_user:Seller=Depends(verify_seller_or_not)
+def admin_delete_product(product_id:int,db:Session=Depends(get_db),
+                current_user:Seller=Depends(get_current_admin)
 ):
-    return delete_product_by_admin(db,product_id,current_user)
+    return delete_product_by_admin(db,product_id,current_user,current_user)
 
 @router.delete("/{product_id}/seller",status_code=status.HTTP_200_OK)
-def delete_product(product_id:int,db:Session=Depends(get_db),
+def seller_delete_product(product_id:int,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
     return delete_product_by_seller(db,product_id)

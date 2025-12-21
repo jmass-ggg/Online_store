@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import os
 import shutil
+from decimal import Decimal
 
 from backend.database import get_db
 from backend.models.product import Product
@@ -14,12 +15,12 @@ from backend.core.error_handler import error_handler
 def add_product_by_seller(
     product_name: str,
     product_category: str,
-    stock: str,
-    price: float,
+    stock: int,
+    price: Decimal,
     description: str,
     image: UploadFile,
     db: Session,
-    current_user: Seller,
+    current_seller: Seller,
     UPLOAD_FOLDER: str
 ) -> Product_create:
     """
@@ -53,7 +54,7 @@ def edit_product_by_seller(
     db: Session,
     product_id: int,
     product_update: Product_update,
-    current_user: Seller
+    current_seller: Seller
 ) -> Product_update:
     """
     Edit a product by seller. Sellers can edit their own products or admins can edit any.
@@ -74,11 +75,14 @@ def edit_product_by_seller(
 def delete_product_by_admin(
     db: Session,
     product_id: int,
+    currrent_admin
 ) -> dict:
     """
     Allow admin to delete any product.
     """
     product = db.query(Product).filter(Product.id == product_id).first()
+    if currrent_admin.role != "Admin":
+        raise HTTPException(status_code=403, detail="Not authorized to edit this product")
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
 
