@@ -49,8 +49,8 @@ def order_the_product(
     new_order = Order(
         buyer_id=current_user.id,
         total_price=total_price,
-        order_status="pending",
-        order_at=datetime.utcnow(),
+        status="PLACED",
+        order_placed=datetime.utcnow(),
         items=order_items_list
     )
 

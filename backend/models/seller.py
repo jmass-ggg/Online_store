@@ -46,12 +46,12 @@ class Seller(Base):
         default="Seller"
     )
 
-    # relationship to Roles
+    
     role = relationship("Roles", back_populates="sellers")
     products: Mapped[list["Product"]] = relationship(
         "Product", back_populates="seller", cascade="all, delete-orphan"
     )
-    orders: Mapped[list["Order"]] = relationship("Order", back_populates="seller")
+    
 
     def __repr__(self):
         return f"<Seller(username={self.username}, business={self.business_name})>"
