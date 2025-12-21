@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
 
 class Order(Base):
+    
     __tablename__ = "order"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -19,6 +20,7 @@ class Order(Base):
     order_status: Mapped[str] = mapped_column(String, default="pending")
     total_price: Mapped[float] = mapped_column(Float, default=0.0)
     order_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    delived_at:Mapped[datetime]=mapped_column(DateTime,default=datetime.utcnow)
 
     user: Mapped["Customer"] = relationship("Customer", back_populates="orders")
     seller: Mapped["Seller"] = relationship("Seller", back_populates="orders")
