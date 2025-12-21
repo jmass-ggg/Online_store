@@ -3,15 +3,15 @@ from typing import List
 from datetime import datetime
 from enum import Enum
 from backend.schemas.order_iteam import OrderItemCreate, OrderItemRead
-
+from decimal import Decimal
 class OrderStatus(str,Enum):
-    pending="pending"
-    shipped="shipped"
-    complete="complete"
+    PLACED = "PLACED"
+    CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
     
 class OrderBase(BaseModel):
-    total_price: float = Field(default=0.0, ge=0, description="Total price of the order")
-    order_status: str = Field(default=OrderStatus.pending, description="Current status of the order")
+    total_price: Decimal = Field(default=Decimal("0.0"), ge=0, description="Total price of the order")
+    order_status: str = Field(default=OrderStatus.PLACED, description="Current status of the order")
     class Config:
         orm_mode = True
         from_attributes = True
