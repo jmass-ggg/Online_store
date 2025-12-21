@@ -23,7 +23,7 @@ ASDASDASD@example.com
   "business_name": "ASDASDAS",
   "business_type": "ASDASAS",
   "business_address": "ASDASDAS",
-  "password": "ASDAASS",
+ASDAASS
   "kyc_document_type": "SDASDAS",
   "kyc_document_number": 12313242,
   "bank_account_name": "ASDASDASD",
@@ -33,3 +33,12 @@ ASDASDASD@example.com
 }
 //Numa@example.com
 password:- Jamesss
+{
+  "product_name": "iphone",
+  "product_category": "phone",
+  "id": 7,
+  "stock": 100,
+  "price": 10000,
+  "description": "best photo",
+  "image_url": "/uploads/iphone.jpg"
+}

@@ -10,21 +10,20 @@
 .page {
   min-height: 100vh;
   width: 100%;
-  background-size: cover;
-  background-position: center;
   position: relative;
   color: white;
   overflow: hidden;
+
+  /* Replace photo with a clean background */
+  background-color: #111827; /* dark neutral tone */
+  /* Or use a subtle gradient for polish */
+  background: linear-gradient(135deg, #1f2937, #111827);
 }
 
-/* DARK CINEMATIC OVERLAY */
+/* DARK OVERLAY REMOVED — keep page clean */
+/* If you still want a subtle overlay effect, you can keep this */
 .overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 35% 45%, rgba(0,0,0,0.25), rgba(0,0,0,0.85)),
-    linear-gradient(to right, rgba(0,0,0,0.9), transparent 45%);
-  z-index: 0;
+  display: none; /* disable cinematic overlay */
 }
 
 /* ================= HEADER ================= */
