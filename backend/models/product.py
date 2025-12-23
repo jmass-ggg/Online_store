@@ -1,16 +1,20 @@
 from __future__ import annotations
 from datetime import datetime
-from sqlalchemy import Integer, String, Float, ForeignKey, DateTime,Numeric
 from decimal import Decimal
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from backend.database import Base
-from enum import Enum as PyEnum
+from enum import Enum
 
-class ProductCategory(PyEnum):
+from sqlalchemy import Integer, String, ForeignKey, DateTime, Numeric, Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from backend.database import Base
+
+
+class ProductCategory(str, Enum):
     CLOTHES = "Clothes"
     ACCESSORIES = "Accessories"
     FOOTWEAR = "Footwear"
     JEWELRY = "Jewelry"
+
 
 class Product(Base):
     __tablename__ = "product"
@@ -18,20 +22,26 @@ class Product(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     product_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    product_category: Mapped[str] = mapped_column(PyEnum(ProductCategory),nullable=False)
+
+    # Option A (common): stores enum *names* in DB: "CLOTHES", "ACCESSORIES", ...
+    product_category: Mapped[ProductCategory] = mapped_column(
+        SAEnum(ProductCategory, name="product_category"),
+        nullable=False,
+    )
+
     stock: Mapped[int] = mapped_column(Integer, default=0)
-    price: Mapped[Decimal] = mapped_column(Numeric(10,2))
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     description: Mapped[str | None] = mapped_column(String)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("seller.id"), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     order_items = relationship("OrderItem", back_populates="product")
     seller: Mapped["Seller"] = relationship("Seller", back_populates="products")
     reviews = relationship("Review", back_populates="product")
+
     def __repr__(self):
         return f"<Product(name={self.product_name}, price={self.price})>"
