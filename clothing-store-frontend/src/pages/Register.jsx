@@ -1,17 +1,52 @@
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { API_BASE_URL } from "../api";
 import "./login.css"; // reuse same CSS
 
 export default function Register() {
   const nav = useNavigate();
 
-  function onSubmit(e) {
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    phone_number: "",
+    password: "",
+    address: "",
+  });
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleChange(e) {
+    setForm({ ...form, [e.target.id]: e.target.value });
+  }
+
+  async function onSubmit(e) {
     e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    // Fake register for now
-    localStorage.setItem("auth_token", "demo_token");
+    try {
+      const res = await fetch(`${API_BASE_URL}/user/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
 
-    // Go to home after register
-    nav("/", { replace: true });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Registration failed");
+      }
+
+      // ✅ success → go to login
+      nav("/login", { replace: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -19,7 +54,7 @@ export default function Register() {
       <section className="left">
         <div className="form-wrap">
 
-          {/* ===== LOGO ===== */}
+          {/* LOGO */}
           <div className="login-logo">
             <Link to="/" className="logo-text">
               JAMES
@@ -29,69 +64,76 @@ export default function Register() {
           <h1>Create Account</h1>
           <p className="sub">Please fill in your details to register</p>
 
+          {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+
           <form className="form" onSubmit={onSubmit}>
-            {/* Username */}
             <div className="field">
-              <label htmlFor="username">Username</label>
+              <label>Username</label>
               <input
                 id="username"
                 type="text"
                 placeholder="Enter your username"
+                value={form.username}
+                onChange={handleChange}
                 required
               />
             </div>
 
-            {/* Email */}
             <div className="field">
-              <label htmlFor="email">Email</label>
+              <label>Email</label>
               <input
                 id="email"
                 type="email"
                 placeholder="Enter your email"
+                value={form.email}
+                onChange={handleChange}
                 required
               />
             </div>
 
-            {/* Phone Number */}
             <div className="field">
-              <label htmlFor="phone">Phone Number</label>
+              <label>Phone Number</label>
               <input
-                id="phone"
+                id="phone_number"
                 type="tel"
                 placeholder="Enter your phone number"
+                value={form.phone_number}
+                onChange={handleChange}
                 required
               />
             </div>
 
-            {/* Password */}
             <div className="field">
-              <label htmlFor="password">Password</label>
+              <label>Password</label>
               <input
                 id="password"
                 type="password"
                 placeholder="Create a password"
+                value={form.password}
+                onChange={handleChange}
                 required
               />
             </div>
 
-            {/* Address */}
             <div className="field">
-              <label htmlFor="address">Address</label>
+              <label>Address</label>
               <input
                 id="address"
                 type="text"
                 placeholder="Enter your address"
+                value={form.address}
+                onChange={handleChange}
                 required
               />
             </div>
 
-            <button className="btn primary" type="submit">
-              Create Account
+            <button className="btn primary" type="submit" disabled={loading}>
+              {loading ? "Creating account..." : "Create Account"}
             </button>
 
             <p className="bottom">
               Already have an account?
-              <a href="/login"> Sign in</a>
+              <Link to="/login"> Sign in</Link>
             </p>
           </form>
         </div>
