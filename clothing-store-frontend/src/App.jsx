@@ -1,16 +1,15 @@
 import { Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Shoes from "./pages/Shoes";
-import ProtectedRoute from "./routes/ProtectedRoute";
+import Home from "./pages/Home.jsx";
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import Shoes from "./pages/Shoes.jsx";
+import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
 
-      {/* ✅ Protected Shoes route */}
       <Route
         path="/shoes"
         element={

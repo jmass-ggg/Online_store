@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { API_BASE_URL } from "../api";
-import "./login.css"; // reuse same CSS
+import "./login.css";
 
 export default function Register() {
   const nav = useNavigate();
@@ -18,14 +18,11 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.id]: e.target.value });
+    setForm((prev) => ({ ...prev, [e.target.id]: e.target.value }));
   }
 
   function continueWithGoogle() {
-    // UI only: replace with your real OAuth URL later
     alert("Google login not connected yet. Add your OAuth URL here.");
-    // Example later:
-    // window.location.href = `${API_BASE_URL}/auth/google`;
   }
 
   async function onSubmit(e) {
@@ -41,37 +38,41 @@ export default function Register() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Registration failed");
+        let msg = "Registration failed";
+        try {
+          const err = await res.json();
+          msg = err?.detail || msg;
+        } catch {}
+        throw new Error(msg);
       }
 
       nav("/login", { replace: true });
     } catch (err) {
-      setError(err.message || "Something went wrong");
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="page">
-      <section className="left">
-        <div className="form-wrap">
-          {/* LOGO */}
+    <main className="login-page">
+      <section className="login-left">
+        <div className="login-formWrap">
+          {/* ✅ LOGO */}
           <div className="login-logo">
-            <Link to="/" className="logo-text">
+            <Link to="/" className="login-logoText">
               JAMES
             </Link>
           </div>
 
-          <h1>Create Account</h1>
-          <p className="sub">Please fill in your details to register</p>
+          <h1 className="login-title">Create Account</h1>
+          <p className="login-sub">Please fill in your details to register</p>
 
-          {error && <p className="error">{error}</p>}
+          {error && <p className="login-error">{error}</p>}
 
-          <form className="form" onSubmit={onSubmit}>
-            <div className="field">
-              <label>Username</label>
+          <form className="login-form" onSubmit={onSubmit}>
+            <div className="login-field">
+              <label htmlFor="username">Username</label>
               <input
                 id="username"
                 type="text"
@@ -82,8 +83,8 @@ export default function Register() {
               />
             </div>
 
-            <div className="field">
-              <label>Email</label>
+            <div className="login-field">
+              <label htmlFor="email">Email</label>
               <input
                 id="email"
                 type="email"
@@ -94,8 +95,8 @@ export default function Register() {
               />
             </div>
 
-            <div className="field">
-              <label>Phone Number</label>
+            <div className="login-field">
+              <label htmlFor="phone_number">Phone Number</label>
               <input
                 id="phone_number"
                 type="tel"
@@ -106,8 +107,8 @@ export default function Register() {
               />
             </div>
 
-            <div className="field">
-              <label>Password</label>
+            <div className="login-field">
+              <label htmlFor="password">Password</label>
               <input
                 id="password"
                 type="password"
@@ -118,8 +119,8 @@ export default function Register() {
               />
             </div>
 
-            <div className="field">
-              <label>Address</label>
+            <div className="login-field">
+              <label htmlFor="address">Address</label>
               <input
                 id="address"
                 type="text"
@@ -130,35 +131,28 @@ export default function Register() {
               />
             </div>
 
-            <button className="btn primary" type="submit" disabled={loading}>
+            <button className="login-btn login-primary" type="submit" disabled={loading}>
               {loading ? "Creating account..." : "Create Account"}
             </button>
 
-            {/* Divider */}
-            <div className="divider" aria-hidden="true">
-              <span>OR</span>
-            </div>
-
-            {/* Google Button */}
             <button
-              className="btn google"
+              className="login-btn login-google"
               type="button"
               onClick={continueWithGoogle}
               disabled={loading}
             >
-              <span className="g-icon" aria-hidden="true">G</span>
+              <span className="login-gIcon" aria-hidden="true">G</span>
               Continue with Google
             </button>
 
-            <p className="bottom">
-              Already have an account?
-              <Link to="/login"> Sign in</Link>
+            <p className="login-bottom">
+              Already have an account? <Link to="/login">Sign in</Link>
             </p>
           </form>
         </div>
       </section>
 
-      <section className="right" aria-hidden="true"></section>
+      <section className="login-right" aria-hidden="true" />
     </main>
   );
 }

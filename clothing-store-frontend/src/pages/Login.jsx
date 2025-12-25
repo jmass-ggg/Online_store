@@ -5,17 +5,13 @@ import "./login.css";
 
 export default function Login() {
   const nav = useNavigate();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   function continueWithGoogle() {
-    // UI only: replace with your real OAuth URL later
     alert("Google login not connected yet. Add your OAuth URL here.");
-    // Example later:
-    // window.location.href = `${API_BASE_URL}/auth/google`;
   }
 
   async function onSubmit(e) {
@@ -25,7 +21,7 @@ export default function Login() {
 
     try {
       const formData = new URLSearchParams();
-      formData.append("username", email); // OAuth2 expects "username"
+      formData.append("username", email);
       formData.append("password", password);
 
       const res = await fetch(`${API_BASE_URL}/login/`, {
@@ -35,95 +31,95 @@ export default function Login() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Login failed");
+        let msg = "Login failed";
+        try {
+          const err = await res.json();
+          msg = err?.detail || msg;
+        } catch {}
+        throw new Error(msg);
       }
 
       const data = await res.json();
-
-      // Store tokens (your backend response)
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token);
-
-      // ✅ Important: ProtectedRoute checks this key
       localStorage.setItem("auth_token", data.access_token);
 
-      // Redirect to home (or you can go directly to /shoes)
       nav("/", { replace: true });
-      // nav("/shoes", { replace: true });
     } catch (err) {
-      setError(err.message || "Something went wrong");
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="page">
-      <section className="left">
-        <div className="form-wrap">
-          {/* LOGO */}
+    <main className="login-page">
+      <section className="login-left">
+        <div className="login-formWrap">
+          {/* ✅ LOGO */}
           <div className="login-logo">
-            <Link to="/" className="logo-text">JAMES</Link>
+            <Link to="/" className="login-logoText">
+              JAMES
+            </Link>
           </div>
 
-          <h1>Welcome Back!</h1>
-          <p className="sub">Welcome back please enter your details</p>
+          <h1 className="login-title">Welcome Back!</h1>
+          <p className="login-sub">Welcome back please enter your details</p>
 
-          {error && <p className="error">{error}</p>}
+          {error && <p className="login-error">{error}</p>}
 
-          <form className="form" onSubmit={onSubmit}>
-            <div className="field">
-              <label>Email</label>
+          <form className="login-form" onSubmit={onSubmit}>
+            <div className="login-field">
+              <label htmlFor="email">Email</label>
               <input
+                id="email"
                 type="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
 
-            <div className="field">
-              <label>Password</label>
+            <div className="login-field">
+              <label htmlFor="password">Password</label>
               <input
+                id="password"
                 type="password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
               />
+              <Link className="login-forgot" to="#">
+                Forgot password
+              </Link>
             </div>
 
-            <button className="btn primary" type="submit" disabled={loading}>
+            <button className="login-btn login-primary" type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </button>
 
-            {/* Divider */}
-            <div className="divider" aria-hidden="true">
-              <span>OR</span>
-            </div>
-
-            {/* Google Button */}
             <button
-              className="btn google"
+              className="login-btn login-google"
               type="button"
               onClick={continueWithGoogle}
               disabled={loading}
             >
-              <span className="g-icon" aria-hidden="true">G</span>
-              Continue with Google
+              <span className="login-gIcon" aria-hidden="true">G</span>
+              Sign in with Google
             </button>
 
-            <p className="bottom">
-              Don&apos;t have an account?
-              <Link to="/register"> Sign up</Link>
+            <p className="login-bottom">
+              Don&apos;t have an account? <Link to="/register">Sign up</Link>
             </p>
           </form>
         </div>
       </section>
 
-      <section className="right" aria-hidden="true"></section>
+      <section className="login-right" aria-hidden="true" />
     </main>
   );
 }
