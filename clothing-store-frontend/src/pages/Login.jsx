@@ -9,10 +9,19 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function continueWithGoogle() {
+    // UI only: replace with your real OAuth URL later
+    alert("Google login not connected yet. Add your OAuth URL here.");
+    // Example later:
+    // window.location.href = `${API_BASE_URL}/auth/google`;
+  }
 
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
       const formData = new URLSearchParams();
@@ -21,9 +30,7 @@ export default function Login() {
 
       const res = await fetch(`${API_BASE_URL}/login/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
       });
 
@@ -34,14 +41,20 @@ export default function Login() {
 
       const data = await res.json();
 
-      // Store tokens
+      // Store tokens (your backend response)
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token);
 
-      // Redirect to home
+      // ✅ Important: ProtectedRoute checks this key
+      localStorage.setItem("auth_token", data.access_token);
+
+      // Redirect to home (or you can go directly to /shoes)
       nav("/", { replace: true });
+      // nav("/shoes", { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -49,7 +62,6 @@ export default function Login() {
     <main className="page">
       <section className="left">
         <div className="form-wrap">
-
           {/* LOGO */}
           <div className="login-logo">
             <Link to="/" className="logo-text">JAMES</Link>
@@ -58,7 +70,7 @@ export default function Login() {
           <h1>Welcome Back!</h1>
           <p className="sub">Welcome back please enter your details</p>
 
-          {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+          {error && <p className="error">{error}</p>}
 
           <form className="form" onSubmit={onSubmit}>
             <div className="field">
@@ -83,8 +95,24 @@ export default function Login() {
               />
             </div>
 
-            <button className="btn primary" type="submit">
-              Sign in
+            <button className="btn primary" type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
+
+            {/* Divider */}
+            <div className="divider" aria-hidden="true">
+              <span>OR</span>
+            </div>
+
+            {/* Google Button */}
+            <button
+              className="btn google"
+              type="button"
+              onClick={continueWithGoogle}
+              disabled={loading}
+            >
+              <span className="g-icon" aria-hidden="true">G</span>
+              Continue with Google
             </button>
 
             <p className="bottom">

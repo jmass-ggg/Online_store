@@ -21,6 +21,13 @@ export default function Register() {
     setForm({ ...form, [e.target.id]: e.target.value });
   }
 
+  function continueWithGoogle() {
+    // UI only: replace with your real OAuth URL later
+    alert("Google login not connected yet. Add your OAuth URL here.");
+    // Example later:
+    // window.location.href = `${API_BASE_URL}/auth/google`;
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
@@ -29,9 +36,7 @@ export default function Register() {
     try {
       const res = await fetch(`${API_BASE_URL}/user/register`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
 
@@ -40,10 +45,9 @@ export default function Register() {
         throw new Error(err.detail || "Registration failed");
       }
 
-      // ✅ success → go to login
       nav("/login", { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -53,7 +57,6 @@ export default function Register() {
     <main className="page">
       <section className="left">
         <div className="form-wrap">
-
           {/* LOGO */}
           <div className="login-logo">
             <Link to="/" className="logo-text">
@@ -64,7 +67,7 @@ export default function Register() {
           <h1>Create Account</h1>
           <p className="sub">Please fill in your details to register</p>
 
-          {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+          {error && <p className="error">{error}</p>}
 
           <form className="form" onSubmit={onSubmit}>
             <div className="field">
@@ -129,6 +132,22 @@ export default function Register() {
 
             <button className="btn primary" type="submit" disabled={loading}>
               {loading ? "Creating account..." : "Create Account"}
+            </button>
+
+            {/* Divider */}
+            <div className="divider" aria-hidden="true">
+              <span>OR</span>
+            </div>
+
+            {/* Google Button */}
+            <button
+              className="btn google"
+              type="button"
+              onClick={continueWithGoogle}
+              disabled={loading}
+            >
+              <span className="g-icon" aria-hidden="true">G</span>
+              Continue with Google
             </button>
 
             <p className="bottom">
