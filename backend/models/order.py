@@ -21,9 +21,9 @@ class Order(Base):
     status: Mapped[OrderStatus] = mapped_column(
         Enum(OrderStatus), default=OrderStatus.PLACED, nullable=False
     )
-    total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     order_placed: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    delivered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
 
     user: Mapped["Customer"] = relationship("Customer", back_populates="orders")
     

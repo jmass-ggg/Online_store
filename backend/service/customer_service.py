@@ -117,10 +117,6 @@ def customer_info_update(
             "Profile update failed"
         )
 
-
-
-
-
 def delete_account_by_owner(db: Session, current_user: Customer):
     """Allow a user to delete their own account."""
 
@@ -129,12 +125,12 @@ def delete_account_by_owner(db: Session, current_user: Customer):
     if not user:
         raise error_handler(status.HTTP_404_NOT_FOUND,"User not found")
     try:
-        with db.rollback():
-           db.add()
+        db.delete(user)
+        db.commit()
         return {"message": "Your account has been deleted successfully."}
 
     except SQLAlchemyError:
-        
+        db.rollback()
         # Log internally, never leak DB errors to client
         raise error_handler(
             status.HTTP_500_INTERNAL_SERVER_ERROR,

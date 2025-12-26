@@ -17,7 +17,7 @@ def place_order(
     current_user: Customer = Depends(get_current_customer),
 ):
     
-    return order_the_product(order_in, db, current_user)
+    return order_the_product(order_in,  current_user,db)
 
 @router.get("/{order_id}/get_oder",response_model=OrderRead)
 def get_order(order_id:int,

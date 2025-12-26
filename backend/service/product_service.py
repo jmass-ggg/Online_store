@@ -4,7 +4,7 @@ from typing import List
 import os
 import shutil
 from decimal import Decimal
-
+from sqlalchemy.exc import SQLAlchemyError
 from backend.database import get_db
 from backend.models.product import Product
 from backend.models.seller import Seller
@@ -21,35 +21,38 @@ def add_product_by_seller(
     image: UploadFile,
     db: Session,
     current_seller: Seller,
-    UPLOAD_FOLDER: str
+    UPLOAD_FOLDER: str,
+    
 ) -> Product_create:
     """
     Allow a seller to add a new product with image upload.
     """
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    file_location = os.path.join(UPLOAD_FOLDER, image.filename)
+    try:
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        file_location = os.path.join(UPLOAD_FOLDER, image.filename)
 
-    with open(file_location, "wb") as f:
-        shutil.copyfileobj(image.file, f)
+        with open(file_location, "wb") as f:
+            shutil.copyfileobj(image.file, f)
 
-    image_url = f"/uploads/{image.filename}"
+        image_url = f"/uploads/{image.filename}"
 
-    new_product = Product(
-        product_name=product_name,
-        product_category=product_category,
-        stock=stock,
-        price=price,
-        description=description,
-        image_url=image_url,
-        seller_id=current_user.id
-    )
+        new_product = Product(
+            product_name=product_name,
+            product_category=product_category,
+            stock=stock,
+            price=price,
+            description=description,
+            image_url=image_url,
+            seller_id=current_seller.id
+        )
 
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
+        db.add(new_product)
+        db.commit()
+        db.refresh(new_product)
 
-    return Product_read.from_orm(new_product)
-
+        return Product_read.from_orm(new_product)
+    except SQLAlchemyError:
+        raise error_handler(status.HTTP_500_INTERNAL_SERVER_ERROR," ")
 def edit_product_by_seller(
     db: Session,
     product_id: int,
@@ -109,7 +112,7 @@ def delete_product_by_seller(
 
 def veiw_product(
     db: Session,
-    product_id: int,
+    product_id: int,current_user
     
 ) -> Product_read:
     """

@@ -19,16 +19,13 @@ from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 from backend.utils.jwt import create_token, verify_token,create_refresh_token
-
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
+from typing import Dict
+from fastapi import status
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
     """Seller submits application. Default status = PENDING."""
 
-    if db.query(Seller).filter(Seller.username == data.username).first():
-        raise error_handler(302, "Username already exists")
-
-    if db.query(Seller).filter(Seller.email == data.email).first():
-        raise error_handler(302, "Email already registered")
-    
     seller = Seller(
         username=data.username,
         email=data.email,
@@ -49,45 +46,65 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
         updated_at=datetime.utcnow(),
     )
 
-    db.add(seller)
-    db.commit()
-    db.refresh(seller)
-
-    return SellerResponse.from_orm(seller)
-
+    try:
+        with db.begin():
+            db.add(seller)
+        return SellerResponse.from_orm(seller)
+    except IntegrityError as exc:
+        db.rollback()
+        error_message=str(exc.orig).lower()
+        if "username" in error_message:
+            raise error_handler(
+                400,"Username already exists"
+            ) 
+        if "email" in error_message:
+            raise error_message(
+                400,"Email already exists"
+            )
+        if "phone number" in error_message:
+            raise error_message(
+                400,"phone already exists"
+            )
+        raise error_handler(
+            status.HTTP_400_BAD_REQUEST,
+            "Invalid customer data"
+        )
 def seller_login(db: Session, form_data) -> TokenResponse:
-    seller = db.query(Seller).filter(Seller.email == form_data.username).first()
-    if not seller:
-        raise error_handler(400, "Invalid credentials")
+    try:
+        seller = db.query(Seller).filter(Seller.email == form_data.username).one_or_none()
+        if not seller:
+            raise error_handler(400, "Invalid credentials")
 
-    if not verify_password(form_data.password, seller.hashed_password):
-        raise error_handler(401, "Incorrect password")
+        if not verify_password(form_data.password, seller.hashed_password):
+            raise error_handler(401, "Incorrect password")
 
-    access_token = create_token({"email": seller.email})
-    refresh_token = create_refresh_token(db, seller)
+        access_token = create_token({"email": seller.email})
+        refresh_token = create_refresh_token(db, seller)
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer"  # <- required field
-    )
-
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer"  # <- required field
+        )
+    except SQLAlchemyError:
+        raise error_handler(status.HTTP_404_NOT_FOUND,"Authentication failed")
 
 def admin_approve_account(
     db: Session,
     seller_id: int,
     seller_approved: SellerVerificationUpdate
 ):
-    seller = db.query(Seller).filter(Seller.id == seller_id).first()
-    if not seller:
+    seller = db.query(Seller).filter(Seller.id == seller_id).one_or_none()
+    if seller is None:
         raise error_handler(404, "Seller not found")
-
-    # Make sure these are the correct types
     seller.status = seller_approved.status
     seller.is_verified = seller_approved.is_verified
     seller.updated_at = datetime.utcnow()
-
-    db.commit()
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise error_handler(500,"Failed to update seller status")
     db.refresh(seller)
     return SellerResponse.from_orm(seller)
 
@@ -128,13 +145,10 @@ def delete_seller_account(db: Session, current_user) -> dict:
     """Seller deletes own account."""
 
     seller = db.query(Seller).filter(Seller.id == current_user.id).first()
-    if not seller:
+    
+    if seller is None:
         raise error_handler(404, "Seller not found")
-
-    db.delete(seller)
-    db.commit()
-
-    return {"message": "Your seller account has been deleted successfully."}
+    
 
 
 def delete_seller_by_admin(
@@ -147,14 +161,31 @@ def delete_seller_by_admin(
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise error_handler(404, "Seller not found")
+    try:
+        db.delete(seller)
+        db.commit()
 
-    db.delete(seller)
-    db.commit()
-
-    return {"message": f"Seller '{seller.username}' has been deleted."}
-
-
-def get_seller_from_token(token: str):
-    
-    seller_email = verify_token(token)
+        return {"message": f"Seller '{seller.username}' has been deleted."}
+    except SQLAlchemyError:
+        db.rollback()
+        raise error_handler(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "Account deletion failed"
+        )
+from fastapi import status
+from jose import JWTError, ExpiredSignatureError
+from jwt import ExpiredSignatureError, InvalidTokenError
+def get_seller_from_token(token: str)->dict:
+    try:
+        seller_email = verify_token(token)
+    except TokenResponse:
+        raise error_handler(
+            status.HTTP_401_UNAUTHORIZED,
+            "Token has expired"
+        )
+    except InvalidTokenError:
+        raise error_handler(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid authentication token"
+        )
     return {"email": seller_email}
