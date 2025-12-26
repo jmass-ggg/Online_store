@@ -81,3 +81,7 @@ def view_the_order(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     return order
+
+def view_all_order(db:Session,current_user:Customer):
+    order=db.query(Order).all()
+    return order
