@@ -1,5 +1,5 @@
 from pydantic import BaseModel,Field
-from backend.schemas.product import Product_read
+from backend.schemas.product import ProductRead
 from decimal import Decimal
 
 class OrderItemBase(BaseModel):

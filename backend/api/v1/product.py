@@ -10,7 +10,7 @@ from backend.utils.verifyied import verify_seller_or_not
 from backend.service.product_service import (
     add_product_by_seller,
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
-    delete_product_by_seller,veiw_product,
+    delete_product_by_seller,view_product,
     view_all_product
 )
 

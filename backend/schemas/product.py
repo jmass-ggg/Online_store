@@ -3,14 +3,15 @@ from datetime import datetime
 from typing import Optional
 from backend.schemas.seller import SellerBase
 from decimal import Decimal
+import re
 from backend.models.product import ProductCategory,ProductStatus
 
 class ProductCreate(BaseModel):
-    product_name: str
+    product_name: constr(min_length=5, max_length=15)
     url_slug: str
     product_category: ProductCategory
     description: str | None = None
-
+    
 
 class ProductUpdate(BaseModel):
     product_name: str | None = None
