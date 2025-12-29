@@ -32,3 +32,12 @@ class ProductVariantCreate(BaseModel):
     size: str | None = None
     price: Decimal
     stock_quantity: int
+
+class ProductVariantRead(BaseModel):
+    color: str 
+    size: str 
+    price: Decimal
+    stock_quantity: int
+    class Config:
+        from_attributes = True
+        orm_mode=True

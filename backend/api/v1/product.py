@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from backend.database import get_db
-from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductCategory,ProductVariantCreate
+from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductCategory,ProductVariantCreate,ProductVariantRead
 from backend.models.seller import Seller
 from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.utils.verifyied import verify_seller_or_not
@@ -49,7 +49,7 @@ def create_product(
 )
 def create_product_variants(
     product_id: int,
-    variants: list[ProductVariantCreate],
+    variants: list[ProductVariantRead],
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(verify_seller_or_not),
 ):
@@ -78,7 +78,8 @@ def admin_delete_product(product_id:int,db:Session=Depends(get_db),
 def seller_delete_product(product_id:int,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
-    return delete_product_by_seller(db,product_id)
+   return delete_product_by_seller(db, product_id, current_user)
+
 
 @router.get("/{product_id}",response_model=ProductRead)
 def get_product(product_id:int,db:Session=Depends(get_db),
