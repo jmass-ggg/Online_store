@@ -6,7 +6,7 @@ class RefreshToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("customer.id"), nullable=True)
-    seller_id = Column(Integer, ForeignKey("seller.id"), nullable=True)
+    role = Column(String, nullable=False)  # "Admin" | "Seller" | "Customer"
+    owner_id = Column(Integer, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     revoked = Column(Boolean, default=False)

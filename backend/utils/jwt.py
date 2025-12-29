@@ -70,7 +70,8 @@ def create_refresh_token(db: Session, user):
 
     new_rt = RefreshToken(
         token=token,
-        user_id=user.id,
+        role=user.role_name,
+        owner_id=user.id,
         expires_at=datetime.utcnow() + timedelta(days=REFRESH_EXP_DAYS)
     )
 

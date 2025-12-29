@@ -1,11 +1,10 @@
 from __future__ import annotations
 from datetime import datetime
-from decimal import Decimal
 from enum import Enum
-
-from sqlalchemy import Integer, String, ForeignKey, DateTime, Numeric, Enum as SAEnum
+from sqlalchemy import (
+    Integer, String, ForeignKey, DateTime, Enum as SAEnum, Text
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from backend.database import Base
 
 
@@ -16,32 +15,49 @@ class ProductCategory(str, Enum):
     JEWELRY = "Jewelry"
 
 
+class ProductStatus(str, Enum):
+    active = "active"
+    inactive = "inactive"
+
+
 class Product(Base):
-    __tablename__ = "product"
+    __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     product_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    url_slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
 
-    # Option A (common): stores enum *names* in DB: "CLOTHES", "ACCESSORIES", ...
     product_category: Mapped[ProductCategory] = mapped_column(
         SAEnum(ProductCategory, name="product_category"),
         nullable=False,
     )
 
-    stock: Mapped[int] = mapped_column(Integer, default=0)
-    price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    description: Mapped[str | None] = mapped_column(String)
-    image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(String)
 
-    seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("seller.id"), nullable=False)
+    status: Mapped[ProductStatus] = mapped_column(
+        SAEnum(ProductStatus, name="product_status"),
+        default=ProductStatus.inactive,
+        nullable=False,
+    )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    seller_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("seller.id"), nullable=False
+    )
 
-    order_items = relationship("OrderItem", back_populates="product")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
     seller: Mapped["Seller"] = relationship("Seller", back_populates="products")
-    reviews = relationship("Review", back_populates="product")
 
-    def __repr__(self):
-        return f"<Product(name={self.product_name}, price={self.price})>"
+    variants: Mapped[list["ProductVariant"]] = relationship(
+        "ProductVariant",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
