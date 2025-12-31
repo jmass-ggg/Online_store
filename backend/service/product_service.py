@@ -199,7 +199,7 @@ def search_product(q: str = Query(..., min_length=1),
     return [ProductRead.from_orm(p) for p in products]
 
 
-def view_all_product_seller(db: Session, seller_id: int) -> List[ProductRead]:
+def view_all_product_seller( seller_id: int,db: Session,) -> List[ProductRead]:
     products = (
         db.query(Product)
         .filter(Product.seller_id == seller_id)

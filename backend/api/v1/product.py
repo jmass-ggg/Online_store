@@ -107,15 +107,15 @@ def seller_delete_product(product_id:int,db:Session=Depends(get_db),
 ):
    return delete_product_by_seller(db, product_id, current_user)
 
-@router.get("/{product_id}",response_model=ProductRead)
-def get_product(product_id:int,db:Session=Depends(get_db),
-                current_user:Seller=Depends(verify_seller_or_not)
-):
-    return view_product(db,product_id)
-
 @router.get("/me", response_model=List[ProductRead])
 def get_my_products(
     db: Session = Depends(get_db),
     current_user: Seller = Depends(verify_seller_or_not),
 ):
-    return view_all_product_seller(db, current_user.id)
+    return view_all_product_seller( current_user.id,db,)
+
+@router.get("/{product_id}",response_model=ProductRead)
+def get_product(product_id:int,db:Session=Depends(get_db),
+                current_user:Seller=Depends(verify_seller_or_not)
+):
+    return view_product(db,product_id)
