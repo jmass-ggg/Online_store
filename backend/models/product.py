@@ -61,3 +61,19 @@ class Product(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    order_items: Mapped[list["OrderItem"]] = relationship(
+        "OrderItem",
+        back_populates="product",
+        cascade="all, delete-orphan",
+    )
+    reviews: Mapped[list["Review"]] = relationship(
+        "Review",
+        back_populates="product",
+        cascade="all, delete-orphan",
+    )
+    def __repr__(self) -> str:
+        return (
+            f"<OrderItem(id={self.id}, order_id={self.order_id}, product_id={self.product_id}, "
+            f"qty={self.quantity}, price={self.price})>"
+        )

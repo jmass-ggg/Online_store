@@ -13,20 +13,14 @@ class OrderItem(Base):
         Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
     )
     product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("product.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     price: Mapped[Decimal] = mapped_column(Numeric(10,2))
 
-    order: Mapped["Order"] = relationship(
-        "Order",
-        back_populates="items"
-    )
+    order: Mapped["Order"] = relationship("Order", back_populates="items")
 
-    product: Mapped["Product"] = relationship(
-        "Product",
-        back_populates="order_items"
-    )
+    product: Mapped["Product"] = relationship("Product", back_populates="order_items")
 
     def __repr__(self):
         return f"<OrderItem(id={self.id}, quantity={self.quantity}, price={self.price})>"

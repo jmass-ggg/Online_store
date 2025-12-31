@@ -11,11 +11,19 @@ class Review(Base):
     rating: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("product.id"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("customer.id"))
+    product_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("customer.id", ondelete="CASCADE"), nullable=False
+    )
 
     product: Mapped["Product"] = relationship("Product", back_populates="reviews")
     user: Mapped["Customer"] = relationship("Customer", back_populates="reviews")
 
-    def __repr__(self):
-        return f"<Review(id={self.id}, rating={self.rating}, user_id={self.user_id})>"
+    def __repr__(self) -> str:
+        return (
+            f"<Review(id={self.id}, rating={self.rating}, "
+            f"product_id={self.product_id}, user_id={self.user_id})>"
+        )
+
