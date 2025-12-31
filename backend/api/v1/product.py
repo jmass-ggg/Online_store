@@ -11,13 +11,36 @@ from backend.utils.verifyied import verify_seller_or_not
 from backend.service.product_service import (
     add_product_by_seller,
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
-    delete_product_by_seller,view_product,
+    delete_product_by_seller,view_product,view_all_product_seller,
     view_all_product
 )
 from typing import Optional
 from backend.models.admin import Admin
 UPLOAD_FOLDER="backend/uploads/"
 router=APIRouter(prefix="/product",tags=["Product"])
+
+@router.get("/", response_model=List[ProductRead])
+def get_all_product(
+    category: Optional[ProductCategory] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return view_all_product(
+        db=db,
+        category=category,
+        skip=skip,
+        limit=limit,
+        only_active=True,
+    )
+
+@router.get("/search",response_model=List[ProductRead])
+def product_shown(q: str = Query(..., min_length=1),
+    category: Optional[ProductCategory] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),):
+    return 
 
 @router.post(
     "/",
@@ -90,38 +113,9 @@ def get_product(product_id:int,db:Session=Depends(get_db),
 ):
     return view_product(db,product_id)
 
-@router.get("/",response_model=List[ProductRead])
-def get_all_product(db:Session=Depends(get_db)
-                    
+@router.get("/all_product",response_model=ProductRead)
+def get_product(db:Session=Depends(get_db),
+                current_user:Seller=Depends(verify_seller_or_not)
 ):
-    return view_all_product(db)
+    return view_all_product_seller(db,current_user.id)
 
-@router.get("/product", response_model=List[ProductRead])
-def get_all_product(
-    q: Optional[str] = Query(None, description="Search product name/slug/description"),
-    category: Optional[ProductCategory] = None,
-    status_: Optional[ProductStatus] = Query(None, alias="status"),
-    seller_id: Optional[int] = None,
-    sort: str = Query("newest", pattern="^(newest|oldest|name_asc|name_desc|updated)$"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    return view_all_product(
-        db=db,
-        skip=skip,
-        limit=limit,
-        q=q,
-        category=category,
-        status=status_,
-        seller_id=seller_id,
-        sort=sort,
-    )
-
-@router.get("/search",response_model=List[ProductRead])
-def product_shown(q: str = Query(..., min_length=1),
-    category: Optional[ProductCategory] = None,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),):
-    return 

@@ -94,62 +94,26 @@ def view_product(db: Session, product_id: int) -> AllProduct:
 
 def view_all_product(
     db: Session,
+    category: Optional[ProductCategory] = None,
     skip: int = 0,
     limit: int = 20,
-) -> list[ProductRead]:
-    products = db.query(Product).offset(skip).limit(limit).all()
-    return [ProductRead.from_orm(p) for p in products]
-
-
-
-def view_all_product(
-    db: Session,
-    skip: int = 0,
-    limit: int = 20,
-    q: str | None = None,
-    category: ProductCategory | None = None,
-    status: ProductStatus | None = None,
-    seller_id: int | None = None,
-    sort: str = "newest",
-) -> list[ProductRead]:
+    only_active: bool = True,
+):
     query = db.query(Product)
 
-    # filters
+    if only_active:
+        query = query.filter(Product.status == ProductStatus.active)
+
     if category:
         query = query.filter(Product.product_category == category)
 
-    if status:
-        query = query.filter(Product.status == status)
+    products = (
+        query.order_by(Product.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
-    if seller_id:
-        query = query.filter(Product.seller_id == seller_id)
-
-    # search (case-insensitive)
-    if q:
-        q_clean = q.strip()
-        like = f"%{q_clean}%"
-
-        query = query.filter(or_(
-                Product.product_name.ilike(like),
-                Product.url_slug.ilike(like),
-                Product.description.ilike(like),
-            )
-        )
-
-    if sort == "newest":
-        query = query.order_by(Product.created_at.desc())
-    elif sort == "oldest":
-        query = query.order_by(Product.created_at.asc())
-    elif sort == "updated":
-        query = query.order_by(Product.updated_at.desc())
-    elif sort == "name_asc":
-        query = query.order_by(Product.product_name.asc())
-    elif sort == "name_desc":
-        query = query.order_by(Product.product_name.desc())
-    else:
-        query = query.order_by(Product.created_at.desc())
-
-    products = query.offset(skip).limit(limit).all()
     return [ProductRead.from_orm(p) for p in products]
 
 
@@ -233,3 +197,10 @@ def search_product(q: str = Query(..., min_length=1),
     ).order_by(Product.created_at.desc())
     products = query.offset(skip).limit(limit).all()
     return [ProductRead.from_orm(p) for p in products]
+
+
+def view_all_product_seller(
+        db:Session,
+        id:int
+):
+    product=db.query(Product).filter(Product.seller_id == id).all()
