@@ -113,9 +113,9 @@ def get_product(product_id:int,db:Session=Depends(get_db),
 ):
     return view_product(db,product_id)
 
-@router.get("/all_product",response_model=ProductRead)
-def get_product(db:Session=Depends(get_db),
-                current_user:Seller=Depends(verify_seller_or_not)
+@router.get("/me", response_model=List[ProductRead])
+def get_my_products(
+    db: Session = Depends(get_db),
+    current_user: Seller = Depends(verify_seller_or_not),
 ):
-    return view_all_product_seller(db,current_user.id)
-
+    return view_all_product_seller(db, current_user.id)
