@@ -13,7 +13,7 @@ class OrderItem(Base):
         Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
     )
     product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("products.id"), nullable=False
     )
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     price: Mapped[Decimal] = mapped_column(Numeric(10,2))

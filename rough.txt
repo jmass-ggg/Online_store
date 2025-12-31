@@ -42,3 +42,287 @@ password:- Jamesss
   "description": "best photo",
   "image_url": "/uploads/iphone.jpg"
 }
+
+
+erDiagram
+    ROLES {
+        int id PK
+        string role_name "UNIQUE"
+        string descripted "NULL"
+    }
+
+    ADMIN {
+        int id PK
+        string username "UNIQUE"
+        string email "UNIQUE"
+        string hashed_password
+        datetime created_at
+        datetime updated_at
+        string role_name FK "-> roles.role_name"
+    }
+
+    CUSTOMER {
+        int id PK
+        string username
+        string email "UNIQUE"
+        string phone_number
+        string hashed_password
+        string address
+        datetime created_at
+        datetime updated_at
+        string status
+        string role_name FK "-> roles.role_name"
+    }
+
+    SELLER {
+        int id PK
+        string username
+        string email "UNIQUE"
+        string phone_number "UNIQUE"
+        string hashed_password
+        string business_name
+        string business_type
+        string business_address
+        string kyc_document_type "NULL"
+        bigint kyc_document_number "NULL"
+        string bank_account_name "NULL"
+        bigint bank_account_number "NULL"
+        string bank_name "NULL"
+        string bank_branch "NULL"
+        datetime created_at
+        datetime updated_at
+        string status
+        boolean is_verified
+        string role_name FK "-> roles.role_name"
+    }
+
+    PRODUCTS {
+        int id PK
+        string product_name
+        string url_slug "UNIQUE"
+        enum product_category
+        text description "NULL"
+        string image_url "NULL"
+        enum status
+        int seller_id FK "-> seller.id"
+        datetime created_at
+        datetime updated_at
+    }
+
+    PRODUCT_IMAGES {
+        int id PK
+        int product_id FK "-> products.id"
+        string image_url
+        string alt_text "NULL"
+        int sort_order
+        boolean is_primary
+        datetime created_at
+    }
+
+    PRODUCT_VARIANTS {
+        int id PK
+        int product_id FK "-> products.id"
+        string sku "UNIQUE"
+        string color "NULL"
+        string size "NULL"
+        numeric price
+        int stock_quantity
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
+    INVENTORY_MOVEMENTS {
+        int id PK
+        int variant_id FK "-> product_variants.id"
+        enum movement_type "RESTOCK|SALE|ADJUSTMENT|RETURN"
+        int quantity_delta
+        string reason "NULL"
+        datetime created_at
+    }
+
+    CARTS {
+        int id PK
+        int customer_id FK "-> customer.id"
+        enum status "ACTIVE|CHECKED_OUT|ABANDONED"
+        datetime created_at
+        datetime updated_at
+    }
+
+    CART_ITEMS {
+        int id PK
+        int cart_id FK "-> carts.id"
+        int variant_id FK "-> product_variants.id"
+        int quantity
+        numeric unit_price_snapshot
+        datetime created_at
+    }
+
+    ADDRESSES {
+        int id PK
+        int customer_id FK "-> customer.id"
+        string full_name
+        string phone_number
+        string line1
+        string line2 "NULL"
+        string city
+        string state "NULL"
+        string postal_code "NULL"
+        string country
+        boolean is_default_shipping
+        boolean is_default_billing
+        datetime created_at
+        datetime updated_at
+    }
+
+    ORDERS {
+        int id PK
+        int buyer_id FK "-> customer.id"
+        enum status "PLACED|CANCELLED|COMPLETED"
+        numeric subtotal
+        numeric discount_total
+        numeric shipping_fee
+        numeric tax_total
+        numeric total_price
+        string currency
+        datetime order_placed
+        datetime delivered_at "NULL"
+        int shipping_address_id FK "-> addresses.id"
+        int billing_address_id FK "-> addresses.id"
+        string notes "NULL"
+    }
+
+    ORDER_STATUS_HISTORY {
+        int id PK
+        int order_id FK "-> orders.id"
+        enum from_status
+        enum to_status
+        int changed_by_admin_id FK "-> admin.id NULL"
+        string note "NULL"
+        datetime created_at
+    }
+
+    ORDER_ITEM {
+        int id PK
+        int order_id FK "-> orders.id"
+        int product_id FK "-> products.id NULL"
+        int variant_id FK "-> product_variants.id NULL"
+        string product_name_snapshot
+        string sku_snapshot "NULL"
+        numeric unit_price_snapshot
+        int quantity
+        numeric line_total
+    }
+
+    PAYMENTS {
+        int id PK
+        int order_id FK "-> orders.id"
+        enum provider "STRIPE|KHALTI|ESEWA|COD"
+        enum status "PENDING|PAID|FAILED|REFUNDED|PARTIALLY_REFUNDED"
+        string transaction_id "NULL"
+        numeric amount
+        string currency
+        datetime paid_at "NULL"
+        datetime created_at
+    }
+
+    REFUNDS {
+        int id PK
+        int payment_id FK "-> payments.id"
+        numeric amount
+        string reason "NULL"
+        enum status "REQUESTED|APPROVED|REJECTED|PROCESSED"
+        datetime created_at
+        datetime processed_at "NULL"
+    }
+
+    SHIPMENTS {
+        int id PK
+        int order_id FK "-> orders.id"
+        enum status "PENDING|SHIPPED|DELIVERED|RETURNED"
+        string carrier "NULL"
+        string tracking_number "NULL"
+        datetime shipped_at "NULL"
+        datetime delivered_at "NULL"
+        datetime created_at
+    }
+
+    RETURNS {
+        int id PK
+        int order_id FK "-> orders.id"
+        enum status "REQUESTED|APPROVED|REJECTED|RECEIVED|REFUNDED"
+        string reason "NULL"
+        datetime created_at
+        datetime updated_at
+    }
+
+    RETURN_ITEMS {
+        int id PK
+        int return_id FK "-> returns.id"
+        int order_item_id FK "-> order_item.id"
+        int quantity
+        string condition_note "NULL"
+    }
+
+    COUPONS {
+        int id PK
+        string code "UNIQUE"
+        enum discount_type "PERCENT|FIXED"
+        numeric discount_value
+        numeric min_order_amount "NULL"
+        datetime starts_at "NULL"
+        datetime ends_at "NULL"
+        int max_uses "NULL"
+        int uses_count
+        boolean is_active
+    }
+
+    ORDER_COUPONS {
+        int id PK
+        int order_id FK "-> orders.id"
+        int coupon_id FK "-> coupons.id"
+        numeric discount_applied
+    }
+
+    REVIEW {
+        int id PK
+        int rating
+        text comment "NULL"
+        int product_id FK "-> products.id"
+        int user_id FK "-> customer.id"
+        boolean is_approved
+        datetime created_at
+    }
+
+    %% Relationships (cardinality)
+    ROLES ||--o{ ADMIN : "role_name"
+    ROLES ||--o{ CUSTOMER : "role_name"
+    ROLES ||--o{ SELLER : "role_name"
+
+    SELLER ||--o{ PRODUCTS : "sells"
+    PRODUCTS ||--o{ PRODUCT_VARIANTS : "has"
+    PRODUCTS ||--o{ PRODUCT_IMAGES : "images"
+    PRODUCT_VARIANTS ||--o{ INVENTORY_MOVEMENTS : "movements"
+
+    CUSTOMER ||--o{ ADDRESSES : "has"
+    CUSTOMER ||--o{ CARTS : "has"
+    CARTS ||--o{ CART_ITEMS : "contains"
+    PRODUCT_VARIANTS ||--o{ CART_ITEMS : "added_as"
+
+    CUSTOMER ||--o{ ORDERS : "places"
+    ADDRESSES ||--o{ ORDERS : "used_for_shipping"
+    ADDRESSES ||--o{ ORDERS : "used_for_billing"
+    ORDERS ||--o{ ORDER_ITEM : "contains"
+    ORDERS ||--o{ PAYMENTS : "paid_by"
+    PAYMENTS ||--o{ REFUNDS : "refunds"
+    ORDERS ||--o{ SHIPMENTS : "ships_in"
+    ORDERS ||--o{ ORDER_STATUS_HISTORY : "status_changes"
+
+    ORDERS ||--o{ RETURNS : "returns"
+    RETURNS ||--o{ RETURN_ITEMS : "items"
+
+    COUPONS ||--o{ ORDER_COUPONS : "applied"
+    ORDERS ||--o{ ORDER_COUPONS : "uses"
+
+    PRODUCTS ||--o{ REVIEW : "has"
+    CUSTOMER ||--o{ REVIEW : "writes"

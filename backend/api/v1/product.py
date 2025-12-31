@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, status, File, UploadFile, Form,Query
 from sqlalchemy.orm import Session
 from typing import List
-
+from backend.models.product import ProductCategory,ProductStatus
+from typing import Optional
 from backend.database import get_db
-from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductCategory,ProductVariantCreate,ProductVariantRead
+from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductVariantCreate,ProductVariantRead
 from backend.models.seller import Seller
 from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.utils.verifyied import verify_seller_or_not
@@ -13,7 +14,7 @@ from backend.service.product_service import (
     delete_product_by_seller,view_product,
     view_all_product
 )
-
+from typing import Optional
 from backend.models.admin import Admin
 UPLOAD_FOLDER="backend/uploads/"
 router=APIRouter(prefix="/product",tags=["Product"])
@@ -37,28 +38,31 @@ def create_product(
         url_slug=url_slug,
         product_category=product_category,
         description=description,
-        image_url=image,
+        image=image,                
         db=db,
         current_seller=current_seller,
-        UPLOAD_FOLDER="uploads",
+        upload_folder=UPLOAD_FOLDER, 
     )
 @router.post(
     "/{product_id}/variants",
-    response_model=list[ProductVariantCreate],
+    response_model=list[ProductVariantRead],
     status_code=status.HTTP_201_CREATED,
 )
 def create_product_variants(
     product_id: int,
-    variants: list[ProductVariantRead],
+    variants: list[ProductVariantCreate],   
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(verify_seller_or_not),
 ):
-    return add_product_variant(
+    created = add_product_variant(
         db=db,
         product_id=product_id,
         variants=variants,
         current_seller=current_seller,
     )
+
+    return [ProductVariantRead.from_orm(v) for v in created]
+
 @router.patch("/{product_id}", response_model=ProductUpdate)
 def product_edit(
     product_id: int,
@@ -80,15 +84,44 @@ def seller_delete_product(product_id:int,db:Session=Depends(get_db),
 ):
    return delete_product_by_seller(db, product_id, current_user)
 
-
 @router.get("/{product_id}",response_model=ProductRead)
 def get_product(product_id:int,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
-    return veiw_product(db,product_id,current_user)
+    return view_product(db,product_id)
 
 @router.get("/",response_model=List[ProductRead])
 def get_all_product(db:Session=Depends(get_db)
                     
 ):
     return view_all_product(db)
+
+@router.get("/product", response_model=List[ProductRead])
+def get_all_product(
+    q: Optional[str] = Query(None, description="Search product name/slug/description"),
+    category: Optional[ProductCategory] = None,
+    status_: Optional[ProductStatus] = Query(None, alias="status"),
+    seller_id: Optional[int] = None,
+    sort: str = Query("newest", pattern="^(newest|oldest|name_asc|name_desc|updated)$"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return view_all_product(
+        db=db,
+        skip=skip,
+        limit=limit,
+        q=q,
+        category=category,
+        status=status_,
+        seller_id=seller_id,
+        sort=sort,
+    )
+
+@router.get("/search",response_model=List[ProductRead])
+def product_shown(q: str = Query(..., min_length=1),
+    category: Optional[ProductCategory] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),):
+    return 

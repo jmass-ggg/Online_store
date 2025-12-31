@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile,Query
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -9,10 +9,12 @@ from backend.database import get_db
 from backend.models.product import Product,ProductStatus,ProductCategory
 from backend.models.seller import Seller
 from backend.models.ProductVariant import ProductVariant
-from backend.schemas.product import ProductCreate,ProductRead,ProductUpdate,ProductVariantCreate
+from backend.schemas.product import ProductCreate,ProductRead,ProductUpdate,ProductVariantCreate,ProductVariantRead,AllProduct
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 from backend.models.admin import Admin
+from sqlalchemy import or_
+from typing import Optional
 
 def add_product_by_seller(
     product_name: str,
@@ -26,7 +28,9 @@ def add_product_by_seller(
 ) -> ProductRead:
 
     os.makedirs(upload_folder, exist_ok=True)
-    file_path = os.path.join(upload_folder, image.filename)
+
+    filename = image.filename
+    file_path = os.path.join(upload_folder, filename)
 
     with open(file_path, "wb") as f:
         shutil.copyfileobj(image.file, f)
@@ -36,7 +40,7 @@ def add_product_by_seller(
         url_slug=url_slug,
         product_category=product_category,
         description=description,
-        image_url=f"/uploads/{image.filename}",
+        image_url=f"/uploads/{filename}",
         status=ProductStatus.inactive,
         seller_id=current_seller.id,
     )
@@ -64,21 +68,90 @@ def add_product_variant(
 
     created_variants: list[ProductVariant] = []
 
-    with db.begin():
-        for v in variants:
-            variant = ProductVariant(
-                product_id=product.id,
-                color=v.color,
-                size=v.size,
-                price=v.price,
-                stock_quantity=v.stock_quantity,
-            )
-            db.add(variant)
-            created_variants.append(variant)
+    for v in variants:
+        variant = ProductVariant(
+            product_id=product.id,
+            color=v.color,
+            size=v.size,
+            price=v.price,
+            stock_quantity=v.stock_quantity,
+        )
+        db.add(variant)
+        created_variants.append(variant)
 
-        product.status = ProductStatus.active
+    product.status = ProductStatus.active
+    db.commit()  
 
     return created_variants
+
+def view_product(db: Session, product_id: int) -> AllProduct:
+    product = db.query(Product).filter(Product.id == product_id).one_or_none()
+
+    if not product:
+        raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
+
+    return ProductRead.from_orm(product)
+
+def view_all_product(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+) -> list[ProductRead]:
+    products = db.query(Product).offset(skip).limit(limit).all()
+    return [ProductRead.from_orm(p) for p in products]
+
+
+
+def view_all_product(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    q: str | None = None,
+    category: ProductCategory | None = None,
+    status: ProductStatus | None = None,
+    seller_id: int | None = None,
+    sort: str = "newest",
+) -> list[ProductRead]:
+    query = db.query(Product)
+
+    # filters
+    if category:
+        query = query.filter(Product.product_category == category)
+
+    if status:
+        query = query.filter(Product.status == status)
+
+    if seller_id:
+        query = query.filter(Product.seller_id == seller_id)
+
+    # search (case-insensitive)
+    if q:
+        q_clean = q.strip()
+        like = f"%{q_clean}%"
+
+        query = query.filter(or_(
+                Product.product_name.ilike(like),
+                Product.url_slug.ilike(like),
+                Product.description.ilike(like),
+            )
+        )
+
+    if sort == "newest":
+        query = query.order_by(Product.created_at.desc())
+    elif sort == "oldest":
+        query = query.order_by(Product.created_at.asc())
+    elif sort == "updated":
+        query = query.order_by(Product.updated_at.desc())
+    elif sort == "name_asc":
+        query = query.order_by(Product.product_name.asc())
+    elif sort == "name_desc":
+        query = query.order_by(Product.product_name.desc())
+    else:
+        query = query.order_by(Product.created_at.desc())
+
+    products = query.offset(skip).limit(limit).all()
+    return [ProductRead.from_orm(p) for p in products]
+
 
 def edit_product_by_seller(
     db: Session,
@@ -142,19 +215,21 @@ def delete_product_by_seller(
 
     return {"message": "Product deleted successfully"}
 
-def view_product(db: Session, product_id: int) -> ProductRead:
-    product = db.query(Product).filter(Product.id == product_id).one_or_none()
-
-    if not product:
-        raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-
-    return ProductRead.from_orm(product)
-
-def view_all_product(
-    db: Session,
-    skip: int = 0,
-    limit: int = 20,
-) -> list[ProductRead]:
-    products = db.query(Product).offset(skip).limit(limit).all()
+def search_product(q: str = Query(..., min_length=1),
+    category: Optional[ProductCategory] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),):
+    like = f"%{q.strip()}%"
+    query=db.query(Product).filter(Product.status == ProductStatus.active)
+    if category:
+        query = query.filter(Product.product_category == category)
+    query = query.filter(
+        or_(
+            Product.product_name.ilike(like),
+            Product.url_slug.ilike(like),
+            Product.description.ilike(like),
+        )
+    ).order_by(Product.created_at.desc())
+    products = query.offset(skip).limit(limit).all()
     return [ProductRead.from_orm(p) for p in products]
-
