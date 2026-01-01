@@ -13,7 +13,7 @@ from backend.schemas.product import ProductCreate,ProductRead,ProductUpdate,Prod
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 from backend.models.admin import Admin
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from typing import Optional
 
 def add_product_by_seller(
@@ -89,8 +89,42 @@ def view_product(db: Session, product_id: int) -> AllProduct:
 
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-
     return ProductRead.from_orm(product)
+
+def search_products(
+    *,
+    q: str,
+    category: Optional[ProductCategory],
+    skip: int,
+    limit: int,
+    db: Session,
+) -> List[ProductRead]:
+    term = q.strip()
+    if not term:
+        return []
+
+    like = f"%{term.lower()}%"
+    active_value = getattr(ProductStatus.active, "value", ProductStatus.active)
+
+    query = (
+        db.query(Product)
+        .filter(Product.status == active_value)
+    )
+
+    if category is not None:
+        query = query.filter(Product.product_category == category)
+
+    # Normalize both sides: lower(trim(column)) LIKE %lower(term)%
+    query = query.filter(
+        or_(
+            func.lower(func.trim(Product.product_name)).like(like),
+            func.lower(func.trim(Product.url_slug)).like(like),
+            func.lower(func.trim(Product.description)).like(like),
+        )
+    ).order_by(Product.created_at.desc())
+
+    products = query.offset(skip).limit(limit).all()
+    return [ProductRead.from_orm(p) for p in products]
 
 def view_all_product(
     db: Session,
@@ -179,24 +213,6 @@ def delete_product_by_seller(
 
     return {"message": "Product deleted successfully"}
 
-def search_product(q: str = Query(..., min_length=1),
-    category: Optional[ProductCategory] = None,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),):
-    like = f"%{q.strip()}%"
-    query=db.query(Product).filter(Product.status == ProductStatus.active)
-    if category:
-        query = query.filter(Product.product_category == category)
-    query = query.filter(
-        or_(
-            Product.product_name.ilike(like),
-            Product.url_slug.ilike(like),
-            Product.description.ilike(like),
-        )
-    ).order_by(Product.created_at.desc())
-    products = query.offset(skip).limit(limit).all()
-    return [ProductRead.from_orm(p) for p in products]
 
 
 def view_all_product_seller( seller_id: int,db: Session,) -> List[ProductRead]:

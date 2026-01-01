@@ -1,30 +1,33 @@
-from pydantic import BaseModel, ConfigDict, Field, constr
+from pydantic import BaseModel, Field, constr
 from decimal import Decimal
 from backend.models.product import ProductCategory, ProductStatus
-from typing import List
+from typing import List, Optional
 
 class ProductCreate(BaseModel):
-    product_name: constr(min_length=5, max_length=50)  # 15 is too short in real apps
+    product_name: constr(min_length=5, max_length=50)
     url_slug: str = Field(..., min_length=3, max_length=80)
     product_category: ProductCategory
-    description: str | None = None
-
+    description: Optional[str] = None
 
 class ProductUpdate(BaseModel):
-    product_name: str | None = Field(None, min_length=5, max_length=50)
-    description: str | None = None
-    status: ProductStatus | None = None
+    product_name: Optional[str] = Field(None, min_length=5, max_length=50)
+    description: Optional[str] = None
+    status: Optional[ProductStatus] = None
 
-
-class ProductRead(ProductCreate):
-
+class ProductRead(BaseModel):
     id: int
+    product_name: str
+    url_slug: str
+    product_category: ProductCategory
+    description: Optional[str] = None
+
+    image_url: Optional[str] = None  
     status: ProductStatus
     seller_id: int
-    class Config:
-        orm_mode=True
-        from_attributes=True
 
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 class ProductVariantCreate(BaseModel):
     color: str | None = None

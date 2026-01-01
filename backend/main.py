@@ -1,18 +1,18 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from backend.api.v1 import customer,product,order,review,seller,admin,login
+
+from backend.api.v1 import customer, product, order, review, seller, admin, login
 from backend.database import Base, engine
 
 app = FastAPI()
 
-origins = ["http://localhost:3000", "http://127.0.0.1:3000","http://localhost:5173"]
-
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,10 +22,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ IMPORTANT: serve EXACT folder where images are saved
+UPLOAD_DIR = "/home/james/james/project/Online_store/backend/uploads"
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 Base.metadata.create_all(bind=engine)
 
-
-# Routers
 app.include_router(login.router)
 app.include_router(customer.router)
 app.include_router(product.router)
@@ -33,6 +35,7 @@ app.include_router(order.router)
 app.include_router(review.router)
 app.include_router(seller.router)
 app.include_router(admin.router)
+
 @app.get("/")
 def hello_world():
-    return {"message": "hello this is online store "}
+    return {"message": "hello this is online store"}

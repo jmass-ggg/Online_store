@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status, File, UploadFile, Form,Query
 from sqlalchemy.orm import Session
 from typing import List
+from backend.core.settings import UPLOAD_DIR
 from backend.models.product import ProductCategory,ProductStatus
 from typing import Optional
 from backend.database import get_db
@@ -12,7 +13,7 @@ from backend.service.product_service import (
     add_product_by_seller,
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
     delete_product_by_seller,view_product,view_all_product_seller,
-    view_all_product
+    view_all_product,search_products
 )
 from typing import Optional
 from backend.models.admin import Admin
@@ -34,19 +35,20 @@ def get_all_product(
         only_active=True,
     )
 
-@router.get("/search",response_model=List[ProductRead])
-def product_shown(q: str = Query(..., min_length=1),
+@router.get("/search", response_model=List[ProductRead])
+def product_search(
+    q: str = Query(..., min_length=1),
     category: Optional[ProductCategory] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),):
-    return 
+    db: Session = Depends(get_db),
+):
+    # Optional: debug SQL if needed
+    # print(query.statement.compile(compile_kwargs={"literal_binds": True}))
 
-@router.post(
-    "/",
-    response_model=ProductRead,
-    status_code=status.HTTP_201_CREATED,
-)
+    return search_products(q=q, category=category, skip=skip, limit=limit, db=db)
+
+@router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
     product_name: str = Form(...),
     url_slug: str = Form(...),
@@ -61,10 +63,10 @@ def create_product(
         url_slug=url_slug,
         product_category=product_category,
         description=description,
-        image=image,                
+        image=image,
         db=db,
         current_seller=current_seller,
-        upload_folder=UPLOAD_FOLDER, 
+        upload_folder=str(UPLOAD_DIR),  
     )
 @router.post(
     "/{product_id}/variants",
