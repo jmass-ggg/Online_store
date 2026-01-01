@@ -15,10 +15,11 @@ from backend.core.error_handler import error_handler
 from backend.models.admin import Admin
 from sqlalchemy import or_, func
 from typing import Optional
+from backend.core.random_slang_url import generate_unique_url_slug
+
 
 def add_product_by_seller(
     product_name: str,
-    url_slug: str,
     product_category: ProductCategory,
     description: str | None,
     image: UploadFile,
@@ -35,6 +36,8 @@ def add_product_by_seller(
     with open(file_path, "wb") as f:
         shutil.copyfileobj(image.file, f)
 
+    url_slug = generate_unique_url_slug(db, product_name)
+
     new_product = Product(
         product_name=product_name,
         url_slug=url_slug,
@@ -50,6 +53,7 @@ def add_product_by_seller(
     db.refresh(new_product)
 
     return ProductRead.from_orm(new_product)
+
 
 def add_product_variant(
     db: Session,

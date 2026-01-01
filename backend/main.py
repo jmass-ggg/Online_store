@@ -22,7 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ IMPORTANT: serve EXACT folder where images are saved
 UPLOAD_DIR = "/home/james/james/project/Online_store/backend/uploads"
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 

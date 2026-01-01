@@ -58,9 +58,10 @@ def create_product(
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(verify_seller_or_not),
 ):
+    
     return add_product_by_seller(
         product_name=product_name,
-        url_slug=url_slug,
+        
         product_category=product_category,
         description=description,
         image=image,
@@ -68,6 +69,7 @@ def create_product(
         current_seller=current_seller,
         upload_folder=str(UPLOAD_DIR),  
     )
+
 @router.post(
     "/{product_id}/variants",
     response_model=list[ProductVariantRead],
