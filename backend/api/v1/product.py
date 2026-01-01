@@ -13,7 +13,7 @@ from backend.service.product_service import (
     add_product_by_seller,
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
     delete_product_by_seller,view_product,view_all_product_seller,
-    view_all_product,search_products
+    view_all_product,search_products,view_product_by_slug
 )
 from typing import Optional
 from backend.models.admin import Admin
@@ -35,6 +35,13 @@ def get_all_product(
         only_active=True,
     )
 
+
+@router.get("/slug/{slug}", response_model=ProductRead)
+def get_product_by_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+):
+    return view_product_by_slug(db, slug)
 @router.get("/search", response_model=List[ProductRead])
 def product_search(
     q: str = Query(..., min_length=1),
@@ -48,6 +55,11 @@ def product_search(
 
     return search_products(q=q, category=category, skip=skip, limit=limit, db=db)
 
+@router.get("/{product_id}",response_model=ProductRead)
+def get_product(product_id:int,db:Session=Depends(get_db),
+                current_user:Seller=Depends(verify_seller_or_not)
+):
+    return view_product(db,product_id)
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
     product_name: str = Form(...),
@@ -118,8 +130,3 @@ def get_my_products(
 ):
     return view_all_product_seller( current_user.id,db,)
 
-@router.get("/{product_id}",response_model=ProductRead)
-def get_product(product_id:int,db:Session=Depends(get_db),
-                current_user:Seller=Depends(verify_seller_or_not)
-):
-    return view_product(db,product_id)

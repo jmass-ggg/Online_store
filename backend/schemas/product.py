@@ -14,16 +14,11 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[ProductStatus] = None
 
-class ProductRead(BaseModel):
+class ProductRead(ProductCreate):
     id: int
-    product_name: str
-    url_slug: str
-    product_category: ProductCategory
-    description: Optional[str] = None
-
-    image_url: Optional[str] = None  
     status: ProductStatus
     seller_id: int
+    image_url: str | None = None   # ✅ add this
 
     class Config:
         orm_mode = True
@@ -45,7 +40,7 @@ class ProductVariantRead(ProductVariantCreate):
         from_attributes=True
 
 class AllProduct(ProductRead):
-    ProductVariants:List[ProductVariantRead]
+    variants: List[ProductVariantRead] = []
 
 class ProductSuggestion(BaseModel):
     id: int

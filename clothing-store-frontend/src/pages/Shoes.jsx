@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom"; // ✅ add
 import "./Shoes.css";
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -20,6 +21,7 @@ export default function Shoes() {
 
       return {
         id: p.id,
+        url_slug: p.url_slug, // ✅ add
         tag: "Just In",
         title: p.product_name,
         category: p.product_category,
@@ -141,7 +143,12 @@ export default function Shoes() {
             <div className="grid">
               {mappedProducts.map((p) => (
                 <article className="card" key={p.id}>
-                  <div className="card-img">
+                  {/* ✅ CLICK IMAGE -> PRODUCT PAGE */}
+                  <Link
+                    to={`/product/${p.url_slug}`}
+                    className="card-img"
+                    style={{ textDecoration: "none" }}
+                  >
                     <img
                       src={p.image}
                       alt={p.title}
@@ -150,7 +157,7 @@ export default function Shoes() {
                         e.currentTarget.src = "/shoes.jpg";
                       }}
                     />
-                  </div>
+                  </Link>
 
                   <div className="card-text">
                     <div className="tag justin">{p.tag}</div>
@@ -158,7 +165,7 @@ export default function Shoes() {
                     <p className="sub">{p.category}</p>
                     <p className="price">${p.price}</p>
 
-                    {/* ✅ Two buttons */}
+                    {/* Two buttons */}
                     <div className="actions">
                       <button
                         className="btn btn-primary"

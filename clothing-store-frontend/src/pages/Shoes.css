@@ -1,13 +1,4 @@
-/* =========================================================
-   Shoes.css  (COPY + PASTE)
-   Nike-like listing page
-   ✅ No horizontal overflow / no cut-off
-   ✅ 3 items per row on laptop, responsive down to mobile
-   ✅ Images centered + consistent size (no weird cropping)
-   ✅ Buttons always fit inside card
-========================================================= */
 
-/* ---------- Reset / Base ---------- */
 html, body {
   height: 100%;
   margin: 0;

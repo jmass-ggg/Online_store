@@ -95,6 +95,12 @@ def view_product(db: Session, product_id: int) -> AllProduct:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
     return ProductRead.from_orm(product)
 
+def view_product_by_slug(db: Session, slug: str) -> ProductRead:
+    product = db.query(Product).filter(Product.url_slug == slug).one_or_none()
+    if not product:
+        raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
+    return ProductRead.from_orm(product)
+
 def search_products(
     *,
     q: str,

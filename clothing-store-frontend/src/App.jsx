@@ -3,6 +3,7 @@ import Home from "./pages/Home.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Shoes from "./pages/Shoes.jsx";
+import Product from "./pages/Product.jsx"; // ✅ add
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 
 export default function App() {
@@ -15,6 +16,16 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shoes />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ product detail page */}
+      <Route
+        path="/product/:slug"
+        element={
+          <ProtectedRoute>
+            <Product />
           </ProtectedRoute>
         }
       />
