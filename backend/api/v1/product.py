@@ -92,7 +92,15 @@ def upload_single_image_of_product(
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(get_current_seller),
 ):
-    return upload_single_product_image(product_id,image,is_primary,sort_order,db,current_seller)
+    return upload_single_product_image(
+        product_id=product_id,
+        image=image,
+        is_primary=is_primary,
+        sort_order=sort_order,
+        db=db,
+        current_seller=current_seller,
+    )
+
 @router.post("/seller/products/{product_id}/images", response_model=List[ProductImageRead])
 def upload_multipile_image_of_product(
     product_id: int,
@@ -100,8 +108,7 @@ def upload_multipile_image_of_product(
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(get_current_seller),
 ):
-    return upload_multiple_product_images(product_id,images,db,current_seller)
-
+    return upload_multiple_product_images(product_id, images, db, current_seller)
 @router.post(
     "/{product_id}/variants",
     response_model=list[ProductVariantRead],

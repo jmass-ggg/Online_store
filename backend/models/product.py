@@ -61,7 +61,13 @@ class Product(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-
+    images: Mapped[list["ProductImage"]] = relationship(   # ✅ ADD THIS
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ProductImage.sort_order",
+    )
     order_items: Mapped[list["OrderItem"]] = relationship(
         "OrderItem",
         back_populates="product",

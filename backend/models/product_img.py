@@ -8,7 +8,6 @@ class ProductImage(Base):
     __tablename__ = "product_images"
 
     __table_args__ = (
-        Index("ix_product_images_product_id", "product_id"),
         UniqueConstraint("product_id", "sort_order", name="uq_product_images_sort_order"),
     )
 

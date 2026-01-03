@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile,Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile,Query,File
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -22,6 +22,7 @@ from backend.core.random_slang_url import generate_unique_url_slug
 from datetime import datetime
 from uuid import uuid4
 from backend.core.settings import UPLOAD_DIR
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 UPLOAD_FOLDER="backend/uploads/"
 
@@ -64,21 +65,30 @@ def add_product_by_seller(
 
 def upload_single_product_image(
     product_id: int,
-    image: UploadFile = File(...),
-    is_primary: bool = False,
-    sort_order: int = 0,db: Session=Depends(get_db),current_seller:Session=Decimal(verify_seller_or_not)):
-    try:
-        product=db.query(Product).filter(Product.id == product_id).one_or_none()
-        if not product:
-            raise error_handler(403,"Product not Found")
-        os.makedirs(UPLOAD_FOLDER)
-        ext = os.path.splitext(image.filename)[1].lower()
-        filename = f"{uuid4().hex}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
+    image: UploadFile,
+    is_primary: bool,
+    sort_order: int,
+    db: Session,
+    current_seller: Seller,
+):
+    product = db.query(Product).filter(Product.id == product_id).one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
 
-        with open(file_path, "wb") as f:
-            shutil.copyfileobj(image.file, f)
-        with db.begin(): 
+    if product.seller_id != current_seller.id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)  # ✅ create the SAME folder you save into
+
+    ext = os.path.splitext(image.filename)[1].lower()
+    filename = f"{uuid4().hex}{ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)  # ✅ same UPLOAD_DIR
+
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(image.file, f)
+
+    try:
+        with db.begin_nested():
             if is_primary:
                 db.query(ProductImage).filter(
                     ProductImage.product_id == product_id,
@@ -92,19 +102,24 @@ def upload_single_product_image(
                 sort_order=sort_order,
             )
             db.add(row)
-            db.flush() 
-
+            db.flush()
+        db.commit()
         db.refresh(row)
         return ProductImageRead.from_orm(row)
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="sort_order already exists for this product")
+
     except SQLAlchemyError:
         db.rollback()
-        raise error_handler(500,"Failed to save product image")
+        raise HTTPException(status_code=500, detail="Failed to save product image")
 
 def upload_multiple_product_images(
     product_id: int,
-    images: List[UploadFile] = File(...),
-    db: Session = Depends(get_db),
-    current_seller: Seller = Depends(verify_seller_or_not),
+    images: List[UploadFile],
+    db: Session,
+    current_seller: Seller,
 ):
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
     if not product:
@@ -117,43 +132,45 @@ def upload_multiple_product_images(
     saved_rows: list[ProductImage] = []
 
     try:
-        with db.begin():  
-            last_sort = (
-                db.query(ProductImage.sort_order)
-                .filter(ProductImage.product_id == product_id)
-                .order_by(ProductImage.sort_order.desc())
-                .first()
+        # Find next sort_order so new images append after existing ones
+        last_sort = (
+            db.query(ProductImage.sort_order)
+            .filter(ProductImage.product_id == product_id)
+            .order_by(ProductImage.sort_order.desc())
+            .first()
+        )
+        start_sort = (last_sort[0] + 1) if last_sort else 0
+
+        for i, img in enumerate(images):
+            ext = os.path.splitext(img.filename)[1].lower()
+            filename = f"{uuid4().hex}{ext}"
+            file_path = os.path.join(UPLOAD_DIR, filename)
+
+            with open(file_path, "wb") as f:
+                shutil.copyfileobj(img.file, f)
+
+            row = ProductImage(
+                product_id=product_id,
+                image_url=f"/uploads/{filename}",
+                is_primary=False,
+                sort_order=start_sort + i,
             )
-            start_sort = (last_sort[0] + 1) if last_sort else 0
+            db.add(row)
+            saved_rows.append(row)
 
-            for i, img in enumerate(images):
-                ext = os.path.splitext(img.filename)[1].lower()
-                filename = f"{uuid4().hex}{ext}"
-                file_path = os.path.join(UPLOAD_DIR, filename)
-
-               
-                with open(file_path, "wb") as f:
-                    shutil.copyfileobj(img.file, f)
-
-               
-                row = ProductImage(
-                    product_id=product_id,
-                    image_url=f"/uploads/{filename}",
-                    is_primary=False,
-                    sort_order=start_sort + i,
-                )
-                db.add(row)
-                saved_rows.append(row)
-
-            db.flush() 
-
+        db.commit()
 
         for r in saved_rows:
             db.refresh(r)
 
         return [ProductImageRead.from_orm(r) for r in saved_rows]
 
-    except Exception:
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Duplicate sort_order for this product")
+
+    except SQLAlchemyError:
+        db.rollback()
         raise HTTPException(status_code=500, detail="Failed to upload product images")
     
 def add_product_variant(
@@ -163,35 +180,67 @@ def add_product_variant(
     current_seller: Seller,
 ) -> list[ProductVariant]:
 
-    product = db.query(Product).filter(Product.id == product_id).one_or_none()
+    try:
+        product = db.query(Product).filter(Product.id == product_id).one_or_none()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
 
-    if not product:
-        raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
+        if product.seller_id != current_seller.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
 
-    if product.seller_id != current_seller.id:
-        raise error_handler(status.HTTP_403_FORBIDDEN, "Not authorized")
+        created_variants: list[ProductVariant] = []
 
-    created_variants: list[ProductVariant] = []
-    sku = generate_hybrid_sku(db, product.url_slug, v.color, v.size)
-    for v in variants:
-        variant = ProductVariant(
-            product_id=product.id,
-            sku=sku,
-            color=v.color,
-            size=v.size,
-            price=v.price,
-            stock_quantity=v.stock_quantity,
-            is_active=True,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+        for v in variants:
+            exists = db.query(ProductVariant.id).filter(
+                ProductVariant.product_id == product_id,
+                ProductVariant.color == v.color,
+                ProductVariant.size == v.size,
+            ).first()
+
+            if exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Variant already exists (color={v.color}, size={v.size})"
+                )
+
+            sku = generate_hybrid_sku(db, product.url_slug, v.color, v.size)
+
+            variant = ProductVariant(
+                product_id=product_id,
+                sku=sku,
+                color=v.color,
+                size=v.size,
+                price=v.price,
+                stock_quantity=v.stock_quantity,
+                is_active=(v.stock_quantity > 0),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+
+            db.add(variant)
+            created_variants.append(variant)
+
+        product.status = ProductStatus.active
+        db.commit()
+
+        for var in created_variants:
+            db.refresh(var)
+
+        return created_variants
+
+    except HTTPException:
+        raise
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Duplicate variant detected (same product_id + color + size)."
         )
-        db.add(variant)
-        created_variants.append(variant)
 
-    product.status = ProductStatus.active
-    db.commit()  
-
-    return created_variants
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error while creating variants")
 
 def view_product(db: Session, product_id: int) -> AllProduct:
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
