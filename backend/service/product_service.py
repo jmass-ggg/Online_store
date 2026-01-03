@@ -16,7 +16,7 @@ from backend.models.admin import Admin
 from sqlalchemy import or_, func
 from typing import Optional
 from backend.core.random_slang_url import generate_unique_url_slug
-
+from datetime import datetime
 
 def add_product_by_seller(
     product_name: str,
@@ -79,6 +79,9 @@ def add_product_variant(
             size=v.size,
             price=v.price,
             stock_quantity=v.stock_quantity,
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         db.add(variant)
         created_variants.append(variant)

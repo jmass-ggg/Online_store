@@ -1,6 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
-from sqlalchemy import Integer, String, Numeric, ForeignKey
+from datetime import datetime
+from sqlalchemy import Integer, String, Numeric, ForeignKey,Boolean,DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
 
@@ -22,7 +23,13 @@ class ProductVariant(Base):
 
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-
+    is_active:Mapped[bool]=mapped_column(Boolean,default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     product: Mapped["Product"] = relationship(
         "Product", back_populates="variants"
     )

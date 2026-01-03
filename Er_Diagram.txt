@@ -1,0 +1,116 @@
+erDiagram
+    ROLES {
+        int id PK
+        string role_name UK
+        string descripted
+    }
+
+    ADMIN {
+        int id PK
+        string username UK
+        string email UK
+        string hashed_password
+        datetime created_at
+        datetime updated_at
+        string role_name FK
+    }
+
+    CUSTOMER {
+        int id PK
+        string username
+        string email UK
+        string phone_number
+        string hashed_password
+        string address
+        datetime created_at
+        datetime updated_at
+        string status
+        string role_name FK
+    }
+
+    SELLER {
+        int id PK
+        string username
+        string email UK
+        string phone_number UK
+        string hashed_password
+        string business_name
+        string business_type
+        string business_address
+        string kyc_document_type
+        bigint kyc_document_number
+        string bank_account_name
+        bigint bank_account_number
+        string bank_name
+        string bank_branch
+        datetime created_at
+        datetime updated_at
+        string status
+        boolean is_verified
+        string role_name FK
+    }
+
+    PRODUCTS {
+        int id PK
+        string product_name
+        string url_slug UK
+        string product_category
+        string description
+        string image_url
+        string status
+        int seller_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    ORDERS {
+        int id PK
+        int buyer_id FK
+        string status
+        decimal total_price
+        datetime order_placed
+        datetime delivered_at
+    }
+
+    ORDER_ITEM {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+        decimal price
+    }
+
+    REVIEW {
+        int id PK
+        int rating
+        string comment
+        int product_id FK
+        int user_id FK
+    }
+
+    REFRESH_TOKENS {
+        int id PK
+        string token UK
+        string role
+        int owner_id
+        datetime expires_at
+        boolean revoked
+    }
+
+    %% Role relationships
+    ROLES ||--o{ ADMIN : "role_name"
+    ROLES ||--o{ CUSTOMER : "role_name"
+    ROLES ||--o{ SELLER : "role_name"
+
+    %% Commerce relationships
+    CUSTOMER ||--o{ ORDERS : "places"
+    ORDERS ||--o{ ORDER_ITEM : "contains"
+    PRODUCTS ||--o{ ORDER_ITEM : "included_in"
+    SELLER ||--o{ PRODUCTS : "lists"
+
+    %% Reviews
+    PRODUCTS ||--o{ REVIEW : "receives"
+    CUSTOMER ||--o{ REVIEW : "writes"
+
+    %% Note: REFRESH_TOKENS.owner_id is polymorphic (Admin/Seller/Customer),
+    %% so it has no enforced FK relationship in the schema.

@@ -122,7 +122,6 @@ erDiagram
     PRODUCT_VARIANTS {
         int id PK
         int product_id FK "-> products.id"
-        string sku "UNIQUE"
         string color "NULL"
         string size "NULL"
         numeric price
