@@ -18,7 +18,7 @@ class ProductRead(ProductCreate):
     id: int
     status: ProductStatus
     seller_id: int
-    image_url: str | None = None   # ✅ add this
+    image_url: str | None = None   
 
     class Config:
         orm_mode = True

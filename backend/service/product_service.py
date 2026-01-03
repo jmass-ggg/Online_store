@@ -228,7 +228,7 @@ def delete_product_by_seller(
 
 
 
-def view_all_product_seller( seller_id: int,db: Session,) -> List[ProductRead]:
+def view_all_product_seller(seller_id: int, db: Session) -> List[ProductRead]:
     products = (
         db.query(Product)
         .filter(Product.seller_id == seller_id)

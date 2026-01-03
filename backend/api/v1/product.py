@@ -15,6 +15,7 @@ from backend.service.product_service import (
     delete_product_by_seller,view_product,view_all_product_seller,
     view_all_product,search_products,view_product_by_slug
 )
+from backend.models.product import Product
 from typing import Optional
 from backend.models.admin import Admin
 UPLOAD_FOLDER="backend/uploads/"
@@ -111,6 +112,13 @@ def product_edit(
 ):
     return edit_product_by_seller(db,product_id,product_update,current_user)
 
+@router.get("/product/me", response_model=list[ProductRead])
+def my_products(
+    db: Session = Depends(get_db),
+    current_seller: Seller = Depends(get_current_seller),
+):
+    return view_all_product_seller(current_seller.id, db)
+
 @router.delete("/{product_id}/admin",status_code=status.HTTP_200_OK)
 def admin_delete_product(product_id:int,db:Session=Depends(get_db),
                 current_admin:Admin=Depends(get_current_admin)
@@ -123,10 +131,4 @@ def seller_delete_product(product_id:int,db:Session=Depends(get_db),
 ):
    return delete_product_by_seller(db, product_id, current_user)
 
-@router.get("/me", response_model=List[ProductRead])
-def get_my_products(
-    db: Session = Depends(get_db),
-    current_user: Seller = Depends(verify_seller_or_not),
-):
-    return view_all_product_seller( current_user.id,db,)
 
