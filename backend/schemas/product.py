@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, constr
 from decimal import Decimal
 from backend.models.product import ProductCategory, ProductStatus
 from typing import List, Optional
+from datetime import datetime
 
 class ProductCreate(BaseModel):
     product_name: constr(min_length=5, max_length=50)
@@ -50,3 +51,28 @@ class ProductSuggestion(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes=True
+
+class ProductImageBase(BaseModel):
+    is_primary: bool = False
+    sort_order: int = Field(0, ge=0)
+    
+
+class ProductImageRead(ProductImageBase):
+    id: int
+    product_id: int
+    image_url: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+class ProductImageUpdate(BaseModel):
+    is_primary: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+    
+
+    class Config:
+        orm_mode = True
+        from_attributes = True

@@ -5,7 +5,7 @@ from backend.core.settings import UPLOAD_DIR
 from backend.models.product import ProductCategory,ProductStatus
 from typing import Optional
 from backend.database import get_db
-from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductVariantCreate,ProductVariantRead
+from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductVariantCreate,ProductVariantRead,ProductImageRead
 from backend.models.seller import Seller
 from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.utils.verifyied import verify_seller_or_not
@@ -13,7 +13,9 @@ from backend.service.product_service import (
     add_product_by_seller,
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
     delete_product_by_seller,view_product,view_all_product_seller,
-    view_all_product,search_products,view_product_by_slug
+    view_all_product,search_products,view_product_by_slug,
+    upload_single_product_image,upload_multiple_product_images
+
 )
 from backend.models.product import Product
 from typing import Optional
@@ -43,6 +45,7 @@ def get_product_by_slug(
     db: Session = Depends(get_db),
 ):
     return view_product_by_slug(db, slug)
+
 @router.get("/search", response_model=List[ProductRead])
 def product_search(
     q: str = Query(..., min_length=1),
@@ -51,9 +54,6 @@ def product_search(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    # Optional: debug SQL if needed
-    # print(query.statement.compile(compile_kwargs={"literal_binds": True}))
-
     return search_products(q=q, category=category, skip=skip, limit=limit, db=db)
 
 @router.get("/{product_id}",response_model=ProductRead)
@@ -61,6 +61,7 @@ def get_product(product_id:int,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
     return view_product(db,product_id)
+
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
     product_name: str = Form(...),
@@ -82,6 +83,24 @@ def create_product(
         current_seller=current_seller,
         upload_folder=str(UPLOAD_DIR),  
     )
+@router.post("/seller/products/{product_id}/image", response_model=ProductImageRead)
+def upload_single_image_of_product(
+    product_id: int,
+    image: UploadFile = File(...),
+    is_primary: bool = False,
+    sort_order: int = 0,
+    db: Session = Depends(get_db),
+    current_seller: Seller = Depends(get_current_seller),
+):
+    return upload_single_product_image(product_id,image,is_primary,sort_order,db,current_seller)
+@router.post("/seller/products/{product_id}/images", response_model=List[ProductImageRead])
+def upload_multipile_image_of_product(
+    product_id: int,
+    images: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_seller: Seller = Depends(get_current_seller),
+):
+    return upload_multiple_product_images(product_id,images,db,current_seller)
 
 @router.post(
     "/{product_id}/variants",

@@ -63,39 +63,133 @@ erDiagram
         datetime updated_at
     }
 
+    PRODUCT_VARIANTS {
+        int id PK
+        int product_id FK
+        string sku UK
+        string color
+        string size
+        decimal price
+        int stock_quantity
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
+    PRODUCT_IMAGES {
+        int id PK
+        int product_id FK
+        string image_url
+        boolean is_primary
+        int sort_order
+        datetime created_at
+    }
+    CARTS {
+        int id PK
+        int buyer_id FK
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    CART_ITEMS {
+        int id PK
+        int cart_id FK
+        int variant_id FK
+        int quantity
+        datetime created_at
+        datetime updated_at
+    }
+
     ORDERS {
         int id PK
         int buyer_id FK
         string status
         decimal total_price
+        decimal shipping_fee
+        decimal discount_amount
+        decimal tax_amount
         datetime order_placed
         datetime delivered_at
     }
 
-    ORDER_ITEM {
+    ORDER_ITEMS {
         int id PK
         int order_id FK
-        int product_id FK
+        int variant_id FK
         int quantity
-        decimal price
+        decimal unit_price_snapshot
+        decimal line_total
     }
 
-    REVIEW {
+    PAYMENTS {
         int id PK
-        int rating
-        string comment
+        int order_id FK
+        string method
+        string status
+        decimal amount
+        string provider_ref
+        datetime created_at
+        datetime updated_at
+    }
+
+    ADDRESSES {
+        int id PK
+        int customer_id FK
+        string full_name
+        string phone_number
+        string province
+        string city
+        string street
+        string postal_code
+        boolean is_default
+        datetime created_at
+        datetime updated_at
+    }
+
+    SHIPMENTS {
+        int id PK
+        int order_id FK
+        string carrier
+        string tracking_number
+        string status
+        datetime shipped_at
+        datetime delivered_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    SELLER_VERIFICATIONS {
+        int id PK
+        int seller_id FK
+        string status
+        int reviewed_by_admin_id FK
+        string review_note
+        datetime created_at
+        datetime updated_at
+    }
+
+    PRODUCT_APPROVALS {
+        int id PK
         int product_id FK
-        int user_id FK
+        string status
+        int reviewed_by_admin_id FK
+        string reason
+        datetime created_at
+        datetime updated_at
     }
 
-    REFRESH_TOKENS {
+    AUDIT_LOGS {
         int id PK
-        string token UK
-        string role
-        int owner_id
-        datetime expires_at
-        boolean revoked
+        string actor_type
+        int actor_id
+        string action
+        string entity_type
+        int entity_id
+        string metadata_json
+        datetime created_at
     }
+
 
     %% Role relationships
     ROLES ||--o{ ADMIN : "role_name"
