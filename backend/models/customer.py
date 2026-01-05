@@ -27,7 +27,7 @@ class Customer(Base):
     role: Mapped["Roles"] = relationship("Roles", back_populates="users")
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="user")
     reviews: Mapped[list["Review"]] = relationship("Review", back_populates="user")
-
+    carts: Mapped[list["Cart"]] = relationship("Cart", back_populates="buyer")
     def __repr__(self):
         return f"<Customer(username={self.username}, email={self.email})>"
 

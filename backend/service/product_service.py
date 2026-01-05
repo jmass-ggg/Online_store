@@ -78,11 +78,11 @@ def upload_single_product_image(
     if product.seller_id != current_seller.id:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)  # ✅ create the SAME folder you save into
+    os.makedirs(UPLOAD_DIR, exist_ok=True)  
 
     ext = os.path.splitext(image.filename)[1].lower()
     filename = f"{uuid4().hex}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)  # ✅ same UPLOAD_DIR
+    file_path = os.path.join(UPLOAD_DIR, filename)  
 
     with open(file_path, "wb") as f:
         shutil.copyfileobj(image.file, f)
@@ -132,7 +132,6 @@ def upload_multiple_product_images(
     saved_rows: list[ProductImage] = []
 
     try:
-        # Find next sort_order so new images append after existing ones
         last_sort = (
             db.query(ProductImage.sort_order)
             .filter(ProductImage.product_id == product_id)
@@ -375,8 +374,6 @@ def delete_product_by_seller(
     db.commit()
 
     return {"message": "Product deleted successfully"}
-
-
 
 def view_all_product_seller(seller_id: int, db: Session) -> List[ProductRead]:
     products = (
