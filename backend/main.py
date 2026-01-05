@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.v1 import customer, product, order, review, seller, admin, login
+from backend.api.v1 import customer, product, order, review, seller, admin, login,cart
 from backend.database import Base, engine
 
 app = FastAPI()
@@ -34,7 +34,7 @@ app.include_router(order.router)
 app.include_router(review.router)
 app.include_router(seller.router)
 app.include_router(admin.router)
-
+app.include_router(cart.router)
 @app.get("/")
 def hello_world():
     return {"message": "hello this is online store"}
