@@ -38,10 +38,9 @@ def add_to_cart_by_customer(db: Session, buyer_id: int, variant_id: int, quantit
     ).first()
 
     if not variant:
-        raise HTTPException(status_code=404, detail="Variant not found or inactive")
-
+        raise HTTPException(404, "Variant not found or inactive")
     if variant.stock_quantity < quantity:
-        raise HTTPException(status_code=400, detail="Not enough stock")
+        raise HTTPException(400, "Not enough stock")
 
     item = db.query(CartItem).filter(
         CartItem.cart_id == cart.id,
