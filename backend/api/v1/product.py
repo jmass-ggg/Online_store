@@ -14,7 +14,7 @@ from backend.service.product_service import (
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
     delete_product_by_seller,view_product,view_all_product_seller,
     view_all_product,search_products,view_product_by_slug,
-    upload_single_product_image,upload_multiple_product_images
+    upload_single_product_image,upload_multiple_product_images,get_product_options
 
 )
 from backend.models.product import Product
@@ -38,7 +38,9 @@ def get_all_product(
         limit=limit,
         only_active=True,
     )
-
+@router.get("/products/{product_id}/options")
+def product_options(product_id: int, db: Session = Depends(get_db)):
+    return get_product_options(db, product_id)
 
 @router.get("/slug/{slug}", response_model=ProductRead)
 def get_product_by_slug(

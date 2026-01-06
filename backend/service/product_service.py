@@ -317,6 +317,62 @@ def view_all_product(
 
     return [ProductRead.from_orm(p) for p in products]
 
+from sqlalchemy import select
+from backend.models.product_img import ProductImage
+from backend.models.ProductVariant import ProductVariant
+
+def get_product_options(db: Session, product_id: int):
+    
+    variants = db.execute(
+        select(ProductVariant).where(
+            ProductVariant.product_id == product_id,
+            ProductVariant.is_active == True
+        )
+    ).scalars().all()
+
+    if not variants:
+        return {"product_id": product_id, "colors": [], "sizes_by_color": {}, "variant_map": {}, "images_by_color": {}}
+
+    images = db.query(ProductImage).filter(ProductImage.product_id == product_id).order_by(ProductImage.sort_order).all()
+
+    # build colors + sizes_by_color + variant_map
+    colors = sorted({v.color for v in variants if v.color})
+    sizes_by_color: dict[str, list[str]] = {}
+    variant_map: dict[str, dict[str, int]] = {}
+
+    for v in variants:
+        c = v.color or "DEFAULT"
+        s = v.size or "DEFAULT"
+
+        sizes_by_color.setdefault(c, [])
+        if s not in sizes_by_color[c]:
+            sizes_by_color[c].append(s)
+
+        variant_map.setdefault(c, {})
+        variant_map[c][s] = v.id
+
+    for c in sizes_by_color:
+        sizes_by_color[c] = sorted(sizes_by_color[c])
+
+    images_by_color: dict[str, list[dict]] = {}
+    for img in images:
+        c = img.color or "DEFAULT"
+        images_by_color.setdefault(c, [])
+        images_by_color[c].append({
+            "id": img.id,
+            "image_url": img.image_url,
+            "is_primary": img.is_primary,
+            "sort_order": img.sort_order,
+        })
+
+    return {
+        "product_id": product_id,
+        "colors": colors,
+        "sizes_by_color": sizes_by_color,
+        "variant_map": variant_map,
+        "images_by_color": images_by_color,
+    }
+
 
 def edit_product_by_seller(
     db: Session,
