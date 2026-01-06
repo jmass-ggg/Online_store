@@ -19,6 +19,7 @@ class ProductImage(Base):
         nullable=False,
         index=True,
     )
+    color: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
     image_url: Mapped[str] = mapped_column(String, nullable=False)
 

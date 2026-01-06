@@ -14,6 +14,11 @@ class ProductCategory(str, Enum):
     FOOTWEAR = "Footwear"
     JEWELRY = "Jewelry"
 
+class TargetAudience(str, Enum):
+    MEN = "Men"
+    WOMEN = "Women"
+    KIDS = "Kids"
+    UNISEX = "Unisex"
 
 class ProductStatus(str, Enum):
     active = "active"
@@ -32,7 +37,12 @@ class Product(Base):
         SAEnum(ProductCategory, name="product_category"),
         nullable=False,
     )
-
+    target_audience: Mapped[TargetAudience] = mapped_column(
+        SAEnum(TargetAudience, name="target_audience"),
+        default=TargetAudience.UNISEX,
+        nullable=False,
+        index=True,
+    )
     description: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(String)
 

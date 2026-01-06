@@ -11,7 +11,7 @@ class OrderStatus(str, Enum):
 
 class OrderBase(BaseModel):
     total_price: Decimal = Field(default=Decimal("0.00"), ge=0)
-    status: OrderStatus = Field(default=OrderStatus.PLACED)  # ✅ MATCH DB FIELD NAME
+    status: OrderStatus = Field(default=OrderStatus.PLACED)  
 
     class Config:
         from_attributes = True

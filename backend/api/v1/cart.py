@@ -8,11 +8,10 @@ from backend.models.customer import Customer
 from backend.service.cart_service import (
     add_to_cart_by_customer,
     get_or_create_active_cart,
-    uncart_the_product,decrease__item_quantity
+    uncart_the_product,decrease__item_quantity,clear_cart
 )
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
-
 
 @router.get("/me", response_model=CartOut)
 def get_my_cart(
@@ -51,3 +50,6 @@ def remove_cart_item(
 ):
     return uncart_the_product(db=db, buyer_id=current_customer.id, item_id=item_id)
 
+@router.delete("/all-item/delete")
+def delete_all_item(db:Session=Depends(get_db),current_user:Customer=Depends(get_current_customer)):
+    return clear_cart(db,current_user.id)

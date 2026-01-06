@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
@@ -28,7 +27,6 @@ def get_or_create_active_cart(db: Session, buyer_id: int) -> Cart:
     cart = db.execute(stmt).scalars().first()
     return cart
 
-
 def add_to_cart_by_customer(db: Session, buyer_id: int, variant_id: int, quantity: int) -> Cart:
     cart = get_or_create_active_cart(db, buyer_id=buyer_id)
 
@@ -53,9 +51,7 @@ def add_to_cart_by_customer(db: Session, buyer_id: int, variant_id: int, quantit
         db.add(CartItem(cart_id=cart.id, variant_id=variant_id, quantity=quantity))
 
     db.commit()
-
     return get_or_create_active_cart(db, buyer_id=buyer_id)
-
 
 def uncart_the_product(db: Session, buyer_id: int, item_id: int) -> Cart:
     cart = get_or_create_active_cart(db, buyer_id=buyer_id)
@@ -73,17 +69,36 @@ def uncart_the_product(db: Session, buyer_id: int, item_id: int) -> Cart:
 
     return get_or_create_active_cart(db, buyer_id=buyer_id)
 
-def decrease__item_quantity(item_id: int,
-    payload: DecreaseQty,
-    db: Session ,
-    buyer_id:int ):
+def decrease__item_quantity(item_id: int, payload: DecreaseQty, db: Session, buyer_id: int):
     cart = get_or_create_active_cart(db, buyer_id=buyer_id)
-    item=db.query(CartItem).filter(CartItem.id ==item_id,CartItem.cart_id == cart.id ).first()
+
+    item = db.query(CartItem).filter(
+        CartItem.id == item_id,
+        CartItem.cart_id == cart.id
+    ).first()
+
     if not item:
         raise HTTPException(status_code=404, detail="Cart item not found")
-    if not item.quantity >payload.amount:
-        item.quantity-=payload.amount
+    if payload.amount < 1:
+        raise HTTPException(400, "amount must be >= 1")
+
+    if item.quantity > payload.amount:
+        item.quantity -= payload.amount
     else:
         db.delete(item)
+
     db.commit()
     return get_or_create_active_cart(db, buyer_id=buyer_id)
+
+def cart_subtotal(cart: Cart) -> float:
+    total = 0.0
+    for item in cart.items:
+        # requires item.variant to be loaded
+        total += float(item.variant.price) * item.quantity
+    return total
+
+def clear_cart(db: Session, buyer_id: int) -> Cart:
+    cart = get_or_create_active_cart(db, buyer_id)
+    db.query(CartItem).filter(CartItem.cart_id == cart.id).delete(synchronize_session=False)
+    db.commit()
+    return get_or_create_active_cart(db, buyer_id)

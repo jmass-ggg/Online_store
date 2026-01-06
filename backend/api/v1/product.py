@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status, File, UploadFile, Form,Query
 from sqlalchemy.orm import Session
 from typing import List
 from backend.core.settings import UPLOAD_DIR
-from backend.models.product import ProductCategory,ProductStatus
+from backend.models.product import ProductCategory,ProductStatus,TargetAudience
 from typing import Optional
 from backend.database import get_db
 from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductVariantCreate,ProductVariantRead,ProductImageRead
@@ -20,6 +20,7 @@ from backend.service.product_service import (
 from backend.models.product import Product
 from typing import Optional
 from backend.models.admin import Admin
+
 UPLOAD_FOLDER="backend/uploads/"
 router=APIRouter(prefix="/product",tags=["Product"])
 
@@ -66,6 +67,7 @@ def get_product(product_id:int,db:Session=Depends(get_db),
 def create_product(
     product_name: str = Form(...),
     url_slug: str = Form(...),
+    targetAudience:TargetAudience=Form(...),
     product_category: ProductCategory = Form(...),
     description: str | None = Form(None),
     image: UploadFile = File(...),
@@ -75,7 +77,7 @@ def create_product(
     
     return add_product_by_seller(
         product_name=product_name,
-        
+        targetAudience=targetAudience,
         product_category=product_category,
         description=description,
         image=image,
@@ -103,12 +105,12 @@ def upload_single_image_of_product(
 
 @router.post("/seller/products/{product_id}/images", response_model=List[ProductImageRead])
 def upload_multipile_image_of_product(
-    product_id: int,
+    product_id: int,color:str,
     images: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(get_current_seller),
 ):
-    return upload_multiple_product_images(product_id, images, db, current_seller)
+    return upload_multiple_product_images(product_id,color, images, db, current_seller)
 @router.post(
     "/{product_id}/variants",
     response_model=list[ProductVariantRead],

@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy.exc import SQLAlchemyError
 from backend.database import get_db
 from backend.utils.verifyied import verify_seller_or_not
-from backend.models.product import Product,ProductStatus,ProductCategory
+from backend.models.product import Product,ProductStatus,ProductCategory,TargetAudience
 from backend.models.seller import Seller
 from backend.models.product_img import ProductImage
 from backend.models.ProductVariant import ProductVariant
@@ -28,6 +28,7 @@ UPLOAD_FOLDER="backend/uploads/"
 
 def add_product_by_seller(
     product_name: str,
+    targetAudience:TargetAudience,
     product_category: ProductCategory,
     description: str | None,
     image: UploadFile,
@@ -49,6 +50,7 @@ def add_product_by_seller(
     new_product = Product(
         product_name=product_name,
         url_slug=url_slug,
+        target_audience=targetAudience,
         product_category=product_category,
         description=description,
         image_url=f"/uploads/{filename}",
@@ -117,6 +119,7 @@ def upload_single_product_image(
 
 def upload_multiple_product_images(
     product_id: int,
+    color:str,
     images: List[UploadFile],
     db: Session,
     current_seller: Seller,
@@ -149,7 +152,9 @@ def upload_multiple_product_images(
                 shutil.copyfileobj(img.file, f)
 
             row = ProductImage(
+                
                 product_id=product_id,
+                color=color,
                 image_url=f"/uploads/{filename}",
                 is_primary=False,
                 sort_order=start_sort + i,
