@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status,Form
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from backend.database import get_db
-from backend.schemas.customer import CustomerCreate, CustomerRead, TokenResponse, CustomerUpdate,LoginResponse
+from backend.schemas.customer import CustomerCreate, CustomerRead, TokenResponse, CustomerUpdate
 from backend.utils.jwt import get_current_customer,create_refresh_token
 from backend.models.customer import Customer
 
@@ -49,12 +49,6 @@ def delete_own_account(db:Session=Depends(get_db),current_user:Customer=Depends(
 def get_current_user(token:str=Depends(oauth2_scheme)):
     return get_user(token)
 
-from backend.utils.jwt import create_token,create_refresh_token
-from backend.core.error_handler import error_handler
 
-@router.post("/refresh", response_model=LoginResponse)
-def refresh_token_endpoint(refresh_token: str, db: Session = Depends(get_db)):
-    user = create_refresh_token(db, refresh_token)
-    new_access_token = create_token({"email": user.email})
-    new_refresh_token = create_refresh_token(db, user)
-    return LoginResponse(access_token=new_access_token, refresh_token=new_refresh_token)
+
+

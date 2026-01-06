@@ -1,23 +1,29 @@
-from jose import jwt, JWTError
-from datetime import datetime, timedelta
-from fastapi import Depends, status
-from sqlalchemy.orm import Session
-from pydantic import BaseSettings
-import secrets
+from __future__ import annotations
 
-from backend.database import get_db
-from backend.models.customer import Customer
-from backend.models.admin import Admin
-from backend.models.seller import Seller
-from backend.models.refresh_token import RefreshToken
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+
+from fastapi import Depends, HTTPException, status
+from jose import JWTError, jwt
+from pydantic import BaseSettings
+from sqlalchemy.orm import Session
+
 from backend.core.error_handler import error_handler
+from backend.database import get_db
+from backend.models.admin import Admin
+from backend.models.customer import Customer
+from backend.models.refresh_token import RefreshToken
+from backend.models.seller import Seller
 from backend.utils.auth import oauth2_scheme
+
 
 
 class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     class Config:
         env_file = ".env"
@@ -25,31 +31,44 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# ------------------------------------------------------------------
-# ACCESS TOKEN
-# ------------------------------------------------------------------
 
-def create_token(email: str, role: str):
+def _now() -> datetime:
+    return datetime.utcnow()
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+
+def create_access_token(email: str, role: str) -> str:
     """
-    role MUST be one of: 'Admin', 'Seller', 'Customer'
+    Creates a short-lived JWT access token.
     """
     payload = {
         "sub": email,
         "role": role,
-        "exp": datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        "type": "access",
+        "iat": int(_now().timestamp()),
+        "exp": _now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     }
-
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def verify_token(token: str):
+def verify_token(token: str) -> dict:
+    """
+    Verify ACCESS token and return {"email": ..., "role": ...}
+    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+
+        if payload.get("type") != "access":
+            raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid access token type")
 
         email = payload.get("sub")
         role = payload.get("role")
 
-        if email is None or role is None:
+        if not email or not role:
             raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid token payload")
 
         return {"email": email, "role": role}
@@ -58,55 +77,61 @@ def verify_token(token: str):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
 
 
-# ------------------------------------------------------------------
-# REFRESH TOKEN
-# ------------------------------------------------------------------
 
-REFRESH_EXP_DAYS = 7
+def create_refresh_token(db: Session, user_id: int, role: str) -> str:
+    """
+    Creates a random refresh token (opaque string), stores ONLY its hash in DB.
+    Returns the raw token to be stored in HttpOnly cookie.
+    """
+    raw = secrets.token_urlsafe(48)
+    token_hash = _hash_token(raw)
 
-
-def create_refresh_token(db: Session, user):
-    token = secrets.token_urlsafe(32)
-
-    new_rt = RefreshToken(
-        token=token,
-        role=user.role_name,
-        owner_id=user.id,
-        expires_at=datetime.utcnow() + timedelta(days=REFRESH_EXP_DAYS)
+    rt = RefreshToken(
+        token_hash=token_hash,
+        role=role,
+        owner_id=user_id,
+        expires_at=_now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        revoked=False,
     )
 
-    db.add(new_rt)
+    db.add(rt)
     db.commit()
-    db.refresh(new_rt)
-
-    return token
+    return raw
 
 
-def verify_refresh_token(db: Session, token: str):
-    rt = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+def verify_refresh_token(db: Session, token: str) -> RefreshToken:
+    """
+    Verify refresh token by hashing and checking DB record.
+    Returns the RefreshToken row if valid.
+    """
+    token_hash = _hash_token(token)
 
+    rt = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
     if not rt:
-        raise error_handler(401, "Invalid refresh token")
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-    if rt.expires_at < datetime.utcnow():
-        db.delete(rt)
+    if rt.revoked:
+        raise HTTPException(status_code=401, detail="Refresh token revoked")
+
+    if rt.expires_at < _now():
+        rt.revoked = True
         db.commit()
-        raise error_handler(401, "Refresh token expired")
+        raise HTTPException(status_code=401, detail="Refresh token expired")
 
-    return rt.user_id
+    return rt
 
 
-# ------------------------------------------------------------------
-# CURRENT USER RESOLUTION
-# ------------------------------------------------------------------
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
+    """
+    FastAPI dependency: returns {"email": ..., "role": ...} from access token.
+    """
     return verify_token(token)
 
 
 def get_current_customer(
     user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     if user["role"] != "Customer":
         raise error_handler(403, "Customer role required")
@@ -120,7 +145,7 @@ def get_current_customer(
 
 def get_current_seller(
     user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     if user["role"] != "Seller":
         raise error_handler(403, "Seller role required")
@@ -134,7 +159,7 @@ def get_current_seller(
 
 def get_current_admin(
     user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     if user["role"] != "Admin":
         raise error_handler(403, "Admin role required")

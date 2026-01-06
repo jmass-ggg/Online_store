@@ -11,14 +11,12 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate,SellerVerificationUpdate
 )
-from backend.schemas.customer import LoginResponse
 from backend.schemas.seller import TokenResponse
 from backend.utils.hashed import hashed_password as hashed_pwd
-from backend.utils.jwt import create_token, verify_token
 from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
-from backend.utils.jwt import create_token, verify_token,create_refresh_token,get_current_seller
+from backend.utils.jwt import get_current_seller
 
 
 def verify_seller_or_not(

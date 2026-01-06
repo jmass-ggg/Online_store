@@ -1,56 +1,123 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, HTTPException, Request
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 
 from backend.database import get_db
-from backend.utils.jwt import create_token, create_refresh_token
+from backend.utils.jwt import create_access_token, create_refresh_token, verify_refresh_token
 from backend.utils.hashed import verify_password
-from backend.core.error_handler import error_handler
 
 from backend.models.admin import Admin
 from backend.models.seller import Seller
 from backend.models.customer import Customer
-
-from backend.schemas.customer import LoginResponse
+from backend.models.refresh_token import RefreshToken
 
 router = APIRouter(prefix="/login", tags=["Login"])
 
 
-@router.post("/", response_model=LoginResponse)
-def unified_login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
+
+@router.post("/login", response_model=LoginResponse)
+def login(
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     email = form_data.username
     password = form_data.password
 
-    # 1. Check ADMIN
-    admin = db.query(Admin).filter(Admin.email == email).first()
-    if admin:
-        if not verify_password(password, admin.hashed_password):
-            raise error_handler(401, "Invalid password")
-        access = create_token(email=admin.email, role="Admin")
-        refresh = create_refresh_token(db, admin)
-        return LoginResponse(access_token=access, refresh_token=refresh)
+    user = db.query(Admin).filter(Admin.email == email).first()
+    role = "Admin"
 
-    # 2. Check SELLER
-    seller = db.query(Seller).filter(Seller.email == email).first()
-    if seller:
-        if not verify_password(password, seller.hashed_password):
-            raise error_handler(401, "Invalid password")
-        access = create_token(email=seller.email, role="Seller")
-        refresh = create_refresh_token(db, seller)
-        return LoginResponse(access_token=access, refresh_token=refresh)
+    if not user:
+        user = db.query(Seller).filter(Seller.email == email).first()
+        role = "Seller"
 
-    # 3. Check CUSTOMER
-    customer = db.query(Customer).filter(Customer.email == email).first()
-    if customer:
-        if not verify_password(password, customer.hashed_password):
-            raise error_handler(401, "Invalid password")
-        access = create_token(email=customer.email, role="Customer")
-        refresh = create_refresh_token(db, customer)
-        return LoginResponse(access_token=access, refresh_token=refresh)
+    if not user:
+        user = db.query(Customer).filter(Customer.email == email).first()
+        role = "Customer"
 
-    # No user found
-    raise error_handler(404, "User not found")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    access = create_access_token(email=user.email, role=role)
+
+    refresh_token = create_refresh_token(db, user_id=user.id, role=role)
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,       
+        samesite="lax",
+        max_age=7 * 24 * 60 * 60,
+        path="/login/refresh",  
+    )
+
+    return LoginResponse(access_token=access)
+
+
+@router.post("/refresh", response_model=LoginResponse)
+def refresh_access_token(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    rt_raw = request.cookies.get("refresh_token")
+    if not rt_raw:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+
+    rt: RefreshToken = verify_refresh_token(db, rt_raw)
+
+    if rt.role == "Admin":
+        user = db.query(Admin).filter(Admin.id == rt.owner_id).first()
+    elif rt.role == "Seller":
+        user = db.query(Seller).filter(Seller.id == rt.owner_id).first()
+    else:
+        user = db.query(Customer).filter(Customer.id == rt.owner_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    rt.revoked = True
+    db.commit()
+
+    new_refresh = create_refresh_token(db, user_id=rt.owner_id, role=rt.role)
+
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh,
+        httponly=True,
+        secure=False,     
+        samesite="lax",
+        max_age=7 * 24 * 60 * 60,
+        path="/login/refresh",
+    )
+
+    new_access = create_access_token(email=user.email, role=rt.role)
+    return LoginResponse(access_token=new_access)
+
+
+@router.post("/logout")
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    rt_raw = request.cookies.get("refresh_token")
+    if rt_raw:
+        try:
+            rt = verify_refresh_token(db, rt_raw)
+            rt.revoked = True
+            db.commit()
+        except HTTPException:
+            pass  
+
+    response.delete_cookie("refresh_token", path="/login/refresh")
+    return {"message": "logged out"}

@@ -11,14 +11,13 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate,SellerVerificationUpdate
 )
-from backend.schemas.customer import LoginResponse
 from backend.schemas.seller import TokenResponse
 from backend.utils.hashed import hashed_password as hashed_pwd
-from backend.utils.jwt import create_token, verify_token
+from backend.utils.jwt import  verify_token
 from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
-from backend.utils.jwt import create_token, verify_token,create_refresh_token
+from backend.utils.jwt import  verify_token,create_refresh_token
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.exc import IntegrityError
 from typing import Dict
@@ -69,25 +68,7 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
             status.HTTP_400_BAD_REQUEST,
             "Invalid customer data"
         )
-def seller_login(db: Session, form_data) -> TokenResponse:
-    try:
-        seller = db.query(Seller).filter(Seller.email == form_data.username).one_or_none()
-        if not seller:
-            raise error_handler(400, "Invalid credentials")
 
-        if not verify_password(form_data.password, seller.hashed_password):
-            raise error_handler(401, "Incorrect password")
-
-        access_token = create_token({"email": seller.email})
-        refresh_token = create_refresh_token(db, seller)
-
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer"  # <- required field
-        )
-    except SQLAlchemyError:
-        raise error_handler(status.HTTP_404_NOT_FOUND,"Authentication failed")
 
 def admin_approve_account(
     db: Session,

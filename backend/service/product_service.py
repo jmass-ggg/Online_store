@@ -318,8 +318,7 @@ def view_all_product(
     return [ProductRead.from_orm(p) for p in products]
 
 from sqlalchemy import select
-from backend.models.product_img import ProductImage
-from backend.models.ProductVariant import ProductVariant
+
 
 def get_product_options(db: Session, product_id: int):
     

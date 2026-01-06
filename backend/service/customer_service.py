@@ -9,10 +9,10 @@ from backend.schemas.customer import (
     CustomerCreate,
     CustomerRead,
     TokenResponse,
-    CustomerUpdate,
-    LoginResponse
+    CustomerUpdate
 )
-from backend.utils.jwt import create_token, verify_token,create_refresh_token
+from backend.api.v1.login import LoginResponse
+from backend.utils.jwt import create_access_token, verify_token,create_refresh_token
 from backend.utils.hashed import  verify_password
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.core.permission import check_permission
@@ -60,7 +60,7 @@ def customer_login(db: Session, form_data) -> LoginResponse:
         user=db.query(Customer).filter(Customer.email == form_data.username).one_or_none()
         if not user or not verify_password(form_data.password, user.hashed_password):
             raise error_handler(404,"User not found")
-        access_token = create_token({"email": user.email})
+        access_token = create_access_token({"email": user.email})
         refresh_token = create_refresh_token(db, user)
         return LoginResponse(access_token=access_token,refresh_token=refresh_token)
     except SQLAlchemyError:

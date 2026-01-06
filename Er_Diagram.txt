@@ -208,3 +208,328 @@ erDiagram
 
     %% Note: REFRESH_TOKENS.owner_id is polymorphic (Admin/Seller/Customer),
     %% so it has no enforced FK relationship in the schema.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Optimized Database Design – Hotel Booking System
+
+This design reflects **production-grade optimization**, normalization, and booking-safety patterns used in real hotel platforms (Booking.com–style systems).
+
+---
+
+## 1. Core Optimization Principles Applied
+
+1. **3NF normalization** (no redundant data)
+2. **Availability stored per room per date** (prevents double booking)
+3. **Minimal joins for search paths**
+4. **Write-heavy operations are transactional**
+5. **Read-heavy operations are index-optimized**
+6. **Money & pricing snapshotted at booking time**
+
+---
+
+## 2. Final Entity List (Optimized)
+
+### 2.1 users
+
+```
+users
+-----
+id (PK)
+name
+email (UNIQUE)
+password_hash
+role  (USER | ADMIN | HOTEL_ADMIN)
+created_at
+```
+
+Indexes:
+
+* UNIQUE(email)
+
+---
+
+### 2.2 hotels
+
+```
+hotels
+------
+id (PK)
+name
+city
+address
+latitude
+longitude
+rating
+owner_id (FK → users.id)
+created_at
+```
+
+Indexes:
+
+* city
+* owner_id
+
+---
+
+### 2.3 room_types (Optimization: avoid enum rigidity)
+
+```
+room_types
+----------
+id (PK)
+name (Single, Double, Suite)
+max_occupancy
+```
+
+---
+
+### 2.4 rooms
+
+```
+rooms
+-----
+id (PK)
+hotel_id (FK → hotels.id)
+room_type_id (FK → room_types.id)
+room_number
+floor
+base_price
+is_active
+```
+
+Constraints:
+
+* UNIQUE(hotel_id, room_number)
+
+Indexes:
+
+* hotel_id
+* room_type_id
+
+---
+
+### 2.5 room_availability (MOST IMPORTANT TABLE)
+
+```
+room_availability
+-----------------
+id (PK)
+room_id (FK → rooms.id)
+available_date
+is_available
+price_override (nullable)
+```
+
+Constraints:
+
+* UNIQUE(room_id, available_date)
+
+Indexes:
+
+* room_id, available_date
+* available_date
+
+Purpose:
+
+* Prevents double booking
+* Enables fast availability search
+
+---
+
+### 2.6 bookings
+
+```
+bookings
+--------
+id (PK)
+user_id (FK → users.id)
+hotel_id (FK → hotels.id)
+status (PENDING | CONFIRMED | CANCELLED)
+check_in_date
+check_out_date
+total_amount
+created_at
+```
+
+Indexes:
+
+* user_id
+* hotel_id
+* status
+
+---
+
+### 2.7 booking_rooms (Pricing snapshot)
+
+```
+booking_rooms
+-------------
+id (PK)
+booking_id (FK → bookings.id)
+room_id (FK → rooms.id)
+price_per_night
+```
+
+Reason:
+
+* Preserves historical price even if room price changes
+
+---
+
+### 2.8 payments
+
+```
+payments
+--------
+id (PK)
+booking_id (FK → bookings.id)
+amount
+currency
+status (INITIATED | SUCCESS | FAILED | REFUNDED)
+payment_provider
+transaction_ref
+created_at
+```
+
+Indexes:
+
+* booking_id
+* transaction_ref
+
+---
+
+## 3. FULL ER DIAGRAM (Textual – Interview Ready)
+
+```
+[USERS]
+   |
+   | 1
+   |------< owns
+   |           n
+[HOTELS]
+   |
+   | 1
+   |------< contains
+   |           n
+[ROOMS] >------ 1 [ROOM_TYPES]
+   |
+   | 1
+   |------< has
+   |           n
+[ROOM_AVAILABILITY]
+
+[USERS]
+   |
+   | 1
+   |------< makes
+   |           n
+[BOOKINGS] >------ 1 [HOTELS]
+   |
+   | 1
+   |------< includes
+   |           n
+[BOOKING_ROOMS] >------ 1 [ROOMS]
+
+[BOOKINGS]
+   |
+   | 1
+   |------< paid_by
+   |           n
+[PAYMENTS]
+```
+
+---
+
+## 4. Booking Availability Algorithm (Optimized)
+
+### Search Query (Indexed)
+
+```sql
+SELECT r.id
+FROM rooms r
+JOIN room_availability ra ON r.id = ra.room_id
+WHERE r.hotel_id = :hotelId
+AND ra.available_date BETWEEN :checkIn AND :checkOut - INTERVAL '1 day'
+AND ra.is_available = true
+GROUP BY r.id
+HAVING COUNT(*) = :numberOfNights;
+```
+
+Why this is optimal:
+
+* Uses composite indexes
+* No joins on bookings table
+* Linear scan avoided
+
+---
+
+## 5. Locking Strategy (Critical for Scale)
+
+During booking:
+
+```sql
+SELECT * FROM room_availability
+WHERE room_id = :roomId
+AND available_date BETWEEN :checkIn AND :checkOut
+FOR UPDATE;
+```
+
+Guarantees:
+
+* No race condition
+* No double booking
+
+---
+
+## 6. Why This Design Is "Production Grade"
+
+| Concern        | How It’s Solved                 |
+| -------------- | ------------------------------- |
+| Double booking | Availability table + DB locking |
+| Price changes  | Snapshot in booking_rooms       |
+| Search speed   | Precomputed availability        |
+| Scalability    | Read-heavy tables indexed       |
+| Audit          | Immutable booking records       |
+
+---
+
+## 7. How to Explain This in Interviews
+
+> "We model availability as a per-room per-day entity and lock rows transactionally during booking to guarantee consistency under concurrent access. Pricing is snapshotted at booking time to preserve historical accuracy."
+
+That explanation alone is **senior-backend level**.
+
+---
+
+## 8. Recommended Next Steps
+
+1. Draw this ER diagram visually (Lucidchart / Draw.io)
+2. Implement schema in PostgreSQL
+3. Generate availability for 12 months ahead
+4. Build transactional booking service
+
+---
+
+If you want next, I can:
+
+* Convert this into **SQL DDL**
+* Provide **Spring Boot JPA entities**
+* Optimize further for **multi-hotel chains**
+* Add **dynamic pricing & seasons**
+
+Tell me how far you want to push this.

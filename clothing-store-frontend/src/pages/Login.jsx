@@ -24,10 +24,14 @@ export default function Login() {
       formData.append("username", email);
       formData.append("password", password);
 
-      const res = await fetch(`${API_BASE_URL}/login/`, {
+      // ✅ Correct endpoint: /login/login
+      const res = await fetch(`${API_BASE_URL}/login/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
+
+        // ✅ REQUIRED: lets browser store HttpOnly refresh cookie
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -40,9 +44,13 @@ export default function Login() {
       }
 
       const data = await res.json();
+
+      // ✅ store access token only
       localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
       localStorage.setItem("auth_token", data.access_token);
+
+      // ❌ DO NOT store refresh token (it's HttpOnly cookie)
+      // localStorage.setItem("refresh_token", data.refresh_token);
 
       nav("/", { replace: true });
     } catch (err) {
@@ -56,11 +64,8 @@ export default function Login() {
     <main className="login-page">
       <section className="login-left">
         <div className="login-formWrap">
-          {/* ✅ LOGO */}
           <div className="login-logo">
-            <Link to="/" className="login-logoText">
-              JAMES
-            </Link>
+            <Link to="/" className="login-logoText">JAMES</Link>
           </div>
 
           <h1 className="login-title">Welcome Back!</h1>
@@ -93,9 +98,7 @@ export default function Login() {
                 required
                 autoComplete="current-password"
               />
-              <Link className="login-forgot" to="#">
-                Forgot password
-              </Link>
+              <Link className="login-forgot" to="#">Forgot password</Link>
             </div>
 
             <button className="login-btn login-primary" type="submit" disabled={loading}>
