@@ -15,24 +15,33 @@ def reverse_geocode(lat: float, lng: float) -> dict:
             "lon": lng,
             "format": "json",
             "addressdetails": 1,
+            "zoom": 18,
         },
         headers={"User-Agent": "fastapi-address-app"},
-        timeout=10,
+        timeout=5,
     )
 
     if response.status_code != 200:
-        raise Exception("Geocoding failed")
+        raise ValueError("Reverse geocoding failed")
 
     data = response.json()
     address = data.get("address", {})
 
     return {
-        "region": address.get("state") or address.get("region"),
-        "line1": data.get("display_name"),
+        "region": address.get("state"),
+        "line1": ", ".join(
+            filter(
+                None,
+                [
+                    address.get("road"),
+                    address.get("suburb"),
+                    address.get("city"),
+                ],
+            )
+        ),
         "postal_code": address.get("postcode"),
-        "country": address.get("country", "Nepal"),
+        "country": address.get("country"),
     }
-
 
 def create_address(
     db: Session,
@@ -40,14 +49,30 @@ def create_address(
     customer_id: int,
 ):
     if address.latitude is None or address.longitude is None:
-        raise ValueError("Latitude & longitude required")
+        raise ValueError("Latitude and longitude are required")
+
+    if not (-90 <= address.latitude <= 90):
+        raise ValueError("Invalid latitude")
+
+    if not (-180 <= address.longitude <= 180):
+        raise ValueError("Invalid longitude")
 
     geo = reverse_geocode(address.latitude, address.longitude)
 
-    data = address.model_dump()
-    data.update(geo)
+    if geo.get("country") != "Nepal":
+        raise ValueError("Service available only in Nepal")
 
-    db_address = Address(**data, customer_id=customer_id)
+    data = address.model_dump()
+
+    data["region"] = geo.get("region") or data.get("region")
+    data["line1"] = geo.get("line1") or data.get("line1")
+    data["postal_code"] = geo.get("postal_code")
+    data["country"] = geo.get("country", "Nepal")
+
+    db_address = Address(
+        **data,
+        customer_id=customer_id,
+    )
 
     db.add(db_address)
     db.commit()
