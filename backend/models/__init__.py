@@ -11,3 +11,4 @@ from .review import Review
 from .refresh_token import RefreshToken
 from .cart import Cart
 from .cart_items import CartItem
+from .address import Address

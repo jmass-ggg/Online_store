@@ -28,6 +28,10 @@ class Customer(Base):
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="user")
     reviews: Mapped[list["Review"]] = relationship("Review", back_populates="user")
     carts: Mapped[list["Cart"]] = relationship("Cart", back_populates="buyer")
+    addresses: Mapped[list["Address"]] = relationship(
+    "Address", back_populates="customer", cascade="all, delete-orphan"
+    )
+
     def __repr__(self):
         return f"<Customer(username={self.username}, email={self.email})>"
 

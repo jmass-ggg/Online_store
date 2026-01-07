@@ -1,0 +1,6 @@
+Layer	Tool
+Map	Leaflet + OpenStreetMap
+Geocoding	Nominatim
+Backend	FastAPI
+DB	PostgreSQL
+ORM	SQLAlchemy
