@@ -70,7 +70,6 @@ class Order(Base):
         nullable=False,
     )
 
-    # Relationships
     user: Mapped["Customer"] = relationship("Customer", back_populates="orders")
 
     shipping_address: Mapped["OrderAddress"] = relationship(

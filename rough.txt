@@ -13,8 +13,8 @@ password:- Jamesss
   "line2": "sdfsdf",
   "postal_code": null,
   "country": "Nepal",
-  "latitude": 27.7172,
-  "longitude": 85.3240,
+  "latitude": 27.7749,
+  "longitude": 85.3349,
   "is_default_shipping": true,
   "is_default_billing": true
 }

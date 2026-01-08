@@ -52,3 +52,14 @@ class SellerFulfillmentOut(BaseModel):
 
 class UpdateFulfillmentStatusRequest(BaseModel):
     status: str
+
+class BuyNowRequest(BaseModel):
+    address_id: int = Field(..., gt=0)
+    variant_id: int = Field(..., gt=0)
+    quantity: int = Field(1, ge=1)
+
+class BuyNowResponse(BaseModel):
+    order_id: int
+    status: str
+    total_price: Decimal
+    seller_count: int
