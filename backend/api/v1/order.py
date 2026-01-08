@@ -1,26 +1,80 @@
-from fastapi import APIRouter, Depends, status
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+
 from sqlalchemy.orm import Session
-from typing import List
+
 from backend.database import get_db
-from backend.schemas.order import OrderCreate, OrderRead
-from backend.schemas.order_iteam import OrderItemRead, OrderItemCreate
-from backend.utils.jwt import get_current_customer
-from backend.models.customer import Customer
-from backend.service.order_service import order_the_product, view_the_order
+from backend.schemas.order import PlaceOrderRequest, PlaceOrderResponse, UpdateFulfillmentStatusRequest
+from backend.service.order_service import place_order_service, update_fulfillment_status_service
+from backend.utils.jwt import get_current_customer, get_current_seller
 
-router=APIRouter(prefix="/order",tags=["Order"])
 
-@router.post("/", response_model=OrderRead)
-def place_order(
-    order_in: OrderCreate,
+router = APIRouter(prefix="/orders", tags=["Orders"])
+
+
+@router.post("", response_model=PlaceOrderResponse, status_code=201)
+def place_order_api(
+    payload: PlaceOrderRequest,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user=Depends(get_current_customer),
 ):
-    
-    return order_the_product(order_in,  current_user,db)
+    order, total_price, seller_count = place_order_service(
+        db,
+        user_id=current_user.id,
+        address_id=payload.address_id,
+    )
+    return PlaceOrderResponse(
+        order_id=order.id,
+        status=str(order.status),
+        total_price=total_price,
+        seller_count=seller_count,
+    )
 
-@router.get("/{order_id}/get_oder",response_model=OrderRead)
-def get_order(order_id:int,
-              db:Session=Depends(get_db),
-              current_user:Customer=Depends(get_current_customer)):
-    return view_the_order(order_id,db,current_user)
+
+@router.patch("/seller/fulfillments/{fulfillment_id}/status", status_code=200)
+def update_fulfillment_status_api(
+    fulfillment_id: int,
+    payload: UpdateFulfillmentStatusRequest,
+    db: Session = Depends(get_db),
+    current_seller=Depends(get_current_seller),
+):
+    fulfillment = update_fulfillment_status_service(
+        db,
+        seller_id=current_seller.id,
+        fulfillment_id=fulfillment_id,
+        new_status=payload.status,
+        sync_item_status=True,
+    )
+
+    shipping = fulfillment.order.shipping_address
+    return {
+        "fulfillment_id": fulfillment.id,
+        "order_id": fulfillment.order_id,
+        "fulfillment_status": str(fulfillment.fulfillment_status),
+        "seller_subtotal": str(fulfillment.seller_subtotal),
+        "order_placed": fulfillment.order.order_placed,
+        "shipping": {
+            "full_name": shipping.full_name if shipping else None,
+            "phone_number": shipping.phone_number if shipping else None,
+            "region": shipping.region if shipping else None,
+            "line1": shipping.line1 if shipping else None,
+            "line2": shipping.line2 if shipping else None,
+            "postal_code": shipping.postal_code if shipping else None,
+            "country": shipping.country if shipping else None,
+            "latitude": shipping.latitude if shipping else None,
+            "longitude": shipping.longitude if shipping else None,
+        },
+        "items": [
+            {
+                "id": i.id,
+                "product_id": i.product_id,
+                "variant_id": i.variant_id,
+                "quantity": i.quantity,
+                "unit_price": str(i.unit_price),
+                "line_total": str(i.line_total),
+                "item_status": str(i.item_status),
+            }
+            for i in (fulfillment.items or [])
+        ],
+    }

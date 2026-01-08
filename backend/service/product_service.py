@@ -334,7 +334,6 @@ def get_product_options(db: Session, product_id: int):
 
     images = db.query(ProductImage).filter(ProductImage.product_id == product_id).order_by(ProductImage.sort_order).all()
 
-    # build colors + sizes_by_color + variant_map
     colors = sorted({v.color for v in variants if v.color})
     sizes_by_color: dict[str, list[str]] = {}
     variant_map: dict[str, dict[str, int]] = {}

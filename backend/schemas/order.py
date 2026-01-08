@@ -1,28 +1,54 @@
-from pydantic import BaseModel, Field
-from typing import List
-from enum import Enum
+from __future__ import annotations
+
+from datetime import datetime
 from decimal import Decimal
-from backend.schemas.order_iteam import OrderItemCreate, OrderItemRead
+from typing import Dict, List, Optional
 
-class OrderStatus(str, Enum):
-    PLACED = "PLACED"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
+from pydantic import BaseModel, Field
 
-class OrderBase(BaseModel):
-    total_price: Decimal = Field(default=Decimal("0.00"), ge=0)
-    status: OrderStatus = Field(default=OrderStatus.PLACED)  
 
-    class Config:
-        from_attributes = True
+class PlaceOrderRequest(BaseModel):
+    address_id: int = Field(..., gt=0)
 
-class OrderCreate(BaseModel):
-    items: List[OrderItemCreate]
 
-class OrderRead(OrderBase):
+class PlaceOrderResponse(BaseModel):
+    order_id: int
+    status: str
+    total_price: Decimal
+    seller_count: int
+
+
+class SellerFulfillmentItem(BaseModel):
     id: int
-    buyer_id: int
-    items: List[OrderItemRead]
+    product_id: int
+    variant_id: int
+    quantity: int
+    unit_price: Decimal
+    line_total: Decimal
+    item_status: str
 
-    class Config:
-        from_attributes = True
+
+class SellerOrderAddressOut(BaseModel):
+    full_name: str
+    phone_number: str
+    region: str
+    line1: str
+    line2: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class SellerFulfillmentOut(BaseModel):
+    fulfillment_id: int
+    order_id: int
+    fulfillment_status: str
+    seller_subtotal: Decimal
+    order_placed: datetime
+    shipping: SellerOrderAddressOut
+    items: List[SellerFulfillmentItem]
+
+
+class UpdateFulfillmentStatusRequest(BaseModel):
+    status: str

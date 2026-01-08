@@ -41,3 +41,7 @@ class ProductVariant(Base):
     product: Mapped["Product"] = relationship("Product", back_populates="variants")
 
     cart_items: Mapped[list["CartItem"]] = relationship("CartItem", back_populates="variant")
+    orderitems: Mapped[list["OrderItem"]] = relationship(
+        "OrderItem",
+        back_populates="variant",
+    )

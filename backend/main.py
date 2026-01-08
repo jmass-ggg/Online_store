@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.v1 import customer, product, order, review, seller, admin, login,cart,address
+from backend.api.v1 import customer, product, review, seller, admin, login,cart,address,order
 from backend.database import Base, engine
 
 app = FastAPI()
@@ -31,7 +31,7 @@ app.include_router(login.router)
 app.include_router(customer.router)
 app.include_router(product.router)
 app.include_router(address.router)
-app.include_router(order.router)
+
 app.include_router(review.router)
 app.include_router(seller.router)
 app.include_router(admin.router)

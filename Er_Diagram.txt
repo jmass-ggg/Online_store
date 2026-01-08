@@ -34,30 +34,61 @@ erDiagram
         string email UK
         string phone_number UK
         string hashed_password
+
         string business_name
         string business_type
         string business_address
+
         string kyc_document_type
         bigint kyc_document_number
+
         string bank_account_name
         bigint bank_account_number
         string bank_name
         string bank_branch
+
         datetime created_at
         datetime updated_at
+
         string status
         boolean is_verified
         string role_name FK
+    }
+
+    ADDRESSES {
+        int id PK
+        int customer_id FK
+
+        string full_name
+        string phone_number
+
+        string region
+        string line1
+        string line2
+        string postal_code
+        string country
+
+        float latitude
+        float longitude
+
+        boolean is_default_shipping
+        boolean is_default_billing
+
+        datetime created_at
+        datetime updated_at
     }
 
     PRODUCTS {
         int id PK
         string product_name
         string url_slug UK
+
         string product_category
+        string target_audience
         string description
         string image_url
         string status
+
         int seller_id FK
         datetime created_at
         datetime updated_at
@@ -66,12 +97,15 @@ erDiagram
     PRODUCT_VARIANTS {
         int id PK
         int product_id FK
+
         string sku UK
         string color
         string size
+
         decimal price
         int stock_quantity
         boolean is_active
+
         datetime created_at
         datetime updated_at
     }
@@ -79,11 +113,16 @@ erDiagram
     PRODUCT_IMAGES {
         int id PK
         int product_id FK
+
+        string color
         string image_url
+
         boolean is_primary
         int sort_order
+
         datetime created_at
     }
+
     CARTS {
         int id PK
         int buyer_id FK
@@ -97,29 +136,66 @@ erDiagram
         int cart_id FK
         int variant_id FK
         int quantity
-        datetime created_at
-        datetime updated_at
     }
-
+REFRESH_TOKENS {
+        int id PK
+        string token_hash UK
+        string role
+        int owner_id
+        datetime expires_at
+        boolean revoked
+    }
     ORDERS {
         int id PK
         int buyer_id FK
         string status
         decimal total_price
-        decimal shipping_fee
-        decimal discount_amount
-        decimal tax_amount
         datetime order_placed
-        datetime delivered_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    ORDER_ADDRESSES {
+        int id PK
+        int order_id FK  %% unique (1 order -> 1 shipping snapshot)
+        string full_name
+        string phone_number
+        string region
+        string line1
+        string line2
+        string postal_code
+        string country
+        float latitude
+        float longitude
+        datetime created_at
     }
 
     ORDER_ITEMS {
         int id PK
         int order_id FK
+        int seller_id FK
+        int product_id FK
         int variant_id FK
         int quantity
-        decimal unit_price_snapshot
+        decimal unit_price
         decimal line_total
+        string item_status
+        datetime created_at
+        datetime updated_at
+    }
+
+    ORDER_FULFILLMENTS {
+        int id PK
+        int order_id FK
+        int seller_id FK
+        string fulfillment_status
+        decimal seller_subtotal
+        datetime accepted_at
+        datetime packed_at
+        datetime shipped_at
+        datetime delivered_at
+        datetime created_at
+        datetime updated_at
     }
 
     PAYMENTS {
@@ -129,20 +205,6 @@ erDiagram
         string status
         decimal amount
         string provider_ref
-        datetime created_at
-        datetime updated_at
-    }
-
-    ADDRESSES {
-        int id PK
-        int customer_id FK
-        string full_name
-        string phone_number
-        string province
-        string city
-        string street
-        string postal_code
-        boolean is_default
         datetime created_at
         datetime updated_at
     }

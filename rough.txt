@@ -103,7 +103,7 @@ erDiagram
 
     CARTS {
         int id PK
-        int customer_id FK "-> customer.id"
+        int custo# backend/service/admin_service.pymer_id FK "-> customer.id"
         enum status "ACTIVE|CHECKED_OUT|ABANDONED"
         datetime created_at
         datetime updated_at
@@ -135,32 +135,7 @@ erDiagram
         datetime updated_at
     }
 
-    ORDERS {
-        int id PK
-        int buyer_id FK "-> customer.id"
-        enum status "PLACED|CANCELLED|COMPLETED"
-        numeric subtotal
-        numeric discount_total
-        numeric shipping_fee
-        numeric tax_total
-        numeric total_price
-        string currency
-        datetime order_placed
-        datetime delivered_at "NULL"
-        int shipping_address_id FK "-> addresses.id"
-        int billing_address_id FK "-> addresses.id"
-        string notes "NULL"
-    }
-
-    ORDER_STATUS_HISTORY {
-        int id PK
-        int order_id FK "-> orders.id"
-        enum from_status
-        enum to_status
-        int changed_by_admin_id FK "-> admin.id NULL"
-        string note "NULL"
-        datetime created_at
-    }
+     
 
     ORDER_ITEM {
         int id PK

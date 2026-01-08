@@ -1,4 +1,4 @@
-# backend/service/admin_service.py
+
 from fastapi import status
 from sqlalchemy.orm import Session
 
