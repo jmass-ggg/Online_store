@@ -5,6 +5,20 @@ ASDAASS
 Numa@example.com
 password:- Jamesss
 
+{
+  "full_name": "hello",
+  "phone_number": "3423423",
+  "region": "Bagmati",
+  "line1": "somewhere",
+  "line2": "sdfsdf",
+  "postal_code": null,
+  "country": "Nepal",
+  "latitude": 27.7172,
+  "longitude": 85.3240,
+  "is_default_shipping": true,
+  "is_default_billing": true
+}
+
 erDiagram
     ROLES {
         int id PK

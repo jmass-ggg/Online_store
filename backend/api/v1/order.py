@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from sqlalchemy.orm import Session
-
+from backend.models.customer import Customer
 from backend.database import get_db
 from backend.schemas.order import PlaceOrderRequest, PlaceOrderResponse, UpdateFulfillmentStatusRequest
 from backend.service.order_service import place_order_service, update_fulfillment_status_service
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 def place_order_api(
     payload: PlaceOrderRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_customer),
+    current_user:Customer=Depends(get_current_customer),
 ):
     order, total_price, seller_count = place_order_service(
         db,
@@ -37,7 +37,7 @@ def update_fulfillment_status_api(
     fulfillment_id: int,
     payload: UpdateFulfillmentStatusRequest,
     db: Session = Depends(get_db),
-    current_seller=Depends(get_current_seller),
+    current_seller:Customer=Depends(get_current_seller),
 ):
     fulfillment = update_fulfillment_status_service(
         db,

@@ -31,7 +31,7 @@ app.include_router(login.router)
 app.include_router(customer.router)
 app.include_router(product.router)
 app.include_router(address.router)
-
+app.include_router(order.router)
 app.include_router(review.router)
 app.include_router(seller.router)
 app.include_router(admin.router)

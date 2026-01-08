@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-
+from backend.models.order_iteam import OrderItem
 from sqlalchemy import (
     Integer, DateTime, ForeignKey, Numeric, Enum as SAEnum,
     UniqueConstraint, Index, func, text
@@ -66,8 +66,8 @@ class OrderFulfillment(Base):
     items: Mapped[list["OrderItem"]] = relationship(
         "OrderItem",
         primaryjoin=lambda: and_(
-            foreign("OrderItem.order_id") == OrderFulfillment.order_id,
-            foreign("OrderItem.seller_id") == OrderFulfillment.seller_id,
+            foreign(OrderItem.order_id) == OrderFulfillment.order_id,
+            foreign(OrderItem.seller_id) == OrderFulfillment.seller_id,
         ),
         viewonly=True,
         lazy="selectin",
