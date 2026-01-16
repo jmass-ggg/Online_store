@@ -152,6 +152,92 @@ def place_order_service(db:Session,user_id:int,address_id:int):
 
     return order, order_total, len(seller_subtotals)
 
+def buy_now_service(
+    db: Session,
+   
+    user_id: int,
+    address_id: int,
+    variant_id: int,
+    quantity: int,
+):
+    if quantity<=0:
+        raise error_handler(400,"Quantity must be at least 1 ")
+    try:
+        address=db.query(Address).filter(Address.id == address_id,Address.customer_id == user_id).first()
+        if not address:
+            raise error_handler(400,"Address not found for this user")
+        variant=(db.query(ProductVariant).
+                 filter(ProductVariant.id == variant_id).
+                 options(selectinload(ProductVariant.product)).
+                 with_for_update().first())
+        if not variant:
+            raise error_handler(404, "Variant not found")
+
+        if not getattr(variant, "is_active", True):
+            raise error_handler(400, "Variant is inactive")
+
+        if variant.stock_quantity < quantity:
+            raise error_handler(400, "Insufficient stock")
+        product=variant.product
+        if not product:
+            raise error_handler(400,"Product has not variant")
+        seller_id=product.seller_id
+        unit_price=Decimal(str(product.price))
+        line_price=(quantity*Decimal(unit_price)).quantize(Decimal("0.01"))
+        order=Order(buyer_id=user_id,
+                    status="PLACED",
+                    total_price=line_price)
+        db.add(order)
+        db.flush()
+
+        db.add(OrderAddress(
+            order_id=order.id,
+            full_name=address.full_name,
+            phone_number=address.phone_number,
+            region=address.region,
+            line1=address.line1,
+            line2=address.line2,
+            postal_code=address.postal_code,
+            country=address.country or "Nepal",
+            latitude=address.latitude,
+            longitude=address.longitude,
+        ))
+        db.add(OrderItem(
+            order_id=order.id,
+            seller_id=seller_id,
+            product_id=product.id,
+            variant_id=variant.id,
+            quantity=quantity,
+            unit_price=unit_price,
+            line_total=line_price,
+            item_status="ACCEPTED"
+        ))
+        db.add(OrderFulfillment(
+            order_id=order.id,
+            seller_id=seller_id,
+            fifulfillment_status="ACCEPTED",
+            seller_subtotal=line_price
+        ))
+        new_stock = db.execute(
+            update(ProductVariant)
+            .where(
+                ProductVariant.id == variant_id,
+                ProductVariant.stock_quantity >= quantity,
+            )
+            .values(stock_quantity=ProductVariant.stock_quantity - quantity)
+            .returning(ProductVariant.stock_quantity)
+        ).scalar_one_or_none()
+        if not new_stock:
+            raise error_handler(404, "Fulfillment not found")
+        db.commit()  
+        return order, line_price, 1
+
+    except Exception:
+        db.rollback()
+        raise
+        
+
+
 
 
 # def _set_status_timestamp(fulfillment, new_status: str) -> None:
@@ -198,107 +284,4 @@ def place_order_service(db:Session,user_id:int,address_id:int):
 #             for item in fulfillment.items:
 #                 item.item_status = new_status
 
-#     return fulfillment
-
-# def buy_now_service(
-#     db: Session,
-#     *,
-#     user_id: int,
-#     address_id: int,
-#     variant_id: int,
-#     quantity: int,
-# ):
-#     if quantity <= 0:
-#         raise error_handler(400, "Quantity must be at least 1")
-
-#     try:
-#         # 1) Address must belong to user
-#         address = (
-#             db.query(Address)
-#             .filter(Address.id == address_id, Address.customer_id == user_id)
-#             .first()
-#         )
-#         if not address:
-#             raise error_handler(404, "Address not found for this user")
-
-#         # 2) Load variant + lock row
-#         variant = (
-#             db.query(ProductVariant)
-#             .filter(ProductVariant.id == variant_id)
-#             .options(selectinload(ProductVariant.product))
-#             .with_for_update()
-#             .first()
-#         )
-#         if not variant:
-#             raise error_handler(404, "Variant not found")
-
-#         if not getattr(variant, "is_active", True):
-#             raise error_handler(400, "Variant is inactive")
-
-#         if variant.stock_quantity < quantity:
-#             raise error_handler(400, "Insufficient stock")
-
-#         product = variant.product
-#         if not product:
-#             raise error_handler(400, "Variant has no product")
-
-#         seller_id = product.seller_id
-#         unit_price = Decimal(str(variant.price))
-#         line_total = (unit_price * Decimal(quantity)).quantize(Decimal("0.01"))
-
-#         # 3) Create order rows
-#         order = Order(buyer_id=user_id, status="PLACED", total_price=line_total)
-#         db.add(order)
-#         db.flush()  # get order.id
-
-#         db.add(OrderAddress(
-#             order_id=order.id,
-#             full_name=address.full_name,
-#             phone_number=address.phone_number,
-#             region=address.region,
-#             line1=address.line1,
-#             line2=address.line2,
-#             postal_code=address.postal_code,
-#             country=address.country or "Nepal",
-#             latitude=address.latitude,
-#             longitude=address.longitude,
-#         ))
-
-#         db.add(OrderItem(
-#             order_id=order.id,
-#             seller_id=seller_id,
-#             product_id=product.id,
-#             variant_id=variant.id,
-#             quantity=quantity,
-#             unit_price=unit_price,
-#             line_total=line_total,
-#             item_status="PENDING",
-#         ))
-
-#         db.add(OrderFulfillment(
-#             order_id=order.id,
-#             seller_id=seller_id,
-#             fulfillment_status="PENDING",
-#             seller_subtotal=line_total,
-#         ))
-
-#         # 4) ✅ GUARANTEED stock decrement (DB-level)
-#         new_stock = db.execute(
-#             update(ProductVariant)
-#             .where(
-#                 ProductVariant.id == variant_id,
-#                 ProductVariant.stock_quantity >= quantity,
-#             )
-#             .values(stock_quantity=ProductVariant.stock_quantity - quantity)
-#             .returning(ProductVariant.stock_quantity)
-#         ).scalar_one_or_none()
-
-#         if new_stock is None:
-#             raise error_handler(400, "Insufficient stock")
-
-#         db.commit()  # ✅ commit everything (order + stock update)
-#         return order, line_total, 1
-
-#     except Exception:
-#         db.rollback()
-#         raise
+#       return fulfillment
