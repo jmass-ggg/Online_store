@@ -6,14 +6,14 @@ from sqlalchemy.orm import Session
 from backend.models.customer import Customer
 from backend.database import get_db
 from backend.schemas.order import PlaceOrderRequest, PlaceOrderResponse, UpdateFulfillmentStatusRequest,BuyNowRequest,BuyNowResponse
-from backend.service.order_service import place_order_service, update_fulfillment_status_service,buy_now_service
+from backend.service.order_service import place_order_service,buy_now_service
 from backend.utils.jwt import get_current_customer, get_current_seller
 
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
-@router.post("", response_model=PlaceOrderResponse, status_code=201)
+@router.post("/order", response_model=PlaceOrderResponse, status_code=201)
 def place_order_api(
     payload: PlaceOrderRequest,
     db: Session = Depends(get_db),
@@ -32,52 +32,52 @@ def place_order_api(
     )
 
 
-@router.patch("/seller/fulfillments/{fulfillment_id}/status", status_code=200)
-def update_fulfillment_status_api(
-    fulfillment_id: int,
-    payload: UpdateFulfillmentStatusRequest,
-    db: Session = Depends(get_db),
-    current_seller:Customer=Depends(get_current_seller),
-):
-    fulfillment = update_fulfillment_status_service(
-        db,
-        seller_id=current_seller.id,
-        fulfillment_id=fulfillment_id,
-        new_status=payload.status,
-        sync_item_status=True,
-    )
+# @router.patch("/seller/fulfillments/{fulfillment_id}/status", status_code=200)
+# def update_fulfillment_status_api(
+#     fulfillment_id: int,
+#     payload: UpdateFulfillmentStatusRequest,
+#     db: Session = Depends(get_db),
+#     current_seller:Customer=Depends(get_current_seller),
+# ):
+#     fulfillment = update_fulfillment_status_service(
+#         db,
+#         seller_id=current_seller.id,
+#         fulfillment_id=fulfillment_id,
+#         new_status=payload.status,
+#         sync_item_status=True,
+#     )
 
-    shipping = fulfillment.order.shipping_address
-    return {
-        "fulfillment_id": fulfillment.id,
-        "order_id": fulfillment.order_id,
-        "fulfillment_status": str(fulfillment.fulfillment_status),
-        "seller_subtotal": str(fulfillment.seller_subtotal),
-        "order_placed": fulfillment.order.order_placed,
-        "shipping": {
-            "full_name": shipping.full_name if shipping else None,
-            "phone_number": shipping.phone_number if shipping else None,
-            "region": shipping.region if shipping else None,
-            "line1": shipping.line1 if shipping else None,
-            "line2": shipping.line2 if shipping else None,
-            "postal_code": shipping.postal_code if shipping else None,
-            "country": shipping.country if shipping else None,
-            "latitude": shipping.latitude if shipping else None,
-            "longitude": shipping.longitude if shipping else None,
-        },
-        "items": [
-            {
-                "id": i.id,
-                "product_id": i.product_id,
-                "variant_id": i.variant_id,
-                "quantity": i.quantity,
-                "unit_price": str(i.unit_price),
-                "line_total": str(i.line_total),
-                "item_status": str(i.item_status),
-            }
-            for i in (fulfillment.items or [])
-        ],
-    }
+#     shipping = fulfillment.order.shipping_address
+#     return {
+#         "fulfillment_id": fulfillment.id,
+#         "order_id": fulfillment.order_id,
+#         "fulfillment_status": str(fulfillment.fulfillment_status),
+#         "seller_subtotal": str(fulfillment.seller_subtotal),
+#         "order_placed": fulfillment.order.order_placed,
+#         "shipping": {
+#             "full_name": shipping.full_name if shipping else None,
+#             "phone_number": shipping.phone_number if shipping else None,
+#             "region": shipping.region if shipping else None,
+#             "line1": shipping.line1 if shipping else None,
+#             "line2": shipping.line2 if shipping else None,
+#             "postal_code": shipping.postal_code if shipping else None,
+#             "country": shipping.country if shipping else None,
+#             "latitude": shipping.latitude if shipping else None,
+#             "longitude": shipping.longitude if shipping else None,
+#         },
+#         "items": [
+#             {
+#                 "id": i.id,
+#                 "product_id": i.product_id,
+#                 "variant_id": i.variant_id,
+#                 "quantity": i.quantity,
+#                 "unit_price": str(i.unit_price),
+#                 "line_total": str(i.line_total),
+#                 "item_status": str(i.item_status),
+#             }
+#             for i in (fulfillment.items or [])
+#         ],
+#     }
 
 @router.post("/buy-now", response_model=BuyNowResponse, status_code=200)
 def buy_now_api(

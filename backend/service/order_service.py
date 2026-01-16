@@ -62,7 +62,6 @@ def place_order_service(db:Session,user_id:int,address_id:int):
             if v.stock_quantity < variant_qty[vid]:
                 raise error_handler(400, f"Insufficient stock for variant {vid}")
         
-        # 6) Compute totals + prepare order items & seller subtotals
         order_total = Decimal("0.00")
         seller_subtotals = defaultdict(lambda: Decimal("0.00"))
         order_items = []
@@ -84,7 +83,7 @@ def place_order_service(db:Session,user_id:int,address_id:int):
                     product_id=v.product_id,
                     variant_id=v.id,
                     quantity=qty,
-                    unit_price=unit_price,     # snapshot price at time of order
+                    unit_price=unit_price,     
                     line_total=line_total,
                     item_status="PENDING",
                 )
@@ -146,10 +145,10 @@ def place_order_service(db:Session,user_id:int,address_id:int):
             )
             if result.rowcount != 1:
                 raise error_handler(400, f"Insufficient stock for variant {vid}")
-
+        
         db.query(CartItem).filter(CartItem.cart_id == cart.id).delete(synchronize_session=False)
         cart.status = "CHECKED_OUT"
-
+        db.commit()
     return order, order_total, len(seller_subtotals)
 
 def buy_now_service(
@@ -215,7 +214,7 @@ def buy_now_service(
         db.add(OrderFulfillment(
             order_id=order.id,
             seller_id=seller_id,
-            fifulfillment_status="ACCEPTED",
+            fulfillment_status="ACCEPTED",
             seller_subtotal=line_price
         ))
         new_stock = db.execute(
