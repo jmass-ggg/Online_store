@@ -149,8 +149,7 @@ erDiagram
         datetime updated_at
     }
 
-     
-
+    
     ORDER_ITEM {
         int id PK
         int order_id FK "-> orders.id"

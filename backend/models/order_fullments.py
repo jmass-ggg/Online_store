@@ -16,9 +16,8 @@ from backend.database import Base
 class FulfillmentStatus(str, Enum):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
-    PACKED = "PACKED"
+    HAND_OVER="HAND_OVER"
     SHIPPED = "SHIPPED"
-    DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
 
 

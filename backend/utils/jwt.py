@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timedelta
+from jose import jwt
+from jose.exceptions import JWTError
 
 from fastapi import Depends, HTTPException, status
-from jose import JWTError, jwt
+
 from pydantic import BaseSettings
 from sqlalchemy.orm import Session
 

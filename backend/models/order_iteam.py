@@ -1,4 +1,4 @@
-# order_item.py
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -16,9 +16,8 @@ from backend.database import Base
 class OrderItemStatus(str, Enum):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
-    PACKED = "PACKED"
+    HAND_OVER="HAND_OVER"
     SHIPPED = "SHIPPED"
-    DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
 
 

@@ -14,8 +14,8 @@ from backend.models.address import Address
 from backend.models.ProductVariant import ProductVariant 
 from backend.models.order import Order
 from backend.models.order_address import OrderAddress
-from backend.models.order_iteam import OrderItem  
-from backend.models.order_fullments import OrderFulfillment  
+from backend.models.order_iteam import OrderItem,OrderItemStatus
+from backend.models.order_fullments import OrderFulfillment  ,FulfillmentStatus  
 from collections import defaultdict
 
 _ALLOWED_STATUS = {"PENDING", "ACCEPTED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"}
@@ -24,7 +24,7 @@ _ALLOWED_STATUS = {"PENDING", "ACCEPTED", "PACKED", "SHIPPED", "DELIVERED", "CAN
 def place_order_service(db:Session,user_id:int,address_id:int):
     tx=db.begin_nested() if db.in_transaction() else db.begin()
     with tx:
-        address=db.query(Address).filter(Address.customer_id == user_id).first()
+        address=db.query(Address).filter(Address.customer_id == user_id,Address.id == address_id).first()
         if not address:
             raise error_handler(400,"USer not found")
         cart = (
@@ -125,7 +125,7 @@ def place_order_service(db:Session,user_id:int,address_id:int):
             OrderFulfillment(
                 order_id=order.id,
                 seller_id=seller_id,
-                fulfillment_status="PENDING",
+                fulfillment_status=FulfillmentStatus.PENDING,
                 seller_subtotal=subtotal.quantize(Decimal("0.01")),
             )
             for seller_id, subtotal in seller_subtotals.items()
@@ -209,12 +209,12 @@ def buy_now_service(
             quantity=quantity,
             unit_price=unit_price,
             line_total=line_price,
-            item_status="ACCEPTED"
+            item_status=OrderItemStatus.PENDING
         ))
         db.add(OrderFulfillment(
             order_id=order.id,
             seller_id=seller_id,
-            fulfillment_status="ACCEPTED",
+            fulfillment_status=FulfillmentStatus.PENDING,
             seller_subtotal=line_price
         ))
         new_stock = db.execute(
@@ -231,10 +231,11 @@ def buy_now_service(
         db.commit()  
         return order, line_price, 1
 
-    except Exception:
+    except Exception: 
         db.rollback()
         raise
         
+# def seller_accept_order(db:Session,user_id:int,address_id:int,order_id:int):
 
 
 

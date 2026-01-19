@@ -43,7 +43,7 @@ class Order(Base):
         ForeignKey("customer.id", ondelete="CASCADE"),
         nullable=False,
     )
-
+    
     status: Mapped[OrderStatus] = mapped_column(
         SAEnum(OrderStatus, name="order_status"),
         default=OrderStatus.PLACED,

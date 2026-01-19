@@ -71,7 +71,7 @@ def reverse_geocode(lat: float, lng: float) -> Dict[str, Any]:
                 "format": "jsonv2",
                 "addressdetails": 1,
                 "zoom": 18,
-                # optional but helpful if you set it
+                
                 "email": NOMINATIM_EMAIL or None,
             },
             timeout=10,
