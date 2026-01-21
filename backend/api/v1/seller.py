@@ -24,9 +24,11 @@ from backend.service.seller_service import (
     admin_approve_account,
     get_seller_from_token
 )
+from backend.utils.verifyied import verify_seller_or_not
+from backend.service.seller_product_service import seller_carts
 from backend.models.seller import Seller
 from backend.utils.auth import oauth2_scheme
-
+from backend.schemas.seller_dashboard import SellerDashboardOut
 from backend.core.error_handler import error_handler
 router=APIRouter(prefix="/sellers",tags=["Seller "] )
 
@@ -38,3 +40,7 @@ def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
 @router.get("/me")
 def get_current_user(token:str=Depends(oauth2_scheme)):
     return get_seller_from_token(token)
+
+@router.get("/orders",response_model=list[SellerDashboardOut])
+def seller_dashboards(db:Session=Depends(get_db),current_user: Seller = Depends(verify_seller_or_not)):
+    return seller_carts(db,current_user.id)
