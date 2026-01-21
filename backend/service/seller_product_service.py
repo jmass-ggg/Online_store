@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 from backend.models.order_fullments import OrderFulfillment, FulfillmentStatus
-from backend.models.order import Order
+from backend.models.order import Order,OrderStatus
 from backend.models.order_iteam import OrderItem
 from sqlalchemy.orm import selectinload
-
+from backend.core.error_handler import error_handler
 
 def seller_accept_the_product(db: Session, seller_id: int):
     return (
@@ -65,3 +65,14 @@ def seller_carts(db: Session, seller_id: int):
         })
 
     return result
+
+def accept_order(db:Session,customer_id:int):
+    customer=(db.query(Order).filter(Order.buyer_id == customer_id).
+          options(selectinload(Order.fulfillments),
+                  selectinload(Order.items),
+                  selectinload(Order.shipping_address)))
+    if customer.status == "PLACED":
+        raise error_handler(400,"Order is already placed")
+    customer.status = OrderStatus.PLACED
+    db.commit()
+    return 
