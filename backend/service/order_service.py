@@ -19,7 +19,7 @@ from backend.models.order_fullments import OrderFulfillment  ,FulfillmentStatus
 from collections import defaultdict
 
 _ALLOWED_STATUS = {"PENDING", "ACCEPTED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"}
-
+DELIVERY_CHARGE=100
 "help to order all the product by one click"
 def place_order_service(db:Session,user_id:int,address_id:int):
     tx=db.begin_nested() if db.in_transaction() else db.begin()
@@ -90,11 +90,11 @@ def place_order_service(db:Session,user_id:int,address_id:int):
             )
 
         order_total = order_total.quantize(Decimal("0.01"))
-
+        grand_total=(order_total+DELIVERY_CHARGE).quantize(Decimal("0.01"))
         order = Order(
             buyer_id=user_id,
             status="PLACED",
-            total_price=order_total,
+            total_price=grand_total,
         )
         db.add(order)
         db.flush() 
@@ -183,9 +183,10 @@ def buy_now_service(
         seller_id=product.seller_id
         unit_price=Decimal(str(product.price))
         line_price=(quantity*Decimal(unit_price)).quantize(Decimal("0.01"))
+        grand_total=(line_price+DELIVERY_CHARGE).quantize(Decimal("0.01"))
         order=Order(buyer_id=user_id,
                     status="PLACED",
-                    total_price=line_price)
+                    total_price=grand_total)
         db.add(order)
         db.flush()
 
@@ -208,14 +209,14 @@ def buy_now_service(
             variant_id=variant.id,
             quantity=quantity,
             unit_price=unit_price,
-            line_total=line_price,
+            line_total=grand_total,
             item_status=OrderItemStatus.PENDING
         ))
         db.add(OrderFulfillment(
             order_id=order.id,
             seller_id=seller_id,
             fulfillment_status=FulfillmentStatus.PENDING,
-            seller_subtotal=line_price
+            seller_subtotal=grand_total
         ))
         new_stock = db.execute(
             update(ProductVariant)
