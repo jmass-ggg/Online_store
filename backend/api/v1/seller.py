@@ -41,6 +41,3 @@ def apply_seller(data: SellerApplicationCreate, db: Session = Depends(get_db)):
 def get_current_user(token:str=Depends(oauth2_scheme)):
     return get_seller_from_token(token)
 
-@router.get("/orders",response_model=list[SellerDashboardOut])
-def seller_dashboards(db:Session=Depends(get_db),current_user: Seller = Depends(verify_seller_or_not)):
-    return seller_carts(db,current_user.id)

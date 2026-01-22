@@ -18,7 +18,9 @@ class DashboardItemOut(BaseModel):
     variant: Optional[str] = None
     qty: int
     price: float
-
+    class Config:
+        from_omr=True
+        omr_mode=True
 
 class SellerDashboardOut(BaseModel):
     order_id: int
@@ -28,3 +30,15 @@ class SellerDashboardOut(BaseModel):
     items: List[DashboardItemOut]
     seller_subtotal: float
     action: Optional[str] = None
+    class Config:
+        from_omr=True
+        omr_mode=True
+
+class OrderActionResponse(BaseModel):
+    message:str
+    order_id:int
+    seller_id:int
+    fulfillment_status:str
+    class Config:
+        from_omr=True
+        omr_mode=True

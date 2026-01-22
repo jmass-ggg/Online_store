@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Session
 from backend.models.order_fullments import OrderFulfillment, FulfillmentStatus
 from backend.models.order import Order,OrderStatus
-from backend.models.order_iteam import OrderItem
+from backend.models.order_iteam import OrderItem,OrderItemStatus
 from sqlalchemy.orm import selectinload
 from backend.core.error_handler import error_handler
-
+from datetime import datetime
 def seller_accept_the_product(db: Session, seller_id: int):
     return (
         db.query(OrderFulfillment)
@@ -66,13 +66,52 @@ def seller_carts(db: Session, seller_id: int):
 
     return result
 
-def accept_order(db:Session,customer_id:int):
-    customer=(db.query(Order).filter(Order.buyer_id == customer_id).
-          options(selectinload(Order.fulfillments),
-                  selectinload(Order.items),
-                  selectinload(Order.shipping_address)))
-    if customer.status == "PLACED":
-        raise error_handler(400,"Order is already placed")
-    customer.status = OrderStatus.PLACED
+def accept_order(db:Session,customer_id:int,seller_id:int,order_id:int):
+    fulfillment=(
+        db.query(OrderFulfillment)
+        .filter(OrderFulfillment.seller_id == seller_id,OrderFulfillment.fulfillment_status == FulfillmentStatus.PENDING,
+            OrderFulfillment.order_id == order_id).options(OrderFulfillment.items,
+            OrderFulfillment.order).first()
+    )
+    if not fulfillment:
+        raise error_handler(404, "Order fulfillment not found for this seller")
+    if fulfillment.fulfillment_status != FulfillmentStatus.PENDING:
+        raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
+    fulfillment.fulfillment_status = FulfillmentStatus.ACCEPTED
+    fulfillment.accepted_at=datetime.utcnow()
+    for item in fulfillment.items:
+        if item.item_status != OrderItemStatus.ACCEPTED:
+            raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
+        item.item_status = OrderItemStatus.ACCEPTED
     db.commit()
-    return 
+    return{
+        "message": "Order accepted",
+        "order_id": order_id,
+        "seller_id": seller_id,
+        "fulfillment_status": fulfillment.fulfillment_status.value,
+    }
+
+def handover_the_product(db:Session,customer_id:int,seller_id:int,order_id:int):
+    fulfillment=(
+        db.query(OrderFulfillment)
+        .filter(OrderFulfillment.seller_id == seller_id,OrderFulfillment.fulfillment_status == FulfillmentStatus.ACCEPTED,
+            OrderFulfillment.order_id == order_id).options(OrderFulfillment.items,
+            OrderFulfillment.order).first()
+    )
+    if not fulfillment:
+        raise error_handler(404, "Order fulfillment not found for this seller")
+    if fulfillment.fulfillment_status != FulfillmentStatus.HAND_OVER:
+        raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
+    fulfillment.fulfillment_status = FulfillmentStatus.HAND_OVER
+    fulfillment.accepted_at=datetime.utcnow()
+    for item in fulfillment.items:
+        if item.item_status != OrderItemStatus.HAND_OVER:
+            raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
+        item.item_status = OrderItemStatus.HAND_OVER
+    db.commit()
+    return{
+        "message": "Order accepted",
+        "order_id": order_id,
+        "seller_id": seller_id,
+        "fulfillment_status": fulfillment.fulfillment_status.value,
+    }
