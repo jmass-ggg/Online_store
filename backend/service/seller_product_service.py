@@ -70,8 +70,9 @@ def accept_order(db:Session,customer_id:int,seller_id:int,order_id:int):
     fulfillment=(
         db.query(OrderFulfillment)
         .filter(OrderFulfillment.seller_id == seller_id,OrderFulfillment.fulfillment_status == FulfillmentStatus.PENDING,
-            OrderFulfillment.order_id == order_id).options(OrderFulfillment.items,
-            OrderFulfillment.order).first()
+            OrderFulfillment.order_id == order_id).options(selectinload(OrderFulfillment.items),
+            selectinload(OrderFulfillment.order))
+            .first()
     )
     if not fulfillment:
         raise error_handler(404, "Order fulfillment not found for this seller")
@@ -80,7 +81,7 @@ def accept_order(db:Session,customer_id:int,seller_id:int,order_id:int):
     fulfillment.fulfillment_status = FulfillmentStatus.ACCEPTED
     fulfillment.accepted_at=datetime.utcnow()
     for item in fulfillment.items:
-        if item.item_status != OrderItemStatus.ACCEPTED:
+        if item.item_status != OrderItemStatus.PENDING:
             raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
         item.item_status = OrderItemStatus.ACCEPTED
     db.commit()
@@ -95,17 +96,18 @@ def handover_the_product(db:Session,customer_id:int,seller_id:int,order_id:int):
     fulfillment=(
         db.query(OrderFulfillment)
         .filter(OrderFulfillment.seller_id == seller_id,OrderFulfillment.fulfillment_status == FulfillmentStatus.ACCEPTED,
-            OrderFulfillment.order_id == order_id).options(OrderFulfillment.items,
-            OrderFulfillment.order).first()
+            OrderFulfillment.order_id == order_id).options(selectinload(OrderFulfillment.items),
+            selectinload(OrderFulfillment.order))
+            .first()
     )
     if not fulfillment:
         raise error_handler(404, "Order fulfillment not found for this seller")
-    if fulfillment.fulfillment_status != FulfillmentStatus.HAND_OVER:
+    if fulfillment.fulfillment_status != FulfillmentStatus.ACCEPTED:
         raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
     fulfillment.fulfillment_status = FulfillmentStatus.HAND_OVER
     fulfillment.accepted_at=datetime.utcnow()
     for item in fulfillment.items:
-        if item.item_status != OrderItemStatus.HAND_OVER:
+        if item.item_status != OrderItemStatus.ACCEPTED:
             raise error_handler(400, f"Cannot accept. Current status: {fulfillment.fulfillment_status}")
         item.item_status = OrderItemStatus.HAND_OVER
     db.commit()
