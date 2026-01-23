@@ -23,8 +23,6 @@ from sqlalchemy.exc import IntegrityError
 from typing import Dict
 from fastapi import status
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
-    """Seller submits application. Default status = PENDING."""
-
     seller = Seller(
         username=data.username,
         email=data.email,
@@ -95,7 +93,6 @@ def update_seller_profile(
     seller_update: SellerUpdate,
     current_user,
 ) -> SellerResponse:
-    """Seller updates own profile."""
 
     seller = db.query(Seller).filter(Seller.id == current_user).first()
     if not seller:

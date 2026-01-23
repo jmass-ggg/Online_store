@@ -20,7 +20,7 @@ from collections import defaultdict
 
 _ALLOWED_STATUS = {"PENDING", "ACCEPTED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"}
 DELIVERY_CHARGE=100
-"help to order all the product by one click"
+
 def place_order_service(db:Session,user_id:int,address_id:int):
     tx=db.begin_nested() if db.in_transaction() else db.begin()
     with tx:

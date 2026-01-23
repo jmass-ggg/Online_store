@@ -5,6 +5,7 @@ from backend.models.order_iteam import OrderItem,OrderItemStatus
 from sqlalchemy.orm import selectinload
 from backend.core.error_handler import error_handler
 from datetime import datetime
+
 def seller_accept_the_product(db: Session, seller_id: int):
     return (
         db.query(OrderFulfillment)

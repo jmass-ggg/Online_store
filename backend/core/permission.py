@@ -5,7 +5,7 @@ from backend.utils.jwt import get_current_customer,get_current_seller
 def check_permission(user,action:str):
     roles=user.role_name
     permission={
-        "Admin": {  # Admin
+        "Admin": {  
             "delete_other_account":True,
             "delete_any_product": True,
             "verify_seller": True,
@@ -15,14 +15,14 @@ def check_permission(user,action:str):
             
         },
         "Customer": 
-        {  # Customer
+        {  
             "browse_products": True,
             "place_order": True,
             "view_own_orders": True,
             "review_the_product":True,
             "delete_the_review":True
         },
-        "Seller": {  # Seller
+        "Seller": { 
             "add_product": True,
             "edit_own_product": True,
             "delete_own_product": True,

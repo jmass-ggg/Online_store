@@ -23,7 +23,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 def create_customer(db: Session, username: str, email: str, 
                     password: str,phone_number:str,address:str,) -> CustomerRead:
-    """Register a new user with hashed password and unique username/email."""
 
     new_user = Customer(
         username=username,
@@ -70,7 +69,6 @@ def customer_login(db: Session, form_data) -> LoginResponse:
 def customer_info_update(
     db: Session,  user_update: CustomerUpdate,user_id:int
 ) -> CustomerRead:
-    """Update user details (self-profile edit)."""
     user = (
         db.query(Customer)
         .filter(Customer.id == user_id)
@@ -92,8 +90,6 @@ def customer_info_update(
 
     except IntegrityError as exc:
         db.rollback()
-
-        # Database is the source of truth
         if "email" in str(exc.orig):
             raise error_handler(
                 status.HTTP_409_CONFLICT,
@@ -131,7 +127,6 @@ def delete_account_by_owner(db: Session, current_user: Customer):
 
     except SQLAlchemyError:
         db.rollback()
-        # Log internally, never leak DB errors to client
         raise error_handler(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "Account deletion failed"

@@ -44,9 +44,6 @@ def _hash_token(token: str) -> str:
 
 
 def create_access_token(email: str, role: str) -> str:
-    """
-    Creates a short-lived JWT access token.
-    """
     payload = {
         "sub": email,
         "role": role,
@@ -58,9 +55,6 @@ def create_access_token(email: str, role: str) -> str:
 
 
 def verify_token(token: str) -> dict:
-    """
-    Verify ACCESS token and return {"email": ..., "role": ...}
-    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
@@ -81,10 +75,6 @@ def verify_token(token: str) -> dict:
 
 
 def create_refresh_token(db: Session, user_id: int, role: str) -> str:
-    """
-    Creates a random refresh token (opaque string), stores ONLY its hash in DB.
-    Returns the raw token to be stored in HttpOnly cookie.
-    """
     raw = secrets.token_urlsafe(48)
     token_hash = _hash_token(raw)
 
@@ -102,10 +92,6 @@ def create_refresh_token(db: Session, user_id: int, role: str) -> str:
 
 
 def verify_refresh_token(db: Session, token: str) -> RefreshToken:
-    """
-    Verify refresh token by hashing and checking DB record.
-    Returns the RefreshToken row if valid.
-    """
     token_hash = _hash_token(token)
 
     rt = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
@@ -125,9 +111,6 @@ def verify_refresh_token(db: Session, token: str) -> RefreshToken:
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
-    """
-    FastAPI dependency: returns {"email": ..., "role": ...} from access token.
-    """
     return verify_token(token)
 
 

@@ -8,7 +8,7 @@ class RefreshToken(Base):
 
     token_hash = Column(String, unique=True, index=True, nullable=False)
 
-    role = Column(String, nullable=False)     # "Admin" | "Seller" | "Customer"
+    role = Column(String, nullable=False)    
     owner_id = Column(Integer, nullable=False)
 
     expires_at = Column(DateTime, nullable=False)

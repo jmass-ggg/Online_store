@@ -52,10 +52,6 @@ def _throttle_one_req_per_sec() -> None:
 
 
 def reverse_geocode(lat: float, lng: float) -> Dict[str, Any]:
-    """
-    Reverse geocode using Nominatim.
-    NOTE: public Nominatim can block you. We handle that gracefully.
-    """
     key = f"{lat:.6f},{lng:.6f}"
     if key in _cache:
         return _cache[key]

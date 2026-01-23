@@ -14,7 +14,6 @@ erDiagram
         datetime updated_at
         string role_name FK
     }
-
     CUSTOMER {
         int id PK
         string username
@@ -208,7 +207,6 @@ REFRESH_TOKENS {
         datetime created_at
         datetime updated_at
     }
-
     SHIPMENTS {
         int id PK
         int order_id FK

@@ -15,9 +15,6 @@ def reveiw_the_product(
     db: Session,
     current_user: Customer
 ) -> Review_read:
-    """
-    Add a review for a product by the current user.
-    """
     if not check_permission(current_user, "review_the_prduct"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
@@ -44,9 +41,6 @@ def update_product_review(
     db: Session,
     current_user: Customer
 ) -> Review_read:
-    """
-    Update an existing review for a product by the current user.
-    """
     if not check_permission(current_user, "review_the_prduct"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
@@ -70,9 +64,6 @@ def get_reviews(
     db: Session,
     current_user: Customer
 ) -> list[Review_read]:
-    """
-    Retrieve all reviews for a specific product.
-    """
     if not check_permission(current_user, "review_the_prduct"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
@@ -87,9 +78,6 @@ def review_delete_by_customer(
     db: Session,
     current_user: Customer
 ) -> dict:
-    """
-    Allow a customer to delete their own review.
-    """
     if not check_permission(current_user, "delete_the_review"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
