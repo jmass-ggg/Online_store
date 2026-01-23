@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,Form
 
 from sqlalchemy.orm import Session
 from backend.models.customer import Customer
@@ -8,14 +8,14 @@ from backend.database import get_db
 from backend.schemas.order import PlaceOrderRequest, PlaceOrderResponse, UpdateFulfillmentStatusRequest,BuyNowRequest,BuyNowResponse
 from backend.service.order_service import place_order_service,buy_now_service
 from backend.utils.jwt import get_current_customer, get_current_seller
-
+from backend.models.order import Order,PaymentMethod
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
 @router.post("/order", response_model=PlaceOrderResponse, status_code=201)
 def place_order_api(
-    payload: PlaceOrderRequest,
+    payload: PlaceOrderRequest,paymentmethod:PaymentMethod=Form(...),
     db: Session = Depends(get_db),
     current_user:Customer=Depends(get_current_customer),
 ):
@@ -23,6 +23,7 @@ def place_order_api(
         db,
         user_id=current_user.id,
         address_id=payload.address_id,
+        paymentmethod=paymentmethod
     )
     return PlaceOrderResponse(
         order_id=order.id,
@@ -81,7 +82,7 @@ def place_order_api(
 
 @router.post("/buy-now", response_model=BuyNowResponse, status_code=200)
 def buy_now_api(
-    payload: BuyNowRequest,
+    payload: BuyNowRequest,paymentmethod:PaymentMethod=Form(...),
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_customer),
 ):
@@ -91,10 +92,12 @@ def buy_now_api(
         address_id=payload.address_id,
         variant_id=payload.variant_id,
         quantity=payload.quantity,
+
     )
     return BuyNowResponse(
         order_id=order.id,
         status=str(order.status),
         total_price=total_price,
         seller_count=seller_count,
+        paymentmethod=paymentmethod
     )

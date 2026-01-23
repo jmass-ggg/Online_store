@@ -12,7 +12,7 @@ from backend.models.cart_items import CartItem
 from backend.models.cart import Cart
 from backend.models.address import Address
 from backend.models.ProductVariant import ProductVariant 
-from backend.models.order import Order
+from backend.models.order import Order,PaymentMethod
 from backend.models.order_address import OrderAddress
 from backend.models.order_iteam import OrderItem,OrderItemStatus
 from backend.models.order_fullments import OrderFulfillment  ,FulfillmentStatus  
@@ -21,7 +21,7 @@ from collections import defaultdict
 _ALLOWED_STATUS = {"PENDING", "ACCEPTED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"}
 DELIVERY_CHARGE=100
 
-def place_order_service(db:Session,user_id:int,address_id:int):
+def place_order_service(db:Session,user_id:int,address_id:int,paymentmethod:str):
     tx=db.begin_nested() if db.in_transaction() else db.begin()
     with tx:
         address=db.query(Address).filter(Address.customer_id == user_id,Address.id == address_id).first()
@@ -95,6 +95,7 @@ def place_order_service(db:Session,user_id:int,address_id:int):
             buyer_id=user_id,
             status="PLACED",
             total_price=grand_total,
+            payment_Method=paymentmethod
         )
         db.add(order)
         db.flush() 
@@ -158,6 +159,7 @@ def buy_now_service(
     address_id: int,
     variant_id: int,
     quantity: int,
+    paymentmethod:str
 ):
     if quantity<=0:
         raise error_handler(400,"Quantity must be at least 1 ")
@@ -186,7 +188,9 @@ def buy_now_service(
         grand_total=(line_price+DELIVERY_CHARGE).quantize(Decimal("0.01"))
         order=Order(buyer_id=user_id,
                     status="PLACED",
-                    total_price=grand_total)
+                    total_price=grand_total,
+                     payment_Method=paymentmethod
+                    )
         db.add(order)
         db.flush()
 

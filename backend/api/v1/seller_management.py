@@ -7,6 +7,7 @@ from backend.schemas.seller import (
     SellerResponse,
     SellerReviewUpdate,SellerVerificationUpdate
 )
+from backend.models.order import Order,PaymentMethod
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
@@ -22,6 +23,7 @@ from backend.service.seller_product_service import (
    handover_the_product
 
 )
+
 from backend.utils.verifyied import verify_seller_or_not
 from backend.service.seller_product_service import seller_carts
 from backend.models.seller import Seller
@@ -32,7 +34,8 @@ from backend.core.error_handler import error_handler
 router=APIRouter(prefix="/seller_managements",tags=["seller"])
 
 @router.get("/Accept",response_model=list[SellerDashboardOut])
-def all_user_cart_seen_by_seller(db:Session=Depends(get_db),current_user:Seller=Depends(get_current_seller)):
+def all_user_cart_seen_by_seller(db:Session=Depends(get_db)
+                                 ,current_user:Seller=Depends(get_current_seller)):
     return seller_carts(db,current_user.id)
 
 @router.post("/orders/{order_id}/accept",response_model=OrderActionResponse)

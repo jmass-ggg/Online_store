@@ -28,6 +28,11 @@ class OrderStatus(str, Enum):
     CANCELLED = "CANCELLED"
     COMPLETED = "COMPLETED"
 
+class PaymentMethod(str,Enum):
+    NULL="NULL"
+    CASH_ON_DELIVERY="CASH ON DELIVERY"
+    ESEWA="ESEWA"
+
 class Order(Base):
     __tablename__ = "orders"
     __table_args__ = (
@@ -51,6 +56,12 @@ class Order(Base):
     )
 
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    payment_Method:Mapped[PaymentMethod]=mapped_column(
+        SAEnum(PaymentMethod,name="Payment_Method"),
+        default=PaymentMethod.NULL,
+        nullable=False,
+    )
 
     order_placed: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -95,6 +106,11 @@ class Order(Base):
         passive_deletes=True,
         lazy="selectin",
     )
-
+    payments:Mapped[list["Payment"]]=relationship(
+        "Payment",back_populates="order",
+        cascade="all, delete-orphan",
+    passive_deletes=True,
+    lazy="selectin",
+    )
     def __repr__(self) -> str:
         return f"<Order(id={self.id}, buyer_id={self.buyer_id}, status={self.status})>"
