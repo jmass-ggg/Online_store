@@ -23,13 +23,18 @@ def place_order_api(
         db,
         user_id=current_user.id,
         address_id=payload.address_id,
-        paymentmethod=paymentmethod
+        paymentmethod=payload.payment_method
     )
+    payment_redirect_url = None
+    if payload.payment_method == PaymentMethod.ESEWA:
+        payment_redirect_url=f"/payments/esewa/initiate?order_id={order.id}"
     return PlaceOrderResponse(
         order_id=order.id,
         status=str(order.status),
         total_price=total_price,
         seller_count=seller_count,
+        payment_method=str(order.payment_Method),
+        payment_redirect_url=payment_redirect_url,
     )
 
 

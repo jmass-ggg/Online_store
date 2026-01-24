@@ -56,7 +56,7 @@ class Payment(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     ref_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
-
+    transaction_uuid: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     initiated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

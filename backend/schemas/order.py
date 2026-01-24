@@ -9,13 +9,15 @@ from pydantic import BaseModel, Field
 
 class PlaceOrderRequest(BaseModel):
     address_id: int = Field(..., gt=0)
-
+    payment_method: str
 
 class PlaceOrderResponse(BaseModel):
     order_id: int
     status: str
     total_price: Decimal
     seller_count: int
+    payment_method: str
+    payment_redirect_url: Optional[str] = None
 
 
 class SellerFulfillmentItem(BaseModel):
