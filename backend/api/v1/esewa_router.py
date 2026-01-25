@@ -53,3 +53,34 @@ def initiate(order_id: int, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(payment)
     signed_field_names = "total_amount,transaction_uuid,product_code"
+    amount=order.total_price
+    tax_amount=Decimal("0.00")
+    product_service_charge=Decimal("0.00")
+    product_delivery_charge = Decimal("0.00")
+    total_amount=amount+tax_amount+product_delivery_charge
+    fields = {
+        "amount": money_str(amount),
+        "tax_amount": money_str(tax_amount),
+        "total_amount": money_str(total_amount),
+        "transaction_uuid": payment.transaction_uuid,
+        "product_code": ESEWA_PRODUCT_CODE,
+        "product_service_charge": money_str(product_service_charge),
+        "product_delivery_charge": money_str(product_delivery_charge),
+        "success_url": "https://YOUR-DOMAIN.COM/payments/esewa/success",
+        "failure_url": "https://YOUR-DOMAIN.COM/payments/esewa/failure",
+        "signed_field_names": signed_field_names,
+    }
+    msg=canonical_message(fields,signed_field_names)
+    fields["signed_field_names"]=hmac_sha256_base64(msg,ESEWA_SECRET_KEY)
+    return auto_submit_form(ESEWA_FORM_URL,fields)
+
+async def status_check(product_code:str,total_amount:str,transaction_uuid:str):
+    params={
+        "total_amount":total_amount,
+        "product_code":product_code,
+        "transaction_uuid":transaction_uuid
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        r=await client.get(ESEWA_FORM_URL,params=params)
+        r.raise_for_status()
+        return r.json()
