@@ -84,3 +84,71 @@ async def status_check(product_code:str,total_amount:str,transaction_uuid:str):
         r=await client.get(ESEWA_FORM_URL,params=params)
         r.raise_for_status()
         return r.json()
+    
+@router.api_route("/sucess",methods=["GET","POST"])
+async def success(request:Request,db:Session=Depends(get_db)):
+    data=request.query_params.get("data")
+    if not data and request.method == "POST":
+        form=await request.form()
+        data=form.get("data")
+    if not data:
+        raise error_handler(400,"Missing data")
+    decoded=decode_esewa_data(data)
+    signed_field_names=decoded.get("signed_field_names")
+    received_sig = decoded.get("signature")
+    if not signed_field_names or not received_sig:
+        raise error_handler(400,"Missing signature fields")
+    msg = canonical_message(decoded, signed_field_names)
+    computed_sig = hmac_sha256_base64(msg, ESEWA_SECRET_KEY)
+    if computed_sig != received_sig:
+        raise HTTPException(400, "Invalid signature")
+
+    tx_uuid = decoded.get("transaction_uuid")
+    if not tx_uuid:
+        raise HTTPException(400, "Missing transaction_uuid")
+
+    payment = db.query(Payment).filter(Payment.transaction_uuid == tx_uuid).first()
+    if not payment:
+        raise HTTPException(404, "Payment not found")
+    st = await status_check(
+        product_code=decoded.get("product_code",""),
+        total_amount=decoded.get("decoded"),
+        transaction_uuid=tx_uuid
+    )
+    st_status=str(st.get("status"))
+    st_ref_id = st.get("ref_id")
+    if st_status == "COMPLETE":
+        payment.status = PaymentStatus.COMPLETE
+        payment.ref_id=st_ref_id
+        payment.verified_at = datetime.now(timezone.utc)
+        payment.order.status = OrderStatus.COMPLETED
+    elif st_status in {"PENDING","AMBIGUOUS"}:
+        payment.status = PaymentStatus.AMBIGUOUS if st_status == "AMBIGUOUS" else PaymentStatus.PENDING
+    elif st_status == "CANCELED":
+        payment.status = PaymentStatus.NOT_FOUND
+        payment.order.status = OrderStatus.CANCELLED
+    elif st_status in {"FULL_REFUND", "PARTIAL_REFUND"}:
+        payment.status = PaymentStatus.FULL_REFUND if st_status == "FULL_REFUND" else PaymentStatus.PARTIAL_REFUND
+
+    else:
+        payment.status = PaymentStatus.FAILED
+        payment.order.status = OrderStatus.CANCELLED
+    db.commit()
+    return{
+        "ok":True,"order_id":payment.order_id,
+        "payment status":payment.status
+    }
+
+@router.api_route("/failure",methods=["GET","POST"])
+async def failure(request:Request,db:Session=Depends(get_db)):
+    return {"ok":False,"message":"Payment failed or cancelled"}
+
+@router.get("/poll/{order_id}")
+async def poll(order_id:int,db:Session=Depends(get_db)):
+    payment=(db.query(Payment)
+             .filter(Payment.order_id == order_id,
+                     Payment.provider == PaymentProvider.ESEWA).order_by(Payment.id.desc()).first())
+    if not payment:
+        raise error_handler(400,"Payent not found")
+    st = await status_check(ESEWA_PRODUCT_CODE, money_str(payment.amount), payment.transaction_uuid)
+    return {"order_id": order_id, "status": st.get("status"), "ref_id": st.get("ref_id")}

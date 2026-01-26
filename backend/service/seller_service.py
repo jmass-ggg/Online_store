@@ -11,6 +11,9 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate,SellerVerificationUpdate
 )
+from fastapi import status
+from jose import JWTError, ExpiredSignatureError
+from jwt import ExpiredSignatureError, InvalidTokenError
 from backend.schemas.seller import TokenResponse
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.jwt import  verify_token
@@ -22,6 +25,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.exc import IntegrityError
 from typing import Dict
 from fastapi import status
+
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
     seller = Seller(
         username=data.username,
@@ -150,9 +154,6 @@ def delete_seller_by_admin(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "Account deletion failed"
         )
-from fastapi import status
-from jose import JWTError, ExpiredSignatureError
-from jwt import ExpiredSignatureError, InvalidTokenError
 def get_seller_from_token(token: str)->dict:
     try:
         seller_email = verify_token(token)
