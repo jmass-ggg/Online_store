@@ -8,7 +8,7 @@ from jose.exceptions import JWTError
 
 from fastapi import Depends, HTTPException, status
 
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 
 from backend.core.error_handler import error_handler
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
+    database_url: str
     class Config:
         env_file = ".env"
 

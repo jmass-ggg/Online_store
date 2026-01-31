@@ -1,15 +1,41 @@
 
 
 services:
-  
+  # db:
+  #   image: postgres:15
+  #   container_name: online_store_db
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: Kanye@12
+  #     POSTGRES_DB: store
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+
+  # backend:
+  #   build: 
+  #     context: ./backend  
+  #     dockerfile: Dockerfile
+  #   container_name: online_store_backend
+  #   restart: always
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - .:/app
   db:
     image: postgres:15
     container_name: online_store_db
     restart : always
     environment:
-      - POSTGRES_USER: postgres
-      - POSTGRES_PASSWORD: Kanye@12
-      - POSTGRES_DB : store
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Kanye@12"
+      POSTGRES_DB : store
     ports:
       - "5434:5434"
     volumes:
@@ -17,8 +43,8 @@ services:
     
   backend:
       build:
-         context:./backend 
-         dockerfile:Dockerfile
+         context: ./backend 
+         dockerfile: Dockerfile
       container_name : online_store_backend
       restart : always
       env_file:
@@ -29,6 +55,7 @@ services:
        - "8080:8000"
       volumes:
         - .:/app
+
   frontend:
     build: 
       context: ./frontend  
