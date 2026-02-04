@@ -59,7 +59,8 @@ class BuyNowRequest(BaseModel):
     address_id: int = Field(..., gt=0)
     variant_id: int = Field(..., gt=0)
     quantity: int = Field(1, ge=1)
-
+    payment_method: str
+    
 class BuyNowResponse(BaseModel):
     order_id: int
     status: str
