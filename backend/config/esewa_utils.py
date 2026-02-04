@@ -4,9 +4,9 @@ import hmac
 import json
 from typing import Dict
 
-def canonical_message(payload:Dict[str,str],signed_field_names:str)->str:
-    fields = [f.strip() for f in signed_field_names.split(",") if f.strip()]
-    return ",".join([f"{f}={payload[f]}" for f in fields])
+def canonical_message(fields: dict, signed_field_names: str) -> str:
+    names = signed_field_names.split(",")
+    return ",".join(f"{name}={fields[name]}" for name in names)
 
 def hmac_sha256_base64(message:str,secret_key:str)->str:
     digest=hmac.new(secret_key.encode(),message.encode(),hashlib.sha256).digest()

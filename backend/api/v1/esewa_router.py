@@ -27,15 +27,16 @@ from backend.core.settings_esewa import (
 router = APIRouter(prefix="/payments/esewa", tags=["eSewa"])
 
 
-# -----------------------
-# helpers
-# -----------------------
+
 def money_str(amount: Decimal) -> str:
-    return f"{amount:.2f}"
+
+    s = f"{Decimal(str(amount)).quantize(Decimal('0.01')):f}"
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s
 
 
 def auto_submit_form(action_url: str, fields: Dict[str, str]) -> str:
-    # escape values to keep HTML safe
     inputs = "\n".join(
         f'<input type="hidden" name="{html.escape(str(k))}" value="{html.escape(str(v))}"/>'
         for k, v in fields.items()

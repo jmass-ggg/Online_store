@@ -1,5 +1,5 @@
-ESEWA_SECRET_KEY = "8gBm/:&EnhH.1/q("
+ESEWA_SECRET_KEY = "8gBm/:&EnhH.1/q"   # ✅ no extra characters
 ESEWA_PRODUCT_CODE = "EPAYTEST"
 
 ESEWA_FORM_URL = "https://rc-epay.esewa.com.np/api/epay/main/v2/form"
-ESEWA_STATUS_URL = "https://rc.esewa.com.np/api/epay/transaction/status/"
+ESEWA_STATUS_URL = "https://uat.esewa.com.np/api/epay/transaction/status/"
