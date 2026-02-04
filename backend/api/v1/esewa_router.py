@@ -12,7 +12,10 @@ from backend.models.order import Order, OrderStatus
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.config.esewa_utils import canonical_message, hmac_sha256_base64, decode_esewa_data
 from backend.core.settings_esewa import (
-    ESEWA_SECRET_KEY, ESEWA_PRODUCT_CODE, ESEWA_FORM_URL, ESEWA_STATUS_URL
+    ESEWA_SECRET_KEY,
+      ESEWA_PRODUCT_CODE, 
+      ESEWA_FORM_URL, 
+    ESEWA_STATUS_URL
 )
 
 router = APIRouter(prefix="/payments/esewa", tags=["eSewa"])
@@ -71,7 +74,7 @@ def initiate(order_id: int, db: Session = Depends(get_db)):
         "signed_field_names": signed_field_names,
     }
     msg=canonical_message(fields,signed_field_names)
-    fields["signed_field_names"]=hmac_sha256_base64(msg,ESEWA_SECRET_KEY)
+    fields["signature"]=hmac_sha256_base64(msg,ESEWA_SECRET_KEY)
     return auto_submit_form(ESEWA_FORM_URL,fields)
 
 async def status_check(product_code:str,total_amount:str,transaction_uuid:str):
@@ -85,7 +88,7 @@ async def status_check(product_code:str,total_amount:str,transaction_uuid:str):
         r.raise_for_status()
         return r.json()
     
-@router.api_route("/sucess",methods=["GET","POST"])
+@router.api_route("/success",methods=["GET","POST"])
 async def success(request:Request,db:Session=Depends(get_db)):
     data=request.query_params.get("data")
     if not data and request.method == "POST":
