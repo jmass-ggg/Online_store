@@ -56,33 +56,12 @@ def _safe_eq(a: str, b: str) -> bool:
     return hmac.compare_digest((a or "").encode("utf-8"), (b or "").encode("utf-8"))
 
 
-def _get_or_create_pending_payment(db: Session, order: Order) -> Payment:
-    """
-    Use latest PENDING/AMBIGUOUS payment if exists, else create a new one.
-    This prevents reusing an old COMPLETE/FAILED payment when user retries.
-    """
-    payment: Optional[Payment] = (
-        db.query(Payment)
-        .filter(
-            Payment.order_id == order.id,
-            Payment.provider == PaymentProvider.ESEWA,
-        )
-        .order_by(Payment.id.desc())
-        .first()
-    )
-
-    if payment and payment.status in {PaymentStatus.PENDING, PaymentStatus.AMBIGUOUS}:
-        # keep amount synced with latest order total
-        payment.amount = order.total_price
-        db.commit()
-        db.refresh(payment)
-        return payment
-
+def _create_payment_attempt(db: Session, order: Order) -> Payment:
     payment = Payment(
         order_id=order.id,
         provider=PaymentProvider.ESEWA,
         status=PaymentStatus.PENDING,
-        amount=order.total_price,  # store full total that user will pay
+        amount=order.total_price,
         transaction_uuid=str(uuid4()),
         initiated_at=datetime.now(timezone.utc),
     )
@@ -141,7 +120,7 @@ def initiate(order_id: int, request: Request, db: Session = Depends(get_db)):
     if not order:
         raise error_handler(404, "Order not found")
 
-    payment = _get_or_create_pending_payment(db, order)
+    payment = _create_payment_attempt(db, order)
 
     amount = Decimal(str(order.total_price)).quantize(Decimal("0.01"))
     tax_amount = Decimal("0.00")

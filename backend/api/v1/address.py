@@ -15,4 +15,4 @@ def create_address_api(
     user: Customer = Depends(get_current_customer),
 ):
     db_address = create_address(db, address, user.id)
-    return AddressResponse.from_orm(db_address)
+    return db_address
