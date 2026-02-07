@@ -6,6 +6,106 @@ Numa@example.com
 password:- Jamesss
 Jamesss@example.com
 Hellos
+import { useState } from "react";
+
+export default function AddressPicker() {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [form, setForm] = useState({
+    full_name: "",
+    phone_number: "",
+    region: "",
+    line1: "",
+    line2: "",
+    postal_code: "",
+    country: "Nepal",
+    latitude: null,
+    longitude: null,
+    is_default_shipping: false,
+    is_default_billing: false,
+  });
+
+  async function search() {
+    if (!q.trim()) return;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+    const data = await res.json();
+    setResults(data);
+  }
+
+  function pick(place) {
+    const a = place.address || {};
+    setForm((f) => ({
+      ...f,
+      region: a.state || a.province || a.county || "",
+      line1: place.display_name || "",
+      postal_code: a.postcode || "",
+      country: a.country || "Nepal",
+      latitude: Number(place.lat),
+      longitude: Number(place.lon),
+    }));
+    setResults([]);
+    setQ(place.display_name || "");
+  }
+
+  async function saveAddress() {
+    const res = await fetch("/api/addresses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    if (!res.ok) alert("Failed to save address");
+    else alert("Saved!");
+  }
+
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <div>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search location…"
+          style={{ width: "100%" }}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button onClick={search}>Search</button>
+          <button onClick={() => { setQ(""); setResults([]); }}>Clear</button>
+        </div>
+
+        {results.length > 0 && (
+          <div style={{ border: "1px solid #ddd", marginTop: 8 }}>
+            {results.map((r) => (
+              <div key={r.place_id} style={{ padding: 8, cursor: "pointer" }} onClick={() => pick(r)}>
+                {r.display_name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <hr />
+
+      <input placeholder="Full name" value={form.full_name}
+        onChange={(e)=>setForm({...form, full_name:e.target.value})} />
+      <input placeholder="Phone" value={form.phone_number}
+        onChange={(e)=>setForm({...form, phone_number:e.target.value})} />
+
+      <input placeholder="Region" value={form.region}
+        onChange={(e)=>setForm({...form, region:e.target.value})} />
+      <input placeholder="Line1" value={form.line1}
+        onChange={(e)=>setForm({...form, line1:e.target.value})} />
+      <input placeholder="Line2 (optional)" value={form.line2}
+        onChange={(e)=>setForm({...form, line2:e.target.value})} />
+      <input placeholder="Postal code" value={form.postal_code}
+        onChange={(e)=>setForm({...form, postal_code:e.target.value})} />
+
+      <button onClick={saveAddress} style={{ marginTop: 12 }}>
+        Save Address
+      </button>
+    </div>
+  );
+}
+
 {
   "full_name": "hello",
   "phone_number": "3423423",
@@ -212,7 +312,6 @@ erDiagram
         int quantity
         string condition_note "NULL"
     }
-
     COUPONS {
         int id PK
         string code "UNIQUE"
@@ -232,7 +331,6 @@ erDiagram
         int coupon_id FK "-> coupons.id"
         numeric discount_applied
     }
-
     REVIEW {
         int id PK
         int rating
