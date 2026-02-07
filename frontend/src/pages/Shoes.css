@@ -1,3 +1,9 @@
+/* =========================================
+   Shoes.css (FULL REWRITE) — Nike-style PLP
+   Works with your CURRENT JSX classes:
+   - Page/layout: .shoes-page .wrap .page .filters .content .content-top ...
+   - Grid/cards: .plp-grid .plp-card .plp-hit .plp-media .plp-thumbs ...
+   ========================================= */
 
 html, body {
   height: 100%;
@@ -6,28 +12,28 @@ html, body {
 
 * { box-sizing: border-box; }
 
-img {
-  display: block;
-  max-width: 100%;
-}
+img { display: block; max-width: 100%; }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+a { color: inherit; text-decoration: none; }
 
 :root{
   --text:#111;
   --muted:#757575;
   --line:#e5e5e5;
   --soft:#f5f5f5;
-  --tile:#e6e6e6;
   --red:#c8102e;
 
-  --gap: clamp(14px, 1.6vw, 22px);
   --padX: clamp(14px, 2.2vw, 44px);
-
   --filtersW: 260px;
+  --wrapMax: 1320px;
+
+  /* Grid */
+  --gapX: 28px;
+  --gapY: 46px;
+
+  /* Card */
+  --radius: 14px;
+  --thumbRadius: 6px;
 }
 
 /* ---------- Page ---------- */
@@ -36,13 +42,12 @@ a {
   min-height: 100vh;
   background: #fff;
   color: var(--text);
-  overflow-x: hidden; /* ✅ prevents any horizontal scroll from tiny overflow */
+  overflow-x: hidden;
 }
 
-/* Full width but safe padding */
 .wrap{
   width: 100%;
-  max-width: none;
+  max-width: var(--wrapMax);
   margin: 0 auto;
   padding-inline: var(--padX);
 }
@@ -57,7 +62,6 @@ a {
   z-index: 1000;
 }
 
-/* ✅ minmax(0,1fr) prevents overlap */
 .header-row{
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr) 420px;
@@ -75,9 +79,7 @@ a {
   border-radius: 999px;
 }
 
-.brand-logo:hover{
-  background: var(--soft);
-}
+.brand-logo:hover{ background: var(--soft); }
 
 .top-nav{
   display: flex;
@@ -87,17 +89,9 @@ a {
   min-width: 0;
 }
 
-.top-nav a{
-  padding: 8px 6px;
-}
-
-.top-nav a:hover{
-  text-decoration: underline;
-}
-
-.top-nav .sale{
-  color: var(--red);
-}
+.top-nav a{ padding: 8px 6px; }
+.top-nav a:hover{ text-decoration: underline; }
+.top-nav .sale{ color: var(--red); }
 
 .header-actions{
   display: flex;
@@ -134,24 +128,20 @@ a {
   border-radius: 999px;
 }
 
-.icon-btn:hover{
-  background: var(--soft);
-}
+.icon-btn:hover{ background: var(--soft); }
 
 /* ---------- Main Layout ---------- */
 .main-wrap{
-  padding: 18px 0 64px;
+  padding: 16px 0 56px;
 }
 
-/* ✅ minmax(0,1fr) prevents content from forcing overflow */
 .page{
   display: grid;
   grid-template-columns: var(--filtersW) minmax(0, 1fr);
-  gap: var(--gap);
+  gap: 18px;
   align-items: start;
 }
 
-/* Hide filters mode */
 .page.filters-hidden{
   grid-template-columns: 1fr;
 }
@@ -160,197 +150,229 @@ a {
   display: none;
 }
 
-/* Filters */
 .filters{
   position: sticky;
   top: 92px;
   align-self: start;
-  padding-right: 18px;
-  border-right: 1px solid var(--line);
   min-width: 0;
+  padding-right: 0;
+  border-right: none; /* no random divider */
+}
+
+.content{ min-width: 0; }
+
+.content-top{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0 14px;
 }
 
 .page-title{
-  margin: 6px 0 18px;
-  font-size: 30px;
+  margin: 0;
+  font-size: 32px;
   font-weight: 900;
   letter-spacing: -0.02em;
 }
 
-/* Content */
-.content{
-  min-width: 0;
-}
-
-.content-top{
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 6px 0 18px;
-}
-
 .link-btn{
-  border: none;
-  background: transparent;
+  border: 1px solid var(--line);
+  background: #fff;
   cursor: pointer;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 999px;
   font-size: 13px;
 }
 
-.link-btn:hover{
-  background: var(--soft);
-}
+.link-btn:hover{ background: var(--soft); }
 
-/* States */
 .state{
-  margin: 10px 0 14px;
+  margin: 10px 0 12px;
   color: var(--muted);
 }
 
-.state.error{
-  color: #b00020;
-}
+.state.error{ color: #b00020; }
 
-/* ---------- Products Grid ---------- */
-/* ✅ 3 columns on laptop, shrinks safely without overflow */
-.grid{
+/* =========================================
+   Nike-style PLP Grid + Card (YOUR CLASSES)
+   ========================================= */
+
+/* 3 / 2 / 1 responsive grid */
+.plp-grid{
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--gap);
+  column-gap: var(--gapX);
+  row-gap: var(--gapY);
   align-items: start;
 }
 
+/* Tablet */
+@media (max-width: 1024px){
+  .plp-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Mobile */
+@media (max-width: 640px){
+  .plp-grid{ grid-template-columns: 1fr; }
+}
+
 /* Card */
-.card{
-  display: grid;
+.plp-card{
+  position: relative;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   min-width: 0;
 }
 
-/* Nike-like tile */
-.card-img{
-  width: 100%;
-  aspect-ratio: 1 / 1; /* ✅ square tile */
-  background: var(--tile);
-  overflow: hidden;
-  display: grid;
-  place-items: center;
+/* Full-card clickable overlay */
+.plp-hit{
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--radius);
 }
 
-/* ✅ Consistent shoe size + centered */
-.card-img img{
-  width: auto;
-  height: auto;
-  max-width: 86%;
-  max-height: 72%;
+/* Media box (big square like Nike) */
+.plp-media{
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #f1f1f1 0%, #f8f8f8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Normalize image scaling */
+.plp-media img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  transition: transform .18s ease;
+}
+
+/* Hover zoom */
+.plp-card:hover .plp-media img{
+  transform: scale(1.03);
+}
+
+/* Thumbnail row */
+.plp-thumbs{
+  position: relative;
+  z-index: 2; /* above overlay */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+/* Thumbnail buttons */
+.plp-thumb{
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: var(--thumbRadius);
+  border: 1px solid #e6e6e6;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.plp-thumb img{
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   object-position: center;
 }
 
-/* Text block */
-.card-text{
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.tag{
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.justin{
-  color: var(--red);
-}
-
-.card-text h3{
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sub{
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.price{
-  margin: 4px 0 0;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-/* ---------- Buttons ---------- */
-/* ✅ grid buttons so they never overflow */
-.actions{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 10px;
-  min-width: 0;
-}
-
-.btn{
-  width: 100%;
-  border: none;
-  cursor: pointer;
-  padding: 12px 10px;
-  border-radius: 999px;
-  font-weight: 900;
-  font-size: 12px;
-  letter-spacing: .06em;
-  white-space: nowrap;
-}
-
-.btn-primary{
-  background: #111;
-  color: #fff;
-}
-
-.btn-primary:hover{
-  opacity: .92;
-}
-
-.btn-outline{
-  background: #fff;
-  border: 1px solid #d6d6d6;
-  color: #111;
-}
-
-.btn-outline:hover{
+.plp-thumb.is-active{
   border-color: #111;
 }
 
-/* ---------- Responsive ---------- */
-@media (max-width: 1200px){
-  .grid{
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* +N */
+.plp-more{
+  font-size: 14px;
+  color: #777;
+  margin-left: 4px;
+}
 
+/* Info */
+.plp-info{
+  position: relative;
+  z-index: 2; /* above overlay */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.plp-badge{
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red);
+  line-height: 1.1;
+}
+
+.plp-title{
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.plp-meta{
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.plp-price{
+  font-size: 16px;
+  font-weight: 900;
+  color: #111;
+  padding-top: 2px;
+}
+
+.plp-special{
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0a7a3f;
+}
+
+/* Remove any injected carousel controls in media */
+.plp-media .slick-arrow,
+.plp-media .slick-dots,
+.plp-media .swiper-button-prev,
+.plp-media .swiper-button-next,
+.plp-media .splide__arrows,
+.plp-media button,
+.plp-media [role="button"],
+.plp-media [class*="arrow"],
+.plp-media [class*="control"]{
+  display: none !important;
+}
+
+/* ---------- Responsive header tweaks ---------- */
+@media (max-width: 1200px){
   .header-row{
     grid-template-columns: 160px minmax(0, 1fr) 360px;
   }
 }
 
 @media (max-width: 900px){
-  .page{
-    grid-template-columns: 1fr;
-  }
-
-  .filters{
-    position: static;
-    border-right: none;
-    padding-right: 0;
-  }
-
-  .top-nav{
-    display: none;
-  }
+  .page{ grid-template-columns: 1fr; }
+  .filters{ position: static; }
+  .top-nav{ display: none; }
 
   .header-row{
     grid-template-columns: 160px minmax(0, 1fr);
@@ -358,15 +380,5 @@ a {
 
   .search{
     width: min(380px, 65vw);
-  }
-}
-
-@media (max-width: 560px){
-  .grid{
-    grid-template-columns: 1fr;
-  }
-
-  .actions{
-    grid-template-columns: 1fr;
   }
 }
