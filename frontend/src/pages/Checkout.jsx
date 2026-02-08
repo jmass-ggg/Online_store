@@ -15,17 +15,14 @@ export default function Checkout() {
   const [addressQuery, setAddressQuery] = useState("");
   const [selectedAddress, setSelectedAddress] = useState("");
 
-  // --- Promo state ---
   const [promo, setPromo] = useState("");
   const [promoApplied, setPromoApplied] = useState(false);
 
-  // --- Example order numbers (replace with real cart later) ---
   const itemsTotal = 128.0;
   const deliveryFee = 4.5;
 
   const discount = useMemo(() => {
     if (!promoApplied) return 0;
-    // simple demo: SAVE10 => $10 discount
     if (promo.trim().toUpperCase() === "SAVE10") return 10;
     // unknown code: no discount
     return 0;
@@ -61,12 +58,12 @@ export default function Checkout() {
 
   return (
     <div className="checkout-page">
-      {/* Top Header (Nike-ish) */}
+      {}
       <header className="ck-header">
         <div className="ck-wrap ck-headerRow">
           <div className="ck-brand">
-            <span className="ck-bag" aria-hidden="true">👜</span>
-            <span className="ck-brandName">ShopModern</span>
+            
+            <span className="ck-brandName">James</span>
           </div>
 
           <nav className="ck-nav">
@@ -87,7 +84,7 @@ export default function Checkout() {
         </div>
       </header>
 
-      {/* Page */}
+      {}
       <main className="ck-wrap ck-main">
         {/* Breadcrumb */}
         <div className="ck-breadcrumb">
@@ -127,10 +124,10 @@ export default function Checkout() {
                     onChange={(e) => setCountryCode(e.target.value)}
                     aria-label="Country code"
                   >
-                    <option value="+880">+880</option>
-                    <option value="+91">+91</option>
-                    <option value="+1">+1</option>
-                    <option value="+44">+44</option>
+                    
+                    <option value="+91">+977</option>
+                    
+                    
                   </select>
                   <input
                     value={phone}
