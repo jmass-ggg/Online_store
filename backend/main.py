@@ -41,3 +41,4 @@ app.include_router(esewa_router.router)
 @app.get("/")
 def hello_world():
     return {"message": "hello this is online store"}
+# https://unsight-unartificially-mozelle.ngrok-free.dev

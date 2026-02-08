@@ -20,7 +20,7 @@ function ProductCard({ p }) {
 
   return (
     <article className="plp-card">
-      {/* Entire card clickable (Nike-like) */}
+      {}
       <Link to={`/product/${p.url_slug}`} className="plp-hit" aria-label={p.title} />
 
       {/* Media */}
@@ -35,27 +35,7 @@ function ProductCard({ p }) {
         />
       </div>
 
-      {/* Thumbnails */}
-      <div className="plp-thumbs" onClick={(e) => e.stopPropagation()}>
-        {thumbs.map((src, i) => (
-          <button
-            key={src + i}
-            type="button"
-            className={`plp-thumb ${i === activeIdx ? "is-active" : ""}`}
-            onMouseEnter={() => setActiveIdx(i)}
-            onFocus={() => setActiveIdx(i)}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveIdx(i);
-            }}
-            aria-label={`Preview image ${i + 1}`}
-          >
-            <img src={src} alt="" />
-          </button>
-        ))}
-
-        {extraCount > 0 && <span className="plp-more">+{extraCount}</span>}
-      </div>
+     
 
       {/* Info */}
       <div className="plp-info">
@@ -107,7 +87,7 @@ export default function Shoes() {
       return {
         id: p.id,
         url_slug: p.url_slug,
-        tag: "Just In",
+       
         title: p.product_name,
         price: p.price ?? p.base_price ?? 0,
         image,
