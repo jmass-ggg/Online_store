@@ -174,7 +174,7 @@ img { display: block; max-width: 100%; }
   border-radius: 12px;
   font-weight: 900;
   font-size: 13px;
-  transition: transform .08s ease, border-color .15s ease, background .15s ease;
+  transition: transform .08s ease, border-color .15s ease, background .15s ease, color .15s ease, opacity .15s ease;
 }
 
 .psizeBtn:hover{
@@ -189,9 +189,12 @@ img { display: block; max-width: 100%; }
 }
 
 .psizeBtn:disabled{
-  opacity: .42;
+  opacity: .38;
   cursor: not-allowed;
   transform: none;
+  background: #f6f6f6;
+  border-color: #e2e2e2;
+  color: #888;
 }
 
 .pnote{

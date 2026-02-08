@@ -23,6 +23,7 @@ from datetime import datetime
 from uuid import uuid4
 from backend.core.settings import UPLOAD_DIR
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import aliased
 
 UPLOAD_FOLDER="backend/uploads/"
 
@@ -251,13 +252,13 @@ def view_product(db: Session, product_id: int) -> AllProduct:
 
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-    return ProductRead.from_orm(product)
+    return AllProduct.from_orm(product)
 
-def view_product_by_slug(db: Session, slug: str) -> ProductRead:
+def view_product_by_slug(db: Session, slug: str) -> AllProduct:
     product = db.query(Product).filter(Product.url_slug == slug).one_or_none()
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-    return ProductRead.from_orm(product)
+    return AllProduct.from_orm(product)
 
 def search_products(
     *,
@@ -266,7 +267,7 @@ def search_products(
     skip: int,
     limit: int,
     db: Session,
-) -> List[ProductRead]:
+) -> AllProduct:
     term = q.strip()
     if not term:
         return []
@@ -300,28 +301,54 @@ def view_all_product(
     limit: int = 20,
     only_active: bool = True,
 ):
-    query = db.query(Product)
 
-    if only_active:
-        query = query.filter(Product.status == ProductStatus.active)
-
-    if category:
-        query = query.filter(Product.product_category == category)
-
-    products = (
-        query.order_by(Product.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+    first_variant_sq = (
+        db.query(
+            ProductVariant.product_id.label("pid"),
+            func.min(ProductVariant.id).label("vid"),
+        )
+        .filter(ProductVariant.is_active == True)
+        .group_by(ProductVariant.product_id)
+        .subquery()
     )
 
-    return [ProductRead.from_orm(p) for p in products]
+    V = aliased(ProductVariant)
+
+    q = (
+        db.query(
+            Product,
+            V.id.label("default_variant_id"),
+            V.price.label("default_price"),
+        )
+        .outerjoin(first_variant_sq, first_variant_sq.c.pid == Product.id)
+        .outerjoin(V, V.id == first_variant_sq.c.vid)
+    )
+
+    if only_active:
+        q = q.filter(Product.status == ProductStatus.active)
+
+    if category:
+        q = q.filter(Product.product_category == category)
+
+    rows = (
+        q.order_by(Product.created_at.desc())
+         .offset(skip)
+         .limit(limit)
+         .all()
+    )
+
+    out = []
+    for product, default_variant_id, default_price in rows:
+        base = ProductRead.model_validate(product).model_dump()
+        base["default_variant_id"] = default_variant_id
+        base["default_price"] = default_price
+        out.append(base)
+
+    return out
 
 from sqlalchemy import select
 
-
 def get_product_options(db: Session, product_id: int):
-    
     variants = db.execute(
         select(ProductVariant).where(
             ProductVariant.product_id == product_id,
@@ -330,13 +357,30 @@ def get_product_options(db: Session, product_id: int):
     ).scalars().all()
 
     if not variants:
-        return {"product_id": product_id, "colors": [], "sizes_by_color": {}, "variant_map": {}, "images_by_color": {}}
+        return {
+            "product_id": product_id,
+            "default_variant_id": None,
+            "default_price": None,
+            "colors": [],
+            "sizes_by_color": {},
+            "variant_map": {},
+            "images_by_color": {},
+        }
 
-    images = db.query(ProductImage).filter(ProductImage.product_id == product_id).order_by(ProductImage.sort_order).all()
+ 
+    variants_sorted = sorted(variants, key=lambda v: v.id)
+    default_variant = variants_sorted[0]
+
+    images = (
+        db.query(ProductImage)
+        .filter(ProductImage.product_id == product_id)
+        .order_by(ProductImage.sort_order)
+        .all()
+    )
 
     colors = sorted({v.color for v in variants if v.color})
     sizes_by_color: dict[str, list[str]] = {}
-    variant_map: dict[str, dict[str, int]] = {}
+    variant_map: dict[str, dict[str, dict]] = {}
 
     for v in variants:
         c = v.color or "DEFAULT"
@@ -347,7 +391,12 @@ def get_product_options(db: Session, product_id: int):
             sizes_by_color[c].append(s)
 
         variant_map.setdefault(c, {})
-        variant_map[c][s] = v.id
+        variant_map[c][s] = {
+            "id": v.id,
+            "price": v.price,                
+            "stock_quantity": v.stock_quantity,
+            "sku": v.sku,
+        }
 
     for c in sizes_by_color:
         sizes_by_color[c] = sorted(sizes_by_color[c])
@@ -365,6 +414,8 @@ def get_product_options(db: Session, product_id: int):
 
     return {
         "product_id": product_id,
+        "default_variant_id": default_variant.id,
+        "default_price": default_variant.price,
         "colors": colors,
         "sizes_by_color": sizes_by_color,
         "variant_map": variant_map,

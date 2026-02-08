@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field, constr,ConfigDict
 from decimal import Decimal
 from backend.models.product import ProductCategory, ProductStatus,TargetAudience
 from typing import List, Optional
@@ -21,10 +21,17 @@ class ProductRead(ProductCreate):
     status: ProductStatus
     seller_id: int
     image_url: str | None = None   
+    
 
     class Config:
-        orm_mode = True
+        
         from_attributes = True
+
+class ProductListRead(ProductRead):
+    model_config = ConfigDict(from_attributes=True)
+
+    default_variant_id: Optional[int] = None
+    default_price: Optional[Decimal] = None
 
 class ProductVariantCreate(BaseModel):
     color: str | None = None

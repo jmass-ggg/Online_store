@@ -5,14 +5,14 @@ from backend.core.settings import UPLOAD_DIR
 from backend.models.product import ProductCategory,ProductStatus,TargetAudience
 from typing import Optional
 from backend.database import get_db
-from backend.schemas.product import ProductRead,ProductCreate,ProductUpdate,ProductVariantCreate,ProductVariantRead,ProductImageRead
+from backend.schemas.product import ProductListRead,ProductRead,ProductCreate,ProductUpdate,ProductVariantCreate,ProductVariantRead,ProductImageRead,AllProduct
 from backend.models.seller import Seller
 from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.utils.verifyied import verify_seller_or_not
 from backend.service.product_service import (
     add_product_by_seller,
     add_product_variant,edit_product_by_seller,delete_product_by_admin,
-    delete_product_by_seller,view_product,view_all_product_seller,
+    delete_product_by_seller,view_product,
     view_all_product,search_products,view_product_by_slug,
     upload_single_product_image,upload_multiple_product_images,get_product_options
 
@@ -24,7 +24,7 @@ from backend.models.admin import Admin
 UPLOAD_FOLDER="backend/uploads/"
 router=APIRouter(prefix="/product",tags=["Product"])
 
-@router.get("/", response_model=List[ProductRead])
+@router.get("/", response_model=List[ProductListRead])
 def get_all_product(
     category: Optional[ProductCategory] = Query(None),
     skip: int = Query(0, ge=0),
@@ -42,7 +42,7 @@ def get_all_product(
 def product_options(product_id: int, db: Session = Depends(get_db)):
     return get_product_options(db, product_id)
 
-@router.get("/slug/{slug}", response_model=ProductRead)
+@router.get("/slug/{slug}", response_model=AllProduct)
 def get_product_by_slug(
     slug: str,
     db: Session = Depends(get_db),
@@ -59,7 +59,7 @@ def product_search(
 ):
     return search_products(q=q, category=category, skip=skip, limit=limit, db=db)
 
-@router.get("/{product_id}",response_model=ProductRead)
+@router.get("/{product_id}",response_model=AllProduct)
 def get_product(product_id:int,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
