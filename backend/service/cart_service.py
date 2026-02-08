@@ -7,16 +7,17 @@ from backend.models.cart import Cart, CartStauts
 from backend.models.cart_items import CartItem
 from backend.models.ProductVariant import ProductVariant
 from backend.core.error_handler import error_handler
+from decimal import Decimal
 
 def get_or_create_active_cart(db:Session,buyer_id:int)->Cart:
-    cart=db.query(Cart).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
+    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
     if cart:
         return cart
     cart=Cart(buyer_id=buyer_id,status=CartStauts.ACTIVE.value)
     db.add(cart)
     db.commit()
     db.refresh(cart)
-    cart=db.query(Cart).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
+    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
     return cart
 
 def add_to_cart_by_customer(db:Session,buyer_id:int,variant_id:int,quantity:int)->Cart:
@@ -31,7 +32,7 @@ def add_to_cart_by_customer(db:Session,buyer_id:int,variant_id:int,quantity:int)
     if item:
         item.quantity+=quantity
     else:
-        db.add(CartItem(cart_id=cart.id,variant_id=variant_id,quantity=quantity))
+        db.add(CartItem(cart_id=cart.id,variant_id=variant_id,quantity=quantity,price=variant.price))
     db.commit()
     return get_or_create_active_cart(db,buyer_id)
 
@@ -49,7 +50,7 @@ def uncart_the_product(db: Session, buyer_id: int, item_id: int) -> Cart:
 def decrease__item_quantity(item_id: int, payload: DecreaseQty, db: Session, buyer_id: int):
     cart=get_or_create_active_cart(db,buyer_id)
     item=db.query(CartItem).filter(CartItem.id == item_id,
-                                   CartItem.cart_id == id).one_or_none()
+                                   CartItem.cart_id == cart.id).one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Cart item not found")
     if item.quantity<1:
@@ -57,18 +58,18 @@ def decrease__item_quantity(item_id: int, payload: DecreaseQty, db: Session, buy
     if item.quantity>payload.amount:
         item.quantity-=payload.amount
     else:
-        db.delete()
+        db.delete(item)
     return get_or_create_active_cart(db, buyer_id=buyer_id)
 
 
 
 
 
-def cart_subtotal(cart: Cart) -> float:
-    total = 0.0
+def cart_subtotal(cart: Cart) -> Decimal:
+    total = Decimal("0.00")
     for item in cart.items:
-        # requires item.variant to be loaded
-        total += float(item.variant.price) * item.quantity
+        
+        total += item.variant.price * item.quantity
     return total
 
 def clear_cart(db: Session, buyer_id: int) -> Cart:

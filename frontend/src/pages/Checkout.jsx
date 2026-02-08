@@ -36,7 +36,7 @@ export default function Checkout() {
     (selectedAddress || "").trim().length > 6;
 
   const mapQuery = encodeURIComponent(
-    (selectedAddress || addressQuery || "Dhaka, Bangladesh").trim()
+    (selectedAddress || addressQuery || "Dhaka, Bangladesh").trim(),
   );
 
   const mapEmbedSrc = `https://www.google.com/maps?q=${mapQuery}&output=embed`;
@@ -62,7 +62,6 @@ export default function Checkout() {
       <header className="ck-header">
         <div className="ck-wrap ck-headerRow">
           <div className="ck-brand">
-            
             <span className="ck-brandName">James</span>
           </div>
 
@@ -72,14 +71,22 @@ export default function Checkout() {
           </nav>
 
           <div className="ck-search">
-            <span className="ck-searchIcon" aria-hidden="true">🔎</span>
+            <span className="ck-searchIcon" aria-hidden="true">
+              🔎
+            </span>
             <input placeholder="Search for products..." />
           </div>
 
           <div className="ck-actions">
-            <button className="ck-iconBtn" aria-label="Cart">🛒</button>
-            <button className="ck-iconBtn" aria-label="Notifications">🔔</button>
-            <button className="ck-avatar" aria-label="Account">👤</button>
+            <button className="ck-iconBtn" aria-label="Cart">
+              🛒
+            </button>
+            <button className="ck-iconBtn" aria-label="Notifications">
+              🔔
+            </button>
+            <button className="ck-avatar" aria-label="Account">
+              👤
+            </button>
           </div>
         </div>
       </header>
@@ -124,15 +131,12 @@ export default function Checkout() {
                     onChange={(e) => setCountryCode(e.target.value)}
                     aria-label="Country code"
                   >
-                    
                     <option value="+91">+977</option>
-                    
-                    
                   </select>
                   <input
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="17XX XXXXXX"
+                    placeholder="98XXXXXXXX"
                     inputMode="numeric"
                   />
                 </div>
@@ -142,35 +146,34 @@ export default function Checkout() {
             <div className="ck-field ck-fieldFull">
               <label>Delivery Address</label>
               <div className="ck-addressRow">
-                <span className="ck-pin" aria-hidden="true">📍</span>
+                <span className="ck-pin" aria-hidden="true">
+                  📍
+                </span>
                 <input
                   value={addressQuery}
                   onChange={(e) => setAddressQuery(e.target.value)}
                   placeholder="Search your delivery address on the map..."
                 />
-                <button
-                  className="ck-miniBtn"
-                  type="button"
-                  onClick={saveAddress}
-                  disabled={addressQuery.trim().length < 6}
-                  title="Save selection"
-                >
-                  Save
-                </button>
+                
               </div>
               {selectedAddress ? (
                 <div className="ck-selected">
                   <div className="ck-selectedLabel">CURRENT SELECTION</div>
                   <div className="ck-selectedRow">
                     <div className="ck-selectedText">{selectedAddress}</div>
-                    <button className="ck-link" type="button" onClick={clearAddress}>
+                    <button
+                      className="ck-link"
+                      type="button"
+                      onClick={clearAddress}
+                    >
                       Change
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="ck-hint">
-                  Tip: type an address and click <b>Save</b>. The map updates to that location.
+                  Tip: type an address and click <b>Save</b>. The map updates to
+                  that location.
                 </div>
               )}
             </div>
@@ -206,9 +209,9 @@ export default function Checkout() {
 
           {/* Right: Order Summary */}
           <aside className="ck-card ck-right">
-            <h3 className="ck-h3">Order Summary</h3>
+            <h3 className="ck-h3">Order Detail</h3>
 
-            <div className="ck-promo">
+            {/* <div className="ck-promo">
               <input
                 value={promo}
                 onChange={(e) => setPromo(e.target.value)}
@@ -217,7 +220,7 @@ export default function Checkout() {
               <button className="ck-outline" type="button" onClick={applyPromo}>
                 APPLY
               </button>
-            </div>
+            </div> */}
 
             <div className="ck-lines">
               <div className="ck-line">
@@ -249,11 +252,14 @@ export default function Checkout() {
 
             <div className="ck-terms">
               By placing your order, you agree to our{" "}
-              <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+              <a href="#">Terms of Service</a> and{" "}
+              <a href="#">Privacy Policy</a>.
             </div>
 
             <div className="ck-secure">
-              <span className="ck-shield" aria-hidden="true">✅</span>
+              <span className="ck-shield" aria-hidden="true">
+                ✅
+              </span>
               <div>
                 <div className="ck-secureTitle">Secure Checkout</div>
                 <div className="ck-secureText">
@@ -274,8 +280,12 @@ export default function Checkout() {
             <a href="#">Shipping Info</a>
           </div>
           <div className="ck-footerBtns">
-            <button className="ck-footBtn" aria-label="Payments">💳</button>
-            <button className="ck-footBtn" aria-label="Wallet">👛</button>
+            <button className="ck-footBtn" aria-label="Payments">
+              💳
+            </button>
+            <button className="ck-footBtn" aria-label="Wallet">
+              👛
+            </button>
           </div>
         </div>
       </footer>
