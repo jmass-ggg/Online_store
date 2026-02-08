@@ -187,6 +187,119 @@ img { display: block; max-width: 100%; }
   background: #111;
   color: #fff;
 }
+/* Product.css (ADD these styles at the bottom) */
+
+.psection{
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.psectionTitle{
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.psectionText{
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ppickup{
+  display: grid;
+  gap: 6px;
+}
+
+.ppickupTitle{
+  font-weight: 950;
+  font-size: 13px;
+}
+
+.plink{
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.plinkInline{
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.pdescText{
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.pbullets{
+  margin: 0 0 12px;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.pdetails{
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.paccordion{
+  padding-top: 0;
+}
+
+.paccHead{
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 16px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 950;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.pchev{
+  font-size: 18px;
+  transform: rotate(180deg);
+  transition: transform .18s ease;
+  opacity: .7;
+}
+
+.pchev.open{
+  transform: rotate(0deg);
+}
+
+.paccBody{
+  padding: 0 0 14px;
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
 
 .psizeBtn:disabled{
   opacity: .38;

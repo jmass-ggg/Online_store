@@ -1,10 +1,23 @@
-import { useMemo, useState } from "react";
+// Checkout.jsx (UPDATED — reads cart_items so checkout shows the real totals)
+// COPY + PASTE
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Checkout.css";
+
+const CART_KEY = "cart_items";
 
 function money(n) {
   const v = Number(n || 0);
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function readCart() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function Checkout() {
@@ -15,35 +28,48 @@ export default function Checkout() {
   const [addressQuery, setAddressQuery] = useState("");
   const [selectedAddress, setSelectedAddress] = useState("");
 
-  const [promo, setPromo] = useState("");
-  const [promoApplied, setPromoApplied] = useState(false);
+  // --- Cart state (from Product.jsx) ---
+  const [cart, setCart] = useState(() => readCart());
 
-  const itemsTotal = 128.0;
+  useEffect(() => {
+    const onUpdate = () => setCart(readCart());
+    window.addEventListener("cart:updated", onUpdate);
+    window.addEventListener("storage", onUpdate);
+    return () => {
+      window.removeEventListener("cart:updated", onUpdate);
+      window.removeEventListener("storage", onUpdate);
+    };
+  }, []);
+
+  const itemsCount = useMemo(
+    () => cart.reduce((sum, x) => sum + Number(x.qty || 0), 0),
+    [cart]
+  );
+
+  const itemsTotal = useMemo(
+    () =>
+      cart.reduce(
+        (sum, x) => sum + Number(x.price || 0) * Number(x.qty || 0),
+        0
+      ),
+    [cart]
+  );
+
+  // keep your existing fee logic
   const deliveryFee = 4.5;
 
-  const discount = useMemo(() => {
-    if (!promoApplied) return 0;
-    if (promo.trim().toUpperCase() === "SAVE10") return 10;
-    // unknown code: no discount
-    return 0;
-  }, [promo, promoApplied]);
-
-  const total = Math.max(0, itemsTotal + deliveryFee - discount);
+  const total = Math.max(0, itemsTotal + deliveryFee);
 
   const canProceed =
+    itemsCount > 0 &&
     fullName.trim().length > 1 &&
     phone.trim().length >= 7 &&
     (selectedAddress || "").trim().length > 6;
 
   const mapQuery = encodeURIComponent(
-    (selectedAddress || addressQuery || "Dhaka, Bangladesh").trim(),
+    (selectedAddress || addressQuery || "Dhaka, Bangladesh").trim()
   );
-
   const mapEmbedSrc = `https://www.google.com/maps?q=${mapQuery}&output=embed`;
-
-  function applyPromo() {
-    setPromoApplied(true);
-  }
 
   function saveAddress() {
     const v = addressQuery.trim();
@@ -58,7 +84,6 @@ export default function Checkout() {
 
   return (
     <div className="checkout-page">
-      {}
       <header className="ck-header">
         <div className="ck-wrap ck-headerRow">
           <div className="ck-brand">
@@ -91,9 +116,7 @@ export default function Checkout() {
         </div>
       </header>
 
-      {}
       <main className="ck-wrap ck-main">
-        {/* Breadcrumb */}
         <div className="ck-breadcrumb">
           <Link to="/">Home</Link>
           <span className="ck-sep">›</span>
@@ -103,7 +126,6 @@ export default function Checkout() {
         </div>
 
         <div className="ck-grid">
-          {/* Left: Delivery Information */}
           <section className="ck-card ck-left">
             <div className="ck-cardHeader">
               <div className="ck-step">
@@ -154,8 +176,8 @@ export default function Checkout() {
                   onChange={(e) => setAddressQuery(e.target.value)}
                   placeholder="Search your delivery address on the map..."
                 />
-                
               </div>
+
               {selectedAddress ? (
                 <div className="ck-selected">
                   <div className="ck-selectedLabel">CURRENT SELECTION</div>
@@ -178,7 +200,6 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* Map */}
             <div className="ck-map">
               <iframe
                 title="Map"
@@ -207,40 +228,26 @@ export default function Checkout() {
             </div>
           </section>
 
-          {/* Right: Order Summary */}
           <aside className="ck-card ck-right">
             <h3 className="ck-h3">Order Detail</h3>
 
-            {/* <div className="ck-promo">
-              <input
-                value={promo}
-                onChange={(e) => setPromo(e.target.value)}
-                placeholder="Promo Code"
-              />
-              <button className="ck-outline" type="button" onClick={applyPromo}>
-                APPLY
-              </button>
-            </div> */}
-
             <div className="ck-lines">
               <div className="ck-line">
-                <span>Items Total (3 items)</span>
+                <span>Items Total ({itemsCount} item{itemsCount === 1 ? "" : "s"})</span>
                 <span>{money(itemsTotal)}</span>
               </div>
               <div className="ck-line">
                 <span>Delivery Fee</span>
-                <span>{money(deliveryFee)}</span>
-              </div>
-              <div className={`ck-line ${discount > 0 ? "ck-discount" : ""}`}>
-                <span>Discount</span>
-                <span>{discount > 0 ? `-${money(discount)}` : money(0)}</span>
+                <span>{money(itemsCount > 0 ? deliveryFee : 0)}</span>
               </div>
 
               <div className="ck-divider" />
 
               <div className="ck-totalRow">
                 <span className="ck-totalLabel">Total</span>
-                <span className="ck-totalValue">{money(total)}</span>
+                <span className="ck-totalValue">
+                  {money(itemsCount > 0 ? total : 0)}
+                </span>
               </div>
 
               <div className="ck-vat">VAT included where applicable</div>
@@ -252,8 +259,7 @@ export default function Checkout() {
 
             <div className="ck-terms">
               By placing your order, you agree to our{" "}
-              <a href="#">Terms of Service</a> and{" "}
-              <a href="#">Privacy Policy</a>.
+              <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
             </div>
 
             <div className="ck-secure">
@@ -267,28 +273,15 @@ export default function Checkout() {
                 </div>
               </div>
             </div>
+
+            {itemsCount === 0 && (
+              <div className="ck-terms" style={{ marginTop: 12 }}>
+                Your cart is empty. Go back and add a product first.
+              </div>
+            )}
           </aside>
         </div>
       </main>
-
-      <footer className="ck-footer">
-        <div className="ck-wrap ck-footerRow2">
-          <div className="ck-footerBrand">👜 ShopModern</div>
-          <div className="ck-footerLinks">
-            <a href="#">Support</a>
-            <a href="#">Return Policy</a>
-            <a href="#">Shipping Info</a>
-          </div>
-          <div className="ck-footerBtns">
-            <button className="ck-footBtn" aria-label="Payments">
-              💳
-            </button>
-            <button className="ck-footBtn" aria-label="Wallet">
-              👛
-            </button>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
