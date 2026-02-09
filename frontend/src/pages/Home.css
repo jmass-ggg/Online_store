@@ -130,7 +130,7 @@ a:focus-visible, button:focus-visible{
 .actions{
   height: 44px;
   padding: 0 10px;
- 
+
   border-radius: var(--pill);
 
   display: flex;
@@ -156,15 +156,11 @@ a:focus-visible, button:focus-visible{
   justify-content: center;
 
   border: 1px solid rgba(255,255,255,.18);
-  color: #fff;
+  color: #000000;
   background: transparent;
   cursor: pointer;
 
-  transition:
-    transform .18s var(--ease),
-    box-shadow .18s var(--ease),
-    background .18s var(--ease),
-    border-color .18s var(--ease);
+  
 }
 
 .auth-btn:hover{
@@ -173,7 +169,7 @@ a:focus-visible, button:focus-visible{
   border-color: rgba(255,255,255,.28);
 }
 
-.auth-login{ background: rgba(255,255,255,.06); }
+
 .auth-login:hover{ background: rgba(255,255,255,.12); }
 
 .auth-signup{
