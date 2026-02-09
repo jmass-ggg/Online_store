@@ -10,25 +10,23 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
 
-    allowedHosts: [".ngrok-free.dev"],
-
+    // DEV: proxy backend through /api
     proxy: {
-      "/product": { target: API_TARGET, changeOrigin: true },
-      "/customer": { target: API_TARGET, changeOrigin: true },
-      "/login": { target: API_TARGET, changeOrigin: true },
-      "/cart": { target: API_TARGET, changeOrigin: true },
-      "/address": { target: API_TARGET, changeOrigin: true },
-      "/order": { target: API_TARGET, changeOrigin: true },
-      "/review": { target: API_TARGET, changeOrigin: true },
-      "/seller": { target: API_TARGET, changeOrigin: true },
-      "/admin": { target: API_TARGET, changeOrigin: true },
-      "/seller_management": { target: API_TARGET, changeOrigin: true },
-      "/esewa": { target: API_TARGET, changeOrigin: true },
+      "/api": {
+        target: API_TARGET,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api/, ""),
+      },
 
-      "/uploads": { target: API_TARGET, changeOrigin: true },
-
-      "/docs": { target: API_TARGET, changeOrigin: true },
-      "/openapi.json": { target: API_TARGET, changeOrigin: true },
+      // DEV: allow backend uploads to load in frontend
+      "/uploads": {
+        target: API_TARGET,
+        changeOrigin: true,
+      },
     },
+
+    // If you use ngrok:
+    // allowedHosts: [".ngrok-free.dev"],
+    // hmr: { clientPort: 443 },
   },
 });

@@ -1,60 +1,43 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { API_BASE_URL } from "../api";
 import "./login.css";
+import { apiFetch } from "../api";
 
 export default function Login() {
   const nav = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function continueWithGoogle() {
-    alert("Google login not connected yet. Add your OAuth URL here.");
-  }
-
   async function onSubmit(e) {
     e.preventDefault();
+    if (loading) return;
+
     setError("");
     setLoading(true);
 
     try {
       const formData = new URLSearchParams();
-      formData.append("username", email);
+      formData.append("username", email.trim());
       formData.append("password", password);
 
-      // ✅ Correct endpoint: /login/login
-      const res = await fetch(`${API_BASE_URL}/login/login`, {
+      const data = await apiFetch("/login/login", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
-
-        // ✅ REQUIRED: lets browser store HttpOnly refresh cookie
-        credentials: "include",
       });
 
-      if (!res.ok) {
-        let msg = "Login failed";
-        try {
-          const err = await res.json();
-          msg = err?.detail || msg;
-        } catch {}
-        throw new Error(msg);
-      }
-
-      const data = await res.json();
-
-      // ✅ store access token only
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("auth_token", data.access_token);
-
-      // ❌ DO NOT store refresh token (it's HttpOnly cookie)
-      // localStorage.setItem("refresh_token", data.refresh_token);
+      window.dispatchEvent(new Event("auth:changed"));
 
       nav("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
@@ -69,7 +52,7 @@ export default function Login() {
           </div>
 
           <h1 className="login-title">Welcome Back!</h1>
-          <p className="login-sub">Welcome back please enter your details</p>
+          <p className="login-sub">Please enter your details to sign in</p>
 
           {error && <p className="login-error">{error}</p>}
 
@@ -89,30 +72,31 @@ export default function Login() {
 
             <div className="login-field">
               <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-              <Link className="login-forgot" to="#">Forgot password</Link>
+
+              <div className="login-passwordRow">
+                <input
+                  id="password"
+                  type={showPw ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="login-showBtn"
+                  onClick={() => setShowPw((v) => !v)}
+                >
+                  {showPw ? "Hide" : "Show"}
+                </button>
+              </div>
+
+              <Link className="login-forgot" to="#">Forgot password?</Link>
             </div>
 
             <button className="login-btn login-primary" type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
-            </button>
-
-            <button
-              className="login-btn login-google"
-              type="button"
-              onClick={continueWithGoogle}
-              disabled={loading}
-            >
-              <span className="login-gIcon" aria-hidden="true">G</span>
-              Sign in with Google
             </button>
 
             <p className="login-bottom">

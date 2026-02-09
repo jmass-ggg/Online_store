@@ -164,13 +164,84 @@ a:hover{ text-decoration:underline; }
   border-radius:999px;
   display:grid;
   place-items:center;
-  background: var(--accent);
-  color:#fff;
+  background: black;
+  color:white;
   font-weight:900;
 }
 .ck-stepText{
   color: var(--muted);
   font-size: 13px;
+}
+.ck-error{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffe8e8;
+  color: #b00020;
+  font-size: 14px;
+}
+
+.ck-secondary{
+  margin-left: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ship-card{
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: #fafafa;
+}
+
+.ship-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ship-title{
+  font-weight: 700;
+}
+
+.ship-edit{
+  border: none;
+  background: transparent;
+  color: #1e88e5;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ship-nameRow{
+  display: flex;
+  gap: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ship-addrRow{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ship-tag{
+  background: #ff5a5a;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.ship-addrText{
+  color: #333;
+  font-size: 14px;
 }
 
 .ck-h2{
@@ -417,7 +488,7 @@ a:hover{ text-decoration:underline; }
 .ck-totalValue{
   font-size: 26px;
   font-weight: 1000;
-  color: var(--accent);
+  color: black;
   letter-spacing: -0.02em;
 }
 

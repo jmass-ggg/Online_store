@@ -2,16 +2,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.v1 import customer, product, review, seller, admin, login,cart,address,order,seller_management,esewa_router
+from backend.api.v1 import (
+    customer, product, review, seller, admin, login, cart, address, order,
+    seller_management, esewa_router
+)
 from backend.database import Base, engine
 
 app = FastAPI()
 
+# If you use Vite proxy, browser origin is ngrok domain.
+# Add your ngrok URL here (or allow patterns).
 origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://unsight-unartificially-mozelle.ngrok-free.dev",
 ]
 
 app.add_middleware(
@@ -38,7 +42,7 @@ app.include_router(admin.router)
 app.include_router(cart.router)
 app.include_router(seller_management.router)
 app.include_router(esewa_router.router)
+
 @app.get("/")
 def hello_world():
     return {"message": "hello this is online store"}
-# https://unsight-unartificially-mozelle.ngrok-free.dev

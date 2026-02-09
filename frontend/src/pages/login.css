@@ -27,6 +27,38 @@ body{
   width:100%;
   display:flex;
 }
+.login-passwordRow{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.login-passwordRow input{
+  flex: 1;
+}
+
+.login-showBtn{
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.16);
+  background: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.login-showBtn:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(0,0,0,.10);
+}
+
+.login-rowBetween{
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
 
 /* 50/50 split like screenshot */
 .login-left{

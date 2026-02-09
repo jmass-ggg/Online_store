@@ -1,18 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Shoes.css";
+import { apiFetch, joinUrl } from "../api";
 
-// ✅ Use env if available (Vite): VITE_API_BASE="https://xxxx.ngrok.app"
-const API_BASE = import.meta?.env?.VITE_API_BASE || "http://127.0.0.1:8000";
 const FOOTWEAR_CATEGORY = "Footwear";
-
-function joinUrl(base, path) {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  const b = base.endsWith("/") ? base.slice(0, -1) : base;
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return `${b}${p}`;
-}
 
 function toNumber(value) {
   if (value === null || value === undefined) return 0;
@@ -22,11 +13,7 @@ function toNumber(value) {
 
 function formatMoney(value) {
   const n = toNumber(value);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(n);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 }
 
 function ProductCard({ p }) {
@@ -35,7 +22,6 @@ function ProductCard({ p }) {
   const images = (p.images?.length ? p.images : [p.image]).filter(Boolean);
   const thumbs = images.slice(0, 5);
   const extraCount = Math.max(0, images.length - thumbs.length);
-
   const hero = images[activeIdx] || images[0] || "/shoes.jpg";
 
   return (
@@ -43,14 +29,7 @@ function ProductCard({ p }) {
       <Link to={`/product/${p.url_slug}`} className="plp-hit" aria-label={p.title} />
 
       <div className="plp-media" aria-hidden="true">
-        <img
-          src={hero}
-          alt=""
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.src = "/shoes.jpg";
-          }}
-        />
+        <img src={hero} alt="" loading="lazy" onError={(e) => (e.currentTarget.src = "/shoes.jpg")} />
       </div>
 
       {thumbs.length > 1 && (
@@ -64,14 +43,7 @@ function ProductCard({ p }) {
               onFocus={() => setActiveIdx(idx)}
               tabIndex={-1}
             >
-              <img
-                src={src}
-                alt=""
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src = "/shoes.jpg";
-                }}
-              />
+              <img src={src} alt="" loading="lazy" onError={(e) => (e.currentTarget.src = "/shoes.jpg")} />
             </button>
           ))}
           {extraCount > 0 && <span className="plp-more">+{extraCount}</span>}
@@ -79,9 +51,7 @@ function ProductCard({ p }) {
       )}
 
       <div className="plp-info">
-        <div className="plp-title" title={p.title}>
-          {p.title}
-        </div>
+        <div className="plp-title" title={p.title}>{p.title}</div>
         <div className="plp-meta">Men&apos;s Shoes</div>
         <div className="plp-price">{formatMoney(p.price)}</div>
       </div>
@@ -90,13 +60,7 @@ function ProductCard({ p }) {
 }
 
 function ProductGrid({ products }) {
-  return (
-    <div className="plp-grid">
-      {products.map((p) => (
-        <ProductCard key={p.id} p={p} />
-      ))}
-    </div>
-  );
+  return <div className="plp-grid">{products.map((p) => <ProductCard key={p.id} p={p} />)}</div>;
 }
 
 export default function Shoes() {
@@ -107,23 +71,16 @@ export default function Shoes() {
 
   const mappedProducts = useMemo(() => {
     return products.map((p) => {
-      const image = joinUrl(API_BASE, p.image_url || "");
+      const image = joinUrl(p.image_url || "");
 
       const rawImages =
         (Array.isArray(p.images) && p.images) ||
         (Array.isArray(p.image_urls) && p.image_urls) ||
         [];
 
-      const images = rawImages.length
-        ? rawImages.map((u) => joinUrl(API_BASE, u))
-        : [image].filter(Boolean);
+      const images = rawImages.length ? rawImages.map((u) => joinUrl(u)) : [image].filter(Boolean);
 
-      const price =
-        p.default_price ??
-        p.defaultPrice ??
-        p.price ??
-        p.base_price ??
-        "0.00";
+      const price = p.default_price ?? p.defaultPrice ?? p.price ?? p.base_price ?? "0.00";
 
       return {
         id: p.id,
@@ -140,28 +97,20 @@ export default function Shoes() {
     setLoading(true);
     setError("");
 
-    const controller = new AbortController();
-
     try {
+      // ✅ relative paths (proxy handles backend)
       const url = q.trim()
-        ? `${API_BASE}/product/search?q=${encodeURIComponent(
-            q
-          )}&category=${encodeURIComponent(FOOTWEAR_CATEGORY)}`
-        : `${API_BASE}/product/?category=${encodeURIComponent(FOOTWEAR_CATEGORY)}`;
+        ? `/product/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(FOOTWEAR_CATEGORY)}`
+        : `/product/?category=${encodeURIComponent(FOOTWEAR_CATEGORY)}`;
 
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const data = await apiFetch(url);
       setProducts(Array.isArray(data) ? data : []);
     } catch (e) {
-      if (e?.name === "AbortError") return;
       setError(e?.message || "Something went wrong");
       setProducts([]);
     } finally {
       setLoading(false);
     }
-
-    return () => controller.abort();
   }
 
   useEffect(() => {
@@ -180,27 +129,17 @@ export default function Shoes() {
       <header className="top-header">
         <div className="wrap header-row">
           <div className="brand">
-            <a href="#" className="brand-logo">
-              JAMES
-            </a>
+            <a href="#" className="brand-logo">JAMES</a>
           </div>
 
           <nav className="top-nav">
-            <a href="#">Men</a>
-            <a href="#">Women</a>
-            <a href="#">Kids</a>
-            <a href="#">Jordan</a>
-            <a href="#">Collections</a>
-            <a href="#" className="sale">
-              Sale
-            </a>
+            <a href="#">Men</a><a href="#">Women</a><a href="#">Kids</a><a href="#">Jordan</a>
+            <a href="#">Collections</a><a href="#" className="sale">Sale</a>
           </nav>
 
           <div className="header-actions">
             <div className="search">
-              <span className="search-icon" aria-hidden="true">
-                🔍
-              </span>
+              <span className="search-icon" aria-hidden="true">🔍</span>
               <input
                 type="text"
                 placeholder="Search footwear..."
@@ -208,12 +147,8 @@ export default function Shoes() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <button className="icon-btn" type="button" aria-label="Favorites">
-              ♡
-            </button>
-            <button className="icon-btn" type="button" aria-label="Bag">
-              👜
-            </button>
+            <button className="icon-btn" type="button" aria-label="Favorites">♡</button>
+            <button className="icon-btn" type="button" aria-label="Bag">👜</button>
           </div>
         </div>
       </header>
