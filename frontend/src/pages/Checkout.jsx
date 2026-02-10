@@ -43,7 +43,7 @@ function readBuyNow() {
   }
 }
 
-// ---------------- Error formatting (Fixes [object Object]) ----------------
+// ---------------- Error formatting ----------------
 function formatApiError(err) {
   const detail = err?.detail;
 
@@ -63,7 +63,6 @@ function formatApiError(err) {
 
 /**
  * Nepal address data (simple version).
- * Expand anytime.
  * lat/lng are province center points (approx).
  */
 const NEPAL = {
@@ -102,10 +101,7 @@ const NEPAL = {
       lng: 83.99,
       cities: [
         { name: "Pokhara", zones: ["Lakeside", "Chipledhunga", "Bagar"] },
-        {
-          name: "Beni",
-          zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk", "New Road Area"],
-        },
+        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk", "New Road Area"] },
       ],
     },
     {
@@ -138,11 +134,23 @@ function jitterCoord(base, maxDelta = 0.03) {
   return Number((base + r).toFixed(6));
 }
 
+// Try to parse line2 like: "Zone, City, Landmark..."
+function parseLine2(line2) {
+  const s = String(line2 || "").trim();
+  if (!s) return { zone: "", city: "", landmark: "" };
+  const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+  return {
+    zone: parts[0] || "",
+    city: parts[1] || "",
+    landmark: parts.slice(2).join(", ") || "",
+  };
+}
+
 export default function Checkout() {
   const location = useLocation();
   const isBuyNowMode = new URLSearchParams(location.search).get("mode") === "buy_now";
 
-  // ---------------- Form ----------------
+  // ---------------- Form state ----------------
   const [fullName, setFullName] = useState("");
   const [countryCode, setCountryCode] = useState("+977");
   const [phone, setPhone] = useState("");
@@ -157,7 +165,11 @@ export default function Checkout() {
   const [saving, setSaving] = useState(false);
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
   const [savedAddress, setSavedAddress] = useState(null);
+
+  // NEW: controls whether form shows or not
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
 
   // ---------------- Order Items ----------------
   const [orderItems, setOrderItems] = useState([]);
@@ -176,7 +188,7 @@ export default function Checkout() {
     };
   }, []);
 
-  // ---------------- Load address list (GET /addresses/) ----------------
+  // ---------------- Load address list ----------------
   useEffect(() => {
     let cancelled = false;
 
@@ -188,7 +200,12 @@ export default function Checkout() {
         if (cancelled) return;
 
         const arr = Array.isArray(list) ? list : [];
-        setSavedAddress(arr.length ? arr[0] : null); // newest first from backend
+        const newest = arr.length ? arr[0] : null;
+        setSavedAddress(newest);
+
+        // If we already have an address, default to NOT editing (hide form)
+        if (newest) setIsEditingAddress(false);
+        else setIsEditingAddress(true);
       } catch (e) {
         if (!cancelled) setErrorMsg(formatApiError(e));
       } finally {
@@ -210,7 +227,6 @@ export default function Checkout() {
       setLoadingOrder(true);
       setErrorMsg("");
 
-      // BUY NOW MODE
       if (isBuyNowMode) {
         const bn = readBuyNow();
         if (!bn) {
@@ -237,7 +253,6 @@ export default function Checkout() {
         return;
       }
 
-      // CART MODE
       const localMap = readLocalMapByVariantId();
       try {
         const cart = await apiFetch("/cart/me");
@@ -290,17 +305,11 @@ export default function Checkout() {
     () => NEPAL.provinces.find((p) => p.name === province) || null,
     [province]
   );
-
   const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
-
-  const cityObj = useMemo(
-    () => cityOptions.find((c) => c.name === city) || null,
-    [cityOptions, city]
-  );
-
+  const cityObj = useMemo(() => cityOptions.find((c) => c.name === city) || null, [cityOptions, city]);
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
 
-  // reset dependent selects
+  // Reset dependent selects
   useEffect(() => {
     setCity("");
     setZone("");
@@ -309,6 +318,50 @@ export default function Checkout() {
   useEffect(() => {
     setZone("");
   }, [city]);
+
+  // ---------------- EDIT: prefill form from savedAddress ----------------
+  function startEdit() {
+    if (savedAddress) {
+      setFullName(savedAddress.full_name || "");
+      const pn = String(savedAddress.phone_number || "");
+      // if pn starts with +977, split it, else keep default code
+      if (pn.startsWith("+977")) {
+        setCountryCode("+977");
+        setPhone(pn.replace("+977", "").trim());
+      } else {
+        setPhone(pn);
+      }
+
+      setProvince(savedAddress.region || "");
+      setAddressLine(savedAddress.line1 || "");
+      setPostalCode(savedAddress.postal_code || "");
+
+      const parsed = parseLine2(savedAddress.line2);
+      setZone(parsed.zone);
+      setCity(parsed.city);
+      setLandmark(parsed.landmark);
+    } else {
+      // blank
+      setFullName("");
+      setCountryCode("+977");
+      setPhone("");
+      setProvince("");
+      setCity("");
+      setZone("");
+      setLandmark("");
+      setAddressLine("");
+      setPostalCode("");
+    }
+
+    setErrorMsg("");
+    setIsEditingAddress(true);
+  }
+
+  function cancelEdit() {
+    setErrorMsg("");
+    // if we have saved address, hide form; otherwise keep it open
+    if (savedAddress) setIsEditingAddress(false);
+  }
 
   // ---------------- Save Address (POST /addresses/) ----------------
   async function saveAddress() {
@@ -321,13 +374,13 @@ export default function Checkout() {
     if (!zone) return setErrorMsg("Please select Zone");
     if (!addressLine.trim()) return setErrorMsg("Please enter Address");
 
-    const baseLat = provinceObj?.lat ?? 27.7172;
-    const baseLng = provinceObj?.lng ?? 85.3240;
+    const pObj = NEPAL.provinces.find((p) => p.name === province) || null;
+    const baseLat = pObj?.lat ?? 27.7172;
+    const baseLng = pObj?.lng ?? 85.324;
 
-    // IMPORTANT: backend requires full_name and phone_number
     const payload = {
       full_name: fullName.trim(),
-      phone_number: `${countryCode}${phone.trim()}`, // if backend wants digits only, change to phone.trim()
+      phone_number: `${countryCode}${phone.trim()}`,
       region: province,
       line1: addressLine.trim(),
       line2: `${zone}, ${city}${landmark.trim() ? `, ${landmark.trim()}` : ""}`,
@@ -347,8 +400,8 @@ export default function Checkout() {
       });
 
       setSavedAddress(saved);
-      // reload list so UI always matches backend
-      setRefreshTick((t) => t + 1);
+      setIsEditingAddress(false); // ✅ hide form after save
+      setRefreshTick((t) => t + 1); // reload newest from GET
     } catch (e) {
       setErrorMsg(formatApiError(e));
     } finally {
@@ -366,9 +419,7 @@ export default function Checkout() {
       const payload = {
         mode: isBuyNowMode ? "BUY_NOW" : "CART",
         address_id: savedAddress.id,
-        items: isBuyNowMode
-          ? orderItems.map((x) => ({ variant_id: x.variant_id, quantity: x.quantity }))
-          : null,
+        items: isBuyNowMode ? orderItems.map((x) => ({ variant_id: x.variant_id, quantity: x.quantity })) : null,
       };
 
       const res = await apiFetch("/order/checkout", {
@@ -383,11 +434,7 @@ export default function Checkout() {
     }
   }
 
-  const canProceed =
-    itemsCount > 0 &&
-    fullName.trim().length > 1 &&
-    phone.trim().length >= 7 &&
-    !!savedAddress;
+  const canProceed = itemsCount > 0 && !!savedAddress;
 
   return (
     <div className="checkout-page">
@@ -403,22 +450,14 @@ export default function Checkout() {
           </nav>
 
           <div className="ck-search">
-            <span className="ck-searchIcon" aria-hidden="true">
-              🔎
-            </span>
+            <span className="ck-searchIcon" aria-hidden="true">🔎</span>
             <input placeholder="Search for products..." />
           </div>
 
           <div className="ck-actions">
-            <button className="ck-iconBtn" aria-label="Cart">
-              🛒
-            </button>
-            <button className="ck-iconBtn" aria-label="Notifications">
-              🔔
-            </button>
-            <button className="ck-avatar" aria-label="Account">
-              👤
-            </button>
+            <button className="ck-iconBtn" aria-label="Cart">🛒</button>
+            <button className="ck-iconBtn" aria-label="Notifications">🔔</button>
+            <button className="ck-avatar" aria-label="Account">👤</button>
           </div>
         </div>
       </header>
@@ -434,7 +473,7 @@ export default function Checkout() {
         </div>
 
         <div className="ck-grid">
-          {/* LEFT - ADDRESS */}
+          {/* LEFT */}
           <section className="ck-card ck-left">
             <div className="ck-cardHeader">
               <div className="ck-step">
@@ -454,16 +493,14 @@ export default function Checkout() {
               <div className="ship-card">
                 <div className="ship-head">
                   <div className="ship-title">Shipping Address</div>
-                  <div className="ship-edit">EDIT</div>
+                  <button type="button" className="ship-edit" onClick={startEdit}>
+                    EDIT
+                  </button>
                 </div>
 
                 <div className="ship-nameRow">
-                  <span className="ship-name">
-                    {savedAddress.full_name || fullName}
-                  </span>
-                  <span className="ship-phone">
-                    {savedAddress.phone_number || `${countryCode} ${phone}`}
-                  </span>
+                  <span className="ship-name">{savedAddress.full_name}</span>
+                  <span className="ship-phone">{savedAddress.phone_number}</span>
                 </div>
 
                 <div className="ship-addrRow">
@@ -479,112 +516,99 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* FORM */}
-            <div className="ck-formGrid">
-              <div className="ck-field">
-                <label>Full Name</label>
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. James Gurung"
-                />
-              </div>
+            {/* ✅ SHOW FORM ONLY WHEN editing OR no saved address */}
+            {(isEditingAddress || !savedAddress) && (
+              <>
+                <div className="ck-formGrid">
+                  <div className="ck-field">
+                    <label>Full Name</label>
+                    <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. James Gurung" />
+                  </div>
 
-              <div className="ck-field">
-                <label>Phone Number</label>
-                <div className="ck-phoneRow">
-                  <select
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    aria-label="Country code"
-                  >
-                    <option value="+977">+977</option>
-                  </select>
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="98XXXXXXXX"
-                    inputMode="numeric"
-                  />
+                  <div className="ck-field">
+                    <label>Phone Number</label>
+                    <div className="ck-phoneRow">
+                      <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} aria-label="Country code">
+                        <option value="+977">+977</option>
+                      </select>
+                      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98XXXXXXXX" inputMode="numeric" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="ck-formGrid" style={{ marginTop: 10 }}>
-              <div className="ck-field">
-                <label>Province / Region</label>
-                <select value={province} onChange={(e) => setProvince(e.target.value)}>
-                  <option value="">Please choose your province / region</option>
-                  {NEPAL.provinces.map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div className="ck-formGrid" style={{ marginTop: 10 }}>
+                  <div className="ck-field">
+                    <label>Province / Region</label>
+                    <select value={province} onChange={(e) => setProvince(e.target.value)}>
+                      <option value="">Please choose your province / region</option>
+                      {NEPAL.provinces.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="ck-field">
-                <label>City</label>
-                <select value={city} onChange={(e) => setCity(e.target.value)} disabled={!province}>
-                  <option value="">Please choose your city</option>
-                  {cityOptions.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div className="ck-field">
+                    <label>City</label>
+                    <select value={city} onChange={(e) => setCity(e.target.value)} disabled={!province}>
+                      <option value="">Please choose your city</option>
+                      {cityOptions.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="ck-field">
-                <label>Zone</label>
-                <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={!city}>
-                  <option value="">Please choose your zone</option>
-                  {zoneOptions.map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div className="ck-field">
+                    <label>Zone</label>
+                    <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={!city}>
+                      <option value="">Please choose your zone</option>
+                      {zoneOptions.map((z) => (
+                        <option key={z} value={z}>
+                          {z}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="ck-field">
-                <label>Landmark (Optional)</label>
-                <input
-                  value={landmark}
-                  onChange={(e) => setLandmark(e.target.value)}
-                  placeholder="e.g. beside train station"
-                />
-              </div>
+                  <div className="ck-field">
+                    <label>Landmark (Optional)</label>
+                    <input value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="e.g. beside train station" />
+                  </div>
 
-              <div className="ck-field ck-fieldFull">
-                <label>Address</label>
-                <input
-                  value={addressLine}
-                  onChange={(e) => setAddressLine(e.target.value)}
-                  placeholder="Please enter your address"
-                />
-              </div>
+                  <div className="ck-field ck-fieldFull">
+                    <label>Address</label>
+                    <input value={addressLine} onChange={(e) => setAddressLine(e.target.value)} placeholder="Please enter your address" />
+                  </div>
 
-              <div className="ck-field">
-                <label>Postal Code (Optional)</label>
-                <input
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="44600"
-                />
-              </div>
-            </div>
+                  <div className="ck-field">
+                    <label>Postal Code (Optional)</label>
+                    <input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="44600" />
+                  </div>
+                </div>
 
-            {errorMsg && <div className="ck-error">{errorMsg}</div>}
+                {errorMsg && <div className="ck-error">{errorMsg}</div>}
 
-            <div className="ck-footerRow">
-              <button className="ck-primary" type="button" onClick={saveAddress} disabled={saving}>
-                {saving ? "SAVING..." : "SAVE ADDRESS"}
-              </button>
-            </div>
+                <div className="ck-footerRow" style={{ gap: 10 }}>
+                  {savedAddress && (
+                    <button className="ck-secondary" type="button" onClick={cancelEdit} disabled={saving}>
+                      CANCEL
+                    </button>
+                  )}
+                  <button className="ck-primary" type="button" onClick={saveAddress} disabled={saving}>
+                    {saving ? "SAVING..." : "SAVE ADDRESS"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* show errors even if form hidden */}
+            {!isEditingAddress && savedAddress && errorMsg && <div className="ck-error">{errorMsg}</div>}
           </section>
 
-          {/* RIGHT - ORDER DETAIL + PAY */}
+          {/* RIGHT */}
           <aside className="ck-card ck-right">
             <h3 className="ck-h3">Order Detail</h3>
 
