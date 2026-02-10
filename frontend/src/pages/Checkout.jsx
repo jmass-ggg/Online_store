@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import "./Checkout.css";
 import { apiFetch } from "../api";
 
 const CART_KEY = "cart_items";
+const BUY_NOW_KEY = "buy_now_item";
 
 function money(n) {
   const v = Number(n || 0);
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
-function readCart() {
+// ---------------- Local helpers (display enrichment) ----------------
+function readLocalCartArray() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
     return Array.isArray(raw) ? raw : [];
@@ -19,212 +21,310 @@ function readCart() {
   }
 }
 
-// ---- Google Maps loader ----
-function loadGoogleMaps(apiKey) {
-  if (window.google?.maps?.places) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector("script[data-google-maps='1']");
-    if (existing) {
-      existing.addEventListener("load", resolve);
-      existing.addEventListener("error", reject);
-      return;
-    }
-
-    const s = document.createElement("script");
-    s.dataset.googleMaps = "1";
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    s.async = true;
-    s.defer = true;
-    s.onload = resolve;
-    s.onerror = () => reject(new Error("Failed to load Google Maps script"));
-    document.head.appendChild(s);
-  });
+function readLocalMapByVariantId() {
+  const arr = readLocalCartArray();
+  const map = new Map();
+  for (const x of arr) {
+    const vid = Number(x?.variant_id ?? x?.variantId ?? x?.id);
+    if (Number.isFinite(vid)) map.set(vid, x);
+  }
+  return map;
 }
 
-// ---- Parse Place into backend fields ----
-function parsePlace(place) {
-  const comps = place?.address_components || [];
+// ---------------- Buy Now helpers ----------------
+function readBuyNow() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BUY_NOW_KEY) || "null");
+    if (!raw?.item?.variant_id) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
 
-  const getLong = (type) =>
-    comps.find((c) => c.types?.includes(type))?.long_name || "";
-  const getShort = (type) =>
-    comps.find((c) => c.types?.includes(type))?.short_name || "";
+/**
+ * Nepal address data (simple version).
+ * You can expand this list anytime.
+ */
+const NEPAL = {
+  provinces: [
+    {
+      name: "Koshi Province",
+      lat: 26.67,
+      lng: 87.27,
+      cities: [
+        { name: "Biratnagar", zones: ["Main Road", "Traffic Chowk", "Bargachhi"] },
+        { name: "Dharan", zones: ["Bhanuchowk", "Putali Line", "Siddha Kali"] },
+      ],
+    },
+    {
+      name: "Madhesh Province",
+      lat: 26.72,
+      lng: 85.92,
+      cities: [
+        { name: "Janakpur", zones: ["Ramanand Chowk", "Mills Area", "Kuwa"] },
+        { name: "Birgunj", zones: ["Ghantaghar", "Adarshanagar", "Dryport"] },
+      ],
+    },
+    {
+      name: "Bagmati Province",
+      lat: 27.72,
+      lng: 85.32,
+      cities: [
+        { name: "Kathmandu", zones: ["New Baneshwor", "Koteshwor", "Kalanki", "Boudha"] },
+        { name: "Lalitpur", zones: ["Jawalakhel", "Patan", "Satdobato"] },
+        { name: "Bhaktapur", zones: ["Suryabinayak", "Thimi", "Durbar Square"] },
+      ],
+    },
+    {
+      name: "Gandaki Province",
+      lat: 28.21,
+      lng: 83.99,
+      cities: [
+        { name: "Pokhara", zones: ["Lakeside", "Chipledhunga", "Bagar"] },
+        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk", "New Road Area"] },
+      ],
+    },
+    {
+      name: "Lumbini Province",
+      lat: 27.53,
+      lng: 83.45,
+      cities: [
+        { name: "Butwal", zones: ["Traffic Chowk", "Golpark", "Kalikanagar"] },
+        { name: "Bhairahawa", zones: ["Siddharthnagar", "Buspark", "Airport Area"] },
+      ],
+    },
+    {
+      name: "Karnali Province",
+      lat: 28.6,
+      lng: 81.6,
+      cities: [{ name: "Birendranagar", zones: ["Yarichowk", "Mangalgadhi", "Airport Area"] }],
+    },
+    {
+      name: "Sudurpashchim Province",
+      lat: 28.95,
+      lng: 80.18,
+      cities: [{ name: "Dhangadhi", zones: ["Campus Road", "Hasanpur", "Chatakpur"] }],
+    },
+  ],
+};
 
-  const streetNumber = getLong("street_number");
-  const route = getLong("route");
-
-  const sublocality =
-    getLong("sublocality") ||
-    getLong("sublocality_level_1") ||
-    getLong("neighborhood");
-
-  const locality = getLong("locality") || getLong("postal_town");
-  const admin2 = getLong("administrative_area_level_2");
-  const admin1 = getLong("administrative_area_level_1"); // Province/Region
-  const postal = getLong("postal_code");
-
-  const country = getLong("country") || "Nepal";
-  const countryCode = (getShort("country") || "").toLowerCase();
-
-  const lat = place?.geometry?.location?.lat?.();
-  const lng = place?.geometry?.location?.lng?.();
-
-  const line1 =
-    [streetNumber, route].filter(Boolean).join(" ") ||
-    place?.formatted_address ||
-    "";
-
-  const line2 = [sublocality, locality, admin2].filter(Boolean).join(", ") || null;
-  const region = admin1 || "Bagmati";
-
-  return {
-    region,
-    line1,
-    line2,
-    postal_code: postal || null,
-    country,
-    country_code: countryCode,
-    latitude: typeof lat === "number" ? lat : null,
-    longitude: typeof lng === "number" ? lng : null,
-    formatted_address: place?.formatted_address || line1,
-  };
+// small random “jitter” so not all users same exact coordinate
+function jitterCoord(base, maxDelta = 0.03) {
+  const r = (Math.random() * 2 - 1) * maxDelta; // -delta..+delta
+  return Number((base + r).toFixed(6));
 }
 
 export default function Checkout() {
-  // --- Form ---
+  const location = useLocation();
+  const isBuyNowMode = new URLSearchParams(location.search).get("mode") === "buy_now";
+
+  // ---------------- Form ----------------
   const [fullName, setFullName] = useState("");
   const [countryCode, setCountryCode] = useState("+977");
   const [phone, setPhone] = useState("");
 
-  const [addressQuery, setAddressQuery] = useState("");
-  const [addr, setAddr] = useState(null);
+  // Daraz-style
+  const [province, setProvince] = useState("");
+  const [city, setCity] = useState("");
+  const [zone, setZone] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [postalCode, setPostalCode] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [savedAddress, setSavedAddress] = useState(null);
 
-  const addressInputRef = useRef(null);
-
-  // --- Cart ---
-  const [cart, setCart] = useState(() => readCart());
+  // ---------------- Order Items ----------------
+  const [orderItems, setOrderItems] = useState([]);
+  const [loadingOrder, setLoadingOrder] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
-    const onUpdate = () => setCart(readCart());
-    window.addEventListener("cart:updated", onUpdate);
-    window.addEventListener("storage", onUpdate);
+    const bump = () => setRefreshTick((t) => t + 1);
+    window.addEventListener("cart:updated", bump);
+    window.addEventListener("storage", bump);
+    window.addEventListener("buy_now:updated", bump);
     return () => {
-      window.removeEventListener("cart:updated", onUpdate);
-      window.removeEventListener("storage", onUpdate);
+      window.removeEventListener("cart:updated", bump);
+      window.removeEventListener("storage", bump);
+      window.removeEventListener("buy_now:updated", bump);
     };
   }, []);
 
+  // ---------------- Load items: BUY_NOW or CART ----------------
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadOrder() {
+      setLoadingOrder(true);
+      setErrorMsg("");
+
+      if (isBuyNowMode) {
+        const bn = readBuyNow();
+        if (!bn) {
+          if (!cancelled) setOrderItems([]);
+          setLoadingOrder(false);
+          return;
+        }
+
+        const it = bn.item;
+        if (!cancelled) {
+          setOrderItems([
+            {
+              id: `buy_now_${it.variant_id}`,
+              variant_id: it.variant_id,
+              quantity: it.quantity ?? 1,
+              price: it.price ?? 0,
+              product_name: it.product_name,
+              image_url: it.image_url,
+              size: it.size,
+            },
+          ]);
+        }
+        setLoadingOrder(false);
+        return;
+      }
+
+      const localMap = readLocalMapByVariantId();
+      try {
+        const cart = await apiFetch("/cart/me");
+        if (cancelled) return;
+
+        const items = Array.isArray(cart?.items) ? cart.items : [];
+        const enriched = items.map((it) => {
+          const local = localMap.get(Number(it.variant_id));
+          return {
+            ...it,
+            product_name: local?.product_name,
+            image_url: local?.image_url,
+            size: local?.size,
+          };
+        });
+
+        setOrderItems(enriched);
+      } catch (e) {
+        if (!cancelled) {
+          setOrderItems([]);
+          setErrorMsg(e?.message || "Failed to load cart");
+        }
+      } finally {
+        if (!cancelled) setLoadingOrder(false);
+      }
+    }
+
+    loadOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick, isBuyNowMode]);
+
+  // ---------------- Totals ----------------
   const itemsCount = useMemo(
-    () => cart.reduce((sum, x) => sum + Number(x.qty || 0), 0),
-    [cart]
+    () => orderItems.reduce((sum, it) => sum + Number(it.quantity || 0), 0),
+    [orderItems]
   );
 
   const itemsTotal = useMemo(
-    () => cart.reduce((sum, x) => sum + Number(x.price || 0) * Number(x.qty || 0), 0),
-    [cart]
+    () => orderItems.reduce((sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 0), 0),
+    [orderItems]
   );
 
   const deliveryFee = 4.5;
-  const total = Math.max(0, itemsTotal + deliveryFee);
+  const total = Math.max(0, itemsTotal + (itemsCount > 0 ? deliveryFee : 0));
 
-  // --- Google Places Autocomplete ---
+  // ---------------- Province/City/Zone derived lists ----------------
+  const provinceObj = useMemo(
+    () => NEPAL.provinces.find((p) => p.name === province) || null,
+    [province]
+  );
+
+  const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
+
+  const cityObj = useMemo(
+    () => cityOptions.find((c) => c.name === city) || null,
+    [cityOptions, city]
+  );
+
+  const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
+
+  // reset dependent selects
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      setErrorMsg("Missing VITE_GOOGLE_MAPS_API_KEY in frontend/.env");
-      return;
-    }
+    setCity("");
+    setZone("");
+  }, [province]);
 
-    let autocomplete;
+  useEffect(() => {
+    setZone("");
+  }, [city]);
 
-    loadGoogleMaps(apiKey)
-      .then(() => {
-        if (!addressInputRef.current) return;
-
-        autocomplete = new window.google.maps.places.Autocomplete(
-          addressInputRef.current,
-          {
-            componentRestrictions: { country: "np" }, // Nepal only
-            fields: ["address_components", "formatted_address", "geometry"],
-          }
-        );
-
-        autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          const parsed = parsePlace(place);
-
-          if (parsed.country_code && parsed.country_code !== "np") {
-            setErrorMsg("Service available only in Nepal");
-            setAddr(null);
-            return;
-          }
-
-          if (!parsed.latitude || !parsed.longitude) {
-            setErrorMsg("Please select an address from the suggestions dropdown.");
-            setAddr(null);
-            return;
-          }
-
-          setErrorMsg("");
-          setAddr(parsed);
-          setAddressQuery(parsed.formatted_address);
-        });
-      })
-      .catch((e) => setErrorMsg(e.message));
-
-    return () => {
-      autocomplete = null;
-    };
-  }, []);
-
-  const mapEmbedSrc = useMemo(() => {
-    if (addr?.latitude && addr?.longitude) {
-      return `https://www.google.com/maps?q=${addr.latitude},${addr.longitude}&z=15&output=embed`;
-    }
-    const q = encodeURIComponent((addressQuery || "Kathmandu, Nepal").trim());
-    return `https://www.google.com/maps?q=${q}&output=embed`;
-  }, [addr, addressQuery]);
-
+  // ---------------- Save Address (NO MAP) ----------------
   async function saveAddress() {
     setErrorMsg("");
 
     if (!fullName.trim()) return setErrorMsg("Full name is required");
     if (phone.trim().length < 7) return setErrorMsg("Phone number is too short");
 
-    if (!addr?.latitude || !addr?.longitude) {
-      return setErrorMsg("Select an address from the Google suggestions list.");
-    }
+    if (!province) return setErrorMsg("Please select Province / Region");
+    if (!city) return setErrorMsg("Please select City");
+    if (!zone) return setErrorMsg("Please select Zone");
+    if (!addressLine.trim()) return setErrorMsg("Please enter Address");
+
+    // make lat/lng near province center
+    const baseLat = provinceObj?.lat ?? 27.7172;
+    const baseLng = provinceObj?.lng ?? 85.3240;
+
+    const payload = {
+      region: province, // ✅ region = province
+      line1: addressLine.trim(), // ✅ line1 = address
+      line2: `${zone}, ${city}${landmark.trim() ? `, ${landmark.trim()}` : ""}`, // ✅ extra info
+      postal_code: postalCode.trim() ? postalCode.trim() : null,
+      country: "Nepal",
+      latitude: jitterCoord(baseLat, 0.05),
+      longitude: jitterCoord(baseLng, 0.05),
+      is_default_shipping: true,
+      is_default_billing: false,
+    };
 
     setSaving(true);
     try {
-      const payload = {
-        region: addr.region,
-        line1: addr.line1,
-        line2: addr.line2,
-        postal_code: addr.postal_code,
-        country: addr.country || "Nepal",
-        latitude: addr.latitude,
-        longitude: addr.longitude,
-        is_default_shipping: true,
-        is_default_billing: false,
-      };
-
-      // ✅ backend router prefix is /addresses
       const saved = await apiFetch("/addresses/", {
         method: "POST",
         body: JSON.stringify(payload),
       });
-
       setSavedAddress(saved);
     } catch (e) {
       setErrorMsg(e?.message || "Failed to save address");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ---------------- Proceed To Pay ----------------
+  async function proceedToPay() {
+    setErrorMsg("");
+    if (!savedAddress) return setErrorMsg("Please save a shipping address to proceed.");
+    if (itemsCount <= 0) return setErrorMsg("No items to checkout.");
+
+    try {
+      const payload = {
+        mode: isBuyNowMode ? "BUY_NOW" : "CART",
+        address_id: savedAddress.id,
+        items: isBuyNowMode
+          ? orderItems.map((x) => ({ variant_id: x.variant_id, quantity: x.quantity }))
+          : null,
+      };
+
+      const res = await apiFetch("/order/checkout", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (res?.payment_url) window.location.href = res.payment_url;
+      else alert("Order created. Implement payment redirect here.");
+    } catch (e) {
+      setErrorMsg(e?.message || "Failed to proceed to payment");
     }
   }
 
@@ -267,9 +367,11 @@ export default function Checkout() {
           <a href="#">Cart</a>
           <span className="ck-sep">›</span>
           <span className="ck-current">Checkout</span>
+          {isBuyNowMode && <span style={{ marginLeft: 8, opacity: 0.7 }}>(Buy Now)</span>}
         </div>
 
         <div className="ck-grid">
+          {/* LEFT - ADDRESS (NO MAP) */}
           <section className="ck-card ck-left">
             <div className="ck-cardHeader">
               <div className="ck-step">
@@ -295,6 +397,7 @@ export default function Checkout() {
                   <span className="ship-tag">HOME</span>
                   <span className="ship-addrText">
                     {savedAddress.line1}
+                    {savedAddress.line2 ? `, ${savedAddress.line2}` : ""}
                     {savedAddress.region ? `, ${savedAddress.region}` : ""}
                     {savedAddress.postal_code ? `, ${savedAddress.postal_code}` : ""}
                     {savedAddress.country ? `, ${savedAddress.country}` : ""}
@@ -303,6 +406,7 @@ export default function Checkout() {
               </div>
             )}
 
+            {/* top row like your current one */}
             <div className="ck-formGrid">
               <div className="ck-field">
                 <label>Full Name</label>
@@ -333,51 +437,125 @@ export default function Checkout() {
               </div>
             </div>
 
-            <div className="ck-field ck-fieldFull">
-              <label>Delivery Address</label>
-              <div className="ck-addressRow">
-                <span className="ck-pin" aria-hidden="true">📍</span>
+            {/* Daraz-style selects */}
+            <div className="ck-formGrid" style={{ marginTop: 10 }}>
+              <div className="ck-field">
+                <label>Province / Region</label>
+                <select value={province} onChange={(e) => setProvince(e.target.value)}>
+                  <option value="">Please choose your province / region</option>
+                  {NEPAL.provinces.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ck-field">
+                <label>City</label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={!province}
+                >
+                  <option value="">Please choose your city</option>
+                  {cityOptions.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ck-field">
+                <label>Zone</label>
+                <select
+                  value={zone}
+                  onChange={(e) => setZone(e.target.value)}
+                  disabled={!city}
+                >
+                  <option value="">Please choose your zone</option>
+                  {zoneOptions.map((z) => (
+                    <option key={z} value={z}>
+                      {z}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ck-field">
+                <label>Landmark (Optional)</label>
                 <input
-                  ref={addressInputRef}
-                  value={addressQuery}
-                  onChange={(e) => {
-                    setAddressQuery(e.target.value);
-                    setAddr(null); // force selecting from dropdown
-                  }}
-                  placeholder="Start typing address (Nepal)..."
+                  value={landmark}
+                  onChange={(e) => setLandmark(e.target.value)}
+                  placeholder="e.g. beside train station"
+                />
+              </div>
+
+              <div className="ck-field ck-fieldFull">
+                <label>Address</label>
+                <input
+                  value={addressLine}
+                  onChange={(e) => setAddressLine(e.target.value)}
+                  placeholder="Please enter your address"
+                />
+              </div>
+
+              <div className="ck-field">
+                <label>Postal Code (Optional)</label>
+                <input
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="44600"
                 />
               </div>
             </div>
 
             {errorMsg && <div className="ck-error">{errorMsg}</div>}
 
-            <div className="ck-map">
-              <iframe
-                title="Map"
-                src={mapEmbedSrc}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-
             <div className="ck-footerRow">
-              <button
-                className="ck-primary"
-                type="button"
-                onClick={saveAddress}
-                disabled={saving || addressQuery.trim().length < 6}
-              >
+              <button className="ck-primary" type="button" onClick={saveAddress} disabled={saving}>
                 {saving ? "SAVING..." : "SAVE ADDRESS"}
               </button>
             </div>
           </section>
 
+          {/* RIGHT - ORDER DETAIL + PAY */}
           <aside className="ck-card ck-right">
             <h3 className="ck-h3">Order Detail</h3>
 
             <div className="ck-lines">
+              {loadingOrder && (
+                <div className="ck-line">
+                  <span>Loading items…</span>
+                  <span />
+                </div>
+              )}
+
+              {!loadingOrder && orderItems.length === 0 && (
+                <div className="ck-line">
+                  <span>No items in {isBuyNowMode ? "buy now" : "cart"}</span>
+                  <span />
+                </div>
+              )}
+
+              {!loadingOrder &&
+                orderItems.map((it) => (
+                  <div className="ck-line" key={it.id}>
+                    <span>
+                      {it.product_name ? it.product_name : `Variant #${it.variant_id}`}
+                      {it.size ? ` (${it.size})` : ""} × {it.quantity}
+                    </span>
+                    <span>{money(Number(it.price) * Number(it.quantity))}</span>
+                  </div>
+                ))}
+
+              <div className="ck-divider" />
+
               <div className="ck-line">
-                <span>Items Total ({itemsCount} item{itemsCount === 1 ? "" : "s"})</span>
+                <span>
+                  Items Total ({itemsCount} item{itemsCount === 1 ? "" : "s"})
+                </span>
                 <span>{money(itemsTotal)}</span>
               </div>
 
@@ -396,7 +574,7 @@ export default function Checkout() {
               <div className="ck-vat">VAT included where applicable</div>
             </div>
 
-            <button className="ck-pay" type="button" disabled={!canProceed}>
+            <button className="ck-pay" type="button" disabled={!canProceed} onClick={proceedToPay}>
               PROCEED TO PAY
             </button>
 

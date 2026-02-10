@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.orm import relationship,Mapped,mapped_column
 from enum import Enum
 from decimal import Decimal
+
 class CartStauts(str,Enum):
     ACTIVE = "ACTIVE"
     CHECKED_OUT = "CHECKED_OUT"

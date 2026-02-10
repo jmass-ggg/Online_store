@@ -1,103 +1,133 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const ASSET_ORIGIN = import.meta.env.VITE_ASSET_ORIGIN || ""; // optional
 
-function getAccessToken() {
-  return localStorage.getItem("access_token") || localStorage.getItem("auth_token") || "";
+const ACCESS_TOKEN_KEY = "access_token";
+const AUTH_TOKEN_KEY = "auth_token";
+
+export function getStoredAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_KEY) || "";
 }
 
-function setAccessToken(token) {
-  localStorage.setItem("access_token", token);
-  localStorage.setItem("auth_token", token);
+export function setStoredAccessToken(token) {
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  window.dispatchEvent(new Event("auth:changed"));
+}
+
+export function clearStoredAccessToken() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
   window.dispatchEvent(new Event("auth:changed"));
 }
 
 export function joinUrl(u) {
   if (!u) return "";
   if (/^https?:\/\//i.test(u)) return u;
-  // keep relative in production (same origin). If ASSET_ORIGIN is set, it becomes absolute.
+
   if (!ASSET_ORIGIN) return u.startsWith("/") ? u : `/${u}`;
   return `${ASSET_ORIGIN}${u.startsWith("/") ? u : `/${u}`}`;
 }
 
+// ---------- error parsing ----------
 async function parseError(res) {
   try {
-    const j = await res.json();
-    return j?.detail || j?.message || JSON.stringify(j);
-  } catch {
-    try {
-      return await res.text();
-    } catch {
-      return "Request failed";
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const j = await res.json();
+      return j?.detail || j?.message || JSON.stringify(j);
     }
+    return await res.text();
+  } catch {
+    return `Request failed (${res.status})`;
   }
 }
 
-async function tryRefresh() {
-  try {
+// ---------- refresh lock (prevents multiple refresh calls at once) ----------
+let refreshPromise = null;
+
+async function refreshAccessTokenOnce() {
+  // If a refresh is already happening, await it.
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
     const res = await fetch(`${API_BASE_URL}/login/refresh`, {
       method: "POST",
-      credentials: "include", // refresh cookie
+      credentials: "include", // ✅ send refresh cookie
     });
-    if (!res.ok) return false;
+
+    if (!res.ok) {
+      // Refresh failed: session expired
+      throw new Error(await parseError(res));
+    }
+
     const data = await res.json();
-    if (data?.access_token) setAccessToken(data.access_token);
-    return true;
-  } catch {
-    return false;
+    if (!data?.access_token) throw new Error("Refresh did not return access_token");
+
+    setStoredAccessToken(data.access_token);
+    return data.access_token;
+  })();
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
   }
 }
 
-/**
- * apiFetch("/product/slug/abc") -> calls /api/product/slug/abc
- * Automatically attaches Authorization header if token exists.
- * Automatically tries refresh once on 401.
- */
+// ---------- main fetch ----------
 export async function apiFetch(path, options = {}) {
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 
-  const headers = new Headers(options.headers || {});
-  const token = getAccessToken();
+  const makeHeaders = (token) => {
+    const headers = new Headers(options.headers || {});
 
-  // Only set JSON content-type if you didn't set something else and body is not FormData
-  const isFormData = options.body instanceof FormData;
-  if (!headers.has("Content-Type") && !isFormData && options.body !== undefined) {
-    headers.set("Content-Type", "application/json");
-  }
+    const isFormData = options.body instanceof FormData;
+    const hasBody = options.body !== undefined && options.body !== null;
 
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+    // Only set JSON content type if caller didn't set it and body is not FormData
+    if (!headers.has("Content-Type") && hasBody && !isFormData) {
+      headers.set("Content-Type", "application/json");
+    }
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include", // IMPORTANT for cookies (refresh_token)
-  });
+    if (token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
 
-  // attempt refresh once
+    return headers;
+  };
+
+  const doFetch = async (token) => {
+    const res = await fetch(url, {
+      ...options,
+      headers: makeHeaders(token),
+      credentials: "include", // ✅ include cookies always
+    });
+    return res;
+  };
+
+  // 1) try normally with current token
+  let token = getStoredAccessToken();
+  let res = await doFetch(token);
+
+  // 2) if 401 try refresh once, then retry
   if (res.status === 401) {
-    const ok = await tryRefresh();
-    if (ok) {
-      const headers2 = new Headers(headers);
-      const token2 = getAccessToken();
-      if (token2) headers2.set("Authorization", `Bearer ${token2}`);
-
-      const res2 = await fetch(url, {
-        ...options,
-        headers: headers2,
-        credentials: "include",
-      });
-
-      if (!res2.ok) throw new Error(await parseError(res2));
-      return res2.headers.get("content-type")?.includes("application/json")
-        ? res2.json()
-        : res2.text();
+    try {
+      token = await refreshAccessTokenOnce();
+      res = await doFetch(token);
+    } catch (e) {
+      // refresh failed => log user out
+      clearStoredAccessToken();
+      throw e instanceof Error ? e : new Error("Session expired. Please login again.");
     }
   }
 
-  if (!res.ok) throw new Error(await parseError(res));
+  // 3) handle non-ok
+  if (!res.ok) {
+    throw new Error(await parseError(res));
+  }
 
-  return res.headers.get("content-type")?.includes("application/json")
-    ? res.json()
-    : res.text();
+  // 4) return json or text
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) return res.json();
+  return res.text();
 }

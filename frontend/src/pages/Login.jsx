@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./login.css";
-import { apiFetch } from "../api";
+import { apiFetch, setStoredAccessToken } from "../api";
 
 export default function Login() {
   const nav = useNavigate();
@@ -31,10 +31,9 @@ export default function Login() {
         body: formData.toString(),
       });
 
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("auth_token", data.access_token);
-      window.dispatchEvent(new Event("auth:changed"));
+      if (!data?.access_token) throw new Error("Missing access token from server");
 
+      setStoredAccessToken(data.access_token);
       nav("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -92,7 +91,9 @@ export default function Login() {
                 </button>
               </div>
 
-              <Link className="login-forgot" to="#">Forgot password?</Link>
+              <Link className="login-forgot" to="#">
+                Forgot password?
+              </Link>
             </div>
 
             <button className="login-btn login-primary" type="submit" disabled={loading}>

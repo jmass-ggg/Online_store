@@ -280,6 +280,27 @@ img { display: block; max-width: 100%; }
   font-size: 22px;
   cursor: pointer;
 }
+.pqtyBtn {
+  border: 1px solid #ddd;
+  background: #fff;
+  width: 44px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.pqtyBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pqtyInput {
+  border: 1px solid #ddd;
+  height: 38px;
+  border-radius: 10px;
+  outline: none;
+}
 
 .pchev{
   font-size: 18px;

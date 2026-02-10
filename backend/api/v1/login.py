@@ -20,6 +20,27 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
 
 
+COOKIE_NAME = "refresh_token"
+COOKIE_MAX_AGE = 7 * 24 * 60 * 60
+
+def set_refresh_cookie(response: Response, token: str):
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=False,           
+        samesite="lax",         
+        max_age=COOKIE_MAX_AGE,
+        path="/",               
+    )
+
+def delete_refresh_cookie(response: Response):
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",               
+    )
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(
     response: Response,
@@ -47,18 +68,9 @@ def login(
         raise HTTPException(status_code=401, detail="Invalid password")
 
     access = create_access_token(email=user.email, role=role)
-
     refresh_token = create_refresh_token(db, user_id=user.id, role=role)
 
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=False,       
-        samesite="lax",
-        max_age=7 * 24 * 60 * 60,
-        path="/login/refresh",  
-    )
+    set_refresh_cookie(response, refresh_token)
 
     return LoginResponse(access_token=access)
 
@@ -69,7 +81,7 @@ def refresh_access_token(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    rt_raw = request.cookies.get("refresh_token")
+    rt_raw = request.cookies.get(COOKIE_NAME)
     if not rt_raw:
         raise HTTPException(status_code=401, detail="Missing refresh token")
 
@@ -85,20 +97,12 @@ def refresh_access_token(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+  
     rt.revoked = True
     db.commit()
 
     new_refresh = create_refresh_token(db, user_id=rt.owner_id, role=rt.role)
-
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh,
-        httponly=True,
-        secure=False,     
-        samesite="lax",
-        max_age=7 * 24 * 60 * 60,
-        path="/login/refresh",
-    )
+    set_refresh_cookie(response, new_refresh)
 
     new_access = create_access_token(email=user.email, role=rt.role)
     return LoginResponse(access_token=new_access)
@@ -110,14 +114,14 @@ def logout(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    rt_raw = request.cookies.get("refresh_token")
+    rt_raw = request.cookies.get(COOKIE_NAME)
     if rt_raw:
         try:
             rt = verify_refresh_token(db, rt_raw)
             rt.revoked = True
             db.commit()
         except HTTPException:
-            pass  
+            pass
 
-    response.delete_cookie("refresh_token", path="/login/refresh")
+    delete_refresh_cookie(response)
     return {"message": "logged out"}

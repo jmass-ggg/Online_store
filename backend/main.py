@@ -10,18 +10,16 @@ from backend.database import Base, engine
 
 app = FastAPI()
 
-# If you use Vite proxy, browser origin is ngrok domain.
-# Add your ngrok URL here (or allow patterns).
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://unsight-unartificially-mozelle.ngrok-free.dev",
+    "https://unsight-unartificially-mozelle.ngrok-free.dev",  # ✅ your current frontend origin
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=True,   # ✅ REQUIRED for cookies
     allow_methods=["*"],
     allow_headers=["*"],
 )

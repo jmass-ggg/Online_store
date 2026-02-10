@@ -36,6 +36,18 @@ def add_to_cart_by_customer(db:Session,buyer_id:int,variant_id:int,quantity:int)
     db.commit()
     return get_or_create_active_cart(db,buyer_id)
 
+def get_item_by_variant_id(db: Session, buyer_id: int, variant_id: int) -> CartItem:
+    cart = get_or_create_active_cart(db, buyer_id)
+
+    item = (
+        db.query(CartItem)
+        .filter(CartItem.cart_id == cart.id, CartItem.variant_id == variant_id)
+        .first()
+    )
+    if not item:
+        raise error_handler(404, "Cart item not found")
+    return item
+
 
 def uncart_the_product(db: Session, buyer_id: int, item_id: int) -> Cart:
     cart=get_or_create_active_cart(db,buyer_id)

@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.schemas.cart import CartOut, CartItemAdd, DecreaseQty
+from backend.schemas.cart import CartOut, CartItemAdd, DecreaseQty,CartItemOut
 from backend.utils.jwt import get_current_customer
 from backend.models.customer import Customer
 from backend.models.cart import Cart
+from backend.models.cart_items import CartItem
 from backend.service.cart_service import (
     add_to_cart_by_customer,
     get_or_create_active_cart,
@@ -13,6 +14,7 @@ from backend.service.cart_service import (
     decrease__item_quantity,
     clear_cart,
     cart_subtotal,
+    get_item_by_variant_id
 )
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
@@ -38,6 +40,16 @@ def get_my_cart(
     cart = get_or_create_active_cart(db, buyer_id=current_customer.id)
     return to_cart_out(cart)
 
+@router.get("/items/by-variant/{variant_id}", response_model=CartItemOut)
+def get_the_item(
+    variant_id: int,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    item = get_item_by_variant_id(db, current_customer.id, variant_id)
+    return item
+
+    
 
 @router.post("/items", response_model=CartOut)
 def add_to_cart(
@@ -63,6 +75,7 @@ def item_quantity_delete(
 ):
     cart = decrease__item_quantity(item_id, payload, db, current_customer.id)
     return to_cart_out(cart)
+
 
 
 @router.delete("/items/{item_id}", response_model=CartOut)

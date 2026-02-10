@@ -19,7 +19,6 @@ class DecreaseQty(BaseModel):
 
 class CartItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     cart_id: int
     variant_id: int
