@@ -1,8 +1,7 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "./Checkout.css";
-import { apiFetch } from "../api";
+import { apiFetch, joinUrl } from "../api";
 
 const CART_KEY = "cart_items";
 const BUY_NOW_KEY = "buy_now_item";
@@ -31,7 +30,6 @@ function readLocalMapByVariantId() {
   return map;
 }
 
-// ---------------- Buy Now helpers ----------------
 function readBuyNow() {
   try {
     const raw = JSON.parse(localStorage.getItem(BUY_NOW_KEY) || "null");
@@ -42,7 +40,6 @@ function readBuyNow() {
   }
 }
 
-// ---------------- Error formatting ----------------
 function formatApiError(err) {
   const detail = err?.detail;
 
@@ -62,7 +59,6 @@ function formatApiError(err) {
 
 /**
  * Nepal address data (simple version).
- * lat/lng are province center points (approx).
  */
 const NEPAL = {
   provinces: [
@@ -127,13 +123,11 @@ const NEPAL = {
   ],
 };
 
-// small random “jitter” so not all users same exact coordinate
 function jitterCoord(base, maxDelta = 0.03) {
-  const r = (Math.random() * 2 - 1) * maxDelta; // -delta..+delta
+  const r = (Math.random() * 2 - 1) * maxDelta;
   return Number((base + r).toFixed(6));
 }
 
-// Try to parse line2 like: "Zone, City, Landmark..."
 function parseLine2(line2) {
   const s = String(line2 || "").trim();
   if (!s) return { zone: "", city: "", landmark: "" };
@@ -166,8 +160,6 @@ export default function Checkout() {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [savedAddress, setSavedAddress] = useState(null);
-
-  // NEW: controls whether form shows or not
   const [isEditingAddress, setIsEditingAddress] = useState(false);
 
   // ---------------- Order Items ----------------
@@ -187,7 +179,7 @@ export default function Checkout() {
     };
   }, []);
 
-  // ---------------- Load address list ----------------
+  // ---------------- Load addresses ----------------
   useEffect(() => {
     let cancelled = false;
 
@@ -202,7 +194,6 @@ export default function Checkout() {
         const newest = arr.length ? arr[0] : null;
         setSavedAddress(newest);
 
-        // If we already have an address, default to NOT editing (hide form)
         if (newest) setIsEditingAddress(false);
         else setIsEditingAddress(true);
       } catch (e) {
@@ -218,7 +209,7 @@ export default function Checkout() {
     };
   }, [refreshTick]);
 
-  // ---------------- Load items: BUY_NOW or CART ----------------
+  // ---------------- Load items ----------------
   useEffect(() => {
     let cancelled = false;
 
@@ -299,16 +290,12 @@ export default function Checkout() {
   const deliveryFee = 4.5;
   const total = Math.max(0, itemsTotal + (itemsCount > 0 ? deliveryFee : 0));
 
-  // ---------------- Province/City/Zone derived lists ----------------
-  const provinceObj = useMemo(
-    () => NEPAL.provinces.find((p) => p.name === province) || null,
-    [province]
-  );
+  // ---------------- Province/City/Zone lists ----------------
+  const provinceObj = useMemo(() => NEPAL.provinces.find((p) => p.name === province) || null, [province]);
   const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
   const cityObj = useMemo(() => cityOptions.find((c) => c.name === city) || null, [cityOptions, city]);
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
 
-  // Reset dependent selects
   useEffect(() => {
     setCity("");
     setZone("");
@@ -318,12 +305,11 @@ export default function Checkout() {
     setZone("");
   }, [city]);
 
-  // ---------------- EDIT: prefill form from savedAddress ----------------
+  // ---------------- Edit address ----------------
   function startEdit() {
     if (savedAddress) {
       setFullName(savedAddress.full_name || "");
       const pn = String(savedAddress.phone_number || "");
-      // if pn starts with +977, split it, else keep default code
       if (pn.startsWith("+977")) {
         setCountryCode("+977");
         setPhone(pn.replace("+977", "").trim());
@@ -340,7 +326,6 @@ export default function Checkout() {
       setCity(parsed.city);
       setLandmark(parsed.landmark);
     } else {
-      // blank
       setFullName("");
       setCountryCode("+977");
       setPhone("");
@@ -358,11 +343,9 @@ export default function Checkout() {
 
   function cancelEdit() {
     setErrorMsg("");
-    // if we have saved address, hide form; otherwise keep it open
     if (savedAddress) setIsEditingAddress(false);
   }
 
-  // ---------------- Save Address (POST /addresses/) ----------------
   async function saveAddress() {
     setErrorMsg("");
 
@@ -399,8 +382,8 @@ export default function Checkout() {
       });
 
       setSavedAddress(saved);
-      setIsEditingAddress(false); // ✅ hide form after save
-      setRefreshTick((t) => t + 1); // reload newest from GET
+      setIsEditingAddress(false);
+      setRefreshTick((t) => t + 1);
     } catch (e) {
       setErrorMsg(formatApiError(e));
     } finally {
@@ -408,7 +391,6 @@ export default function Checkout() {
     }
   }
 
-  // ---------------- Proceed To Pay ----------------
   async function proceedToPay() {
     setErrorMsg("");
     if (!savedAddress) return setErrorMsg("Please save a shipping address to proceed.");
@@ -482,11 +464,7 @@ export default function Checkout() {
               <div className="ck-stepText">Step 1 of 2</div>
             </div>
 
-            {loadingAddress && (
-              <div className="ck-hint" style={{ marginBottom: 10 }}>
-                Loading saved addresses…
-              </div>
-            )}
+            {loadingAddress && <div className="ck-hint">Loading saved addresses…</div>}
 
             {savedAddress && (
               <div className="ship-card">
@@ -515,7 +493,51 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* ✅ SHOW FORM ONLY WHEN editing OR no saved address */}
+            {/* ✅ Daraz-like product section UNDER address (always stacks, never overlaps) */}
+            <div className="ck-itemsUnderAddress">
+              <div className="ck-itemsHead">
+                <div className="ck-itemsTitle">Package 1 of 1</div>
+                <div className="ck-itemsSub">
+                  Fulfilled by <b>James</b>
+                </div>
+              </div>
+
+              <div className="ck-itemsBody">
+                {loadingOrder && <div className="ck-hint">Loading items…</div>}
+
+                {!loadingOrder && orderItems.length === 0 && <div className="ck-hint">No items to show.</div>}
+
+                {!loadingOrder &&
+                  orderItems.map((it) => {
+                    const src = joinUrl(it.image_url || "") || "/shoes.jpg";
+                    return (
+                      <div className="ck-itemRow" key={`left_${it.id}`}>
+                        <img
+                          className="ck-itemImg"
+                          src={src}
+                          alt={it.product_name || "Product"}
+                          onError={(e) => (e.currentTarget.src = "/shoes.jpg")}
+                        />
+
+                        <div className="ck-itemInfo">
+                          <div className="ck-itemName">
+                            {it.product_name ? it.product_name : `Variant #${it.variant_id}`}
+                          </div>
+
+                          <div className="ck-itemMeta">
+                            {it.size ? <span>Size: {it.size}</span> : null}
+                            <span>Qty: {it.quantity}</span>
+                          </div>
+                        </div>
+
+                        <div className="ck-itemPrice">{money(Number(it.price) * Number(it.quantity))}</div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* ✅ Address form (no overlap now) */}
             {(isEditingAddress || !savedAddress) && (
               <>
                 <div className="ck-formGrid">
@@ -603,7 +625,6 @@ export default function Checkout() {
               </>
             )}
 
-            {/* show errors even if form hidden */}
             {!isEditingAddress && savedAddress && errorMsg && <div className="ck-error">{errorMsg}</div>}
           </section>
 
