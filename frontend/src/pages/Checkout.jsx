@@ -1,4 +1,4 @@
-// Checkout.jsx
+
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "./Checkout.css";
@@ -12,7 +12,6 @@ function money(n) {
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
-// ---------------- Local helpers (display enrichment) ----------------
 function readLocalCartArray() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || "[]");

@@ -219,14 +219,16 @@ a { color: inherit; text-decoration: none; }
 .plp-media img{
   width: 100%;
   height: 100%;
-  object-fit: contain;
+
+  object-fit: cover;     /* ✅ IMPORTANT: removes big white margins */
   object-position: center;
-  transform: scale(1.07);
-  transition: transform .18s ease;
+
+  transform: none;       /* ✅ remove scaling that can look weird */
+  
 }
 
 .plp-card:hover .plp-media img{
-  transform: scale(1.10);
+  transform: scale(1.03);
 }
 
 /* Thumbnails: under image, left aligned (Nike-like) */

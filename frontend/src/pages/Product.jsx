@@ -34,6 +34,9 @@ export default function Product() {
   const [activeImg, setActiveImg] = useState("/shoes.jpg");
   const [selectedVariant, setSelectedVariant] = useState(null);
 
+  // ✅ NEW: color selection
+  const [selectedColor, setSelectedColor] = useState("");
+
   const [qty, setQty] = useState(1);
 
   const [shipOpen, setShipOpen] = useState(false);
@@ -55,9 +58,40 @@ export default function Product() {
     return Array.isArray(v) ? v : [];
   }, [product]);
 
+  // ✅ NEW: unique color options
+  const colorOptions = useMemo(() => {
+    const map = new Map();
+
+    for (const v of variants) {
+      const color = String(v?.color || "").trim();
+      if (!color) continue;
+
+      if (!map.has(color)) map.set(color, v);
+      else {
+        // prefer in-stock representative for that color
+        const cur = map.get(color);
+        const vStock = toNumber(v.stock_quantity);
+        const cStock = toNumber(cur.stock_quantity);
+        const vIn = vStock > 0;
+        const cIn = cStock > 0;
+        if (vIn && !cIn) map.set(color, v);
+      }
+    }
+
+    return Array.from(map.entries()).map(([color, variant]) => ({ color, variant }));
+  }, [variants]);
+
+  // ✅ NEW: variants filtered by selected color
+  const filteredVariants = useMemo(() => {
+    if (!selectedColor) return variants;
+    const pick = String(selectedColor).trim().toLowerCase();
+    return variants.filter((v) => String(v?.color || "").trim().toLowerCase() === pick);
+  }, [variants, selectedColor]);
+
+  // ✅ UPDATED: size options depend on filteredVariants (color)
   const sizeOptions = useMemo(() => {
     const map = new Map();
-    for (const v of variants) {
+    for (const v of filteredVariants) {
       const size = String(v?.size || "").trim();
       if (!size) continue;
 
@@ -82,7 +116,7 @@ export default function Product() {
       return a.size.localeCompare(b.size, undefined, { numeric: true, sensitivity: "base" });
     });
     return arr;
-  }, [variants]);
+  }, [filteredVariants]);
 
   const defaultVariant = useMemo(() => {
     if (sizeOptions.length === 0) return null;
@@ -108,6 +142,7 @@ export default function Product() {
       setError("");
       setProduct(null);
       setSelectedVariant(null);
+      setSelectedColor("");
 
       try {
         const data = await apiFetch(`/product/slug/${encodeURIComponent(slug)}`);
@@ -129,14 +164,24 @@ export default function Product() {
     };
   }, [slug]);
 
-  // set default size once loaded
+  // ✅ NEW: pick default color once product loaded
   useEffect(() => {
     if (!product) return;
-    if (selectedVariant) return;
-    if (defaultVariant) setSelectedVariant(defaultVariant);
-  }, [product, defaultVariant, selectedVariant]);
+    if (selectedColor) return;
+    if (colorOptions.length === 0) return;
 
-  // ✅ keep qty valid when size changes (if stock smaller)
+    // prefer an in-stock color
+    const inStockColor = colorOptions.find((x) => toNumber(x.variant.stock_quantity) > 0);
+    setSelectedColor((inStockColor || colorOptions[0]).color);
+  }, [product, colorOptions, selectedColor]);
+
+  // ✅ UPDATED: set default variant when color changes (or product loads)
+  useEffect(() => {
+    if (!product) return;
+    setSelectedVariant(null); // reset so chosenVariant uses defaultVariant for this color
+  }, [selectedColor, product]);
+
+  // ✅ keep qty valid when chosen variant changes
   useEffect(() => {
     if (!chosenVariant) return;
     const max = toNumber(chosenVariant.stock_quantity);
@@ -165,7 +210,7 @@ export default function Product() {
     return { v, variantId, stock, safeQty };
   }
 
-  // ✅ Quantity controls
+  // Quantity controls
   const decQty = () => setQty((q) => Math.max(1, q - 1));
   const incQty = () => setQty((q) => (stockMax > 0 ? Math.min(stockMax, q + 1) : q + 1));
   const onQtyInput = (e) => {
@@ -174,7 +219,6 @@ export default function Product() {
     setQty(stockMax > 0 ? Math.min(stockMax, n) : n);
   };
 
-  // ✅ Add to Cart: backend cart (adds qty)
   async function handleAddToCart() {
     const info = getVariantOrToast();
     if (!info) return;
@@ -196,7 +240,6 @@ export default function Product() {
     }
   }
 
-  // ✅ Order Now: buy-now checkout item (replaces previous buy-now item)
   function handleOrderNow() {
     const info = getVariantOrToast();
     if (!info) return;
@@ -207,14 +250,13 @@ export default function Product() {
       item: {
         variant_id: info.variantId,
         quantity: info.safeQty,
-
-        // display info for checkout (no extra request needed)
         product_id: product.id,
         product_name: product.product_name,
         product_category: product.product_category,
         url_slug: product.url_slug,
         image_url: activeImg,
         size: info.v.size,
+        color: info.v.color, // ✅ include color
         price: toNumber(info.v.price),
       },
     };
@@ -254,7 +296,35 @@ export default function Product() {
           <p className="pcat">{product.product_category}</p>
           <p className="pprice">{formatMoney(displayPrice)}</p>
 
-          {/* Sizes */}
+          {/* ✅ Color options */}
+          {colorOptions.length > 0 && (
+            <div className="pcolorBlock">
+              <div className="pcolorRowTop">
+                <span className="pcolorLabel">Color</span>
+                <span className="pcolorChosen">{selectedColor || "—"}</span>
+              </div>
+
+              <div className="pcolors">
+                {colorOptions.map(({ color }) => {
+                  const chosen = String(selectedColor).toLowerCase() === String(color).toLowerCase();
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`pcolorBtn ${chosen ? "selected" : ""}`}
+                      onClick={() => setSelectedColor(color)}
+                      disabled={busy}
+                      title={`Select color ${color}`}
+                    >
+                      {color}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Sizes (filtered by color) */}
           <div className="psizes">
             {sizeOptions.map(({ size, variant }) => {
               const chosen = chosenVariant?.id === variant.id;
@@ -275,7 +345,7 @@ export default function Product() {
             })}
           </div>
 
-          {/* ✅ Quantity */}
+          {/* Quantity */}
           <div className="pqtyRow" style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
             <span style={{ fontWeight: 600 }}>Quantity</span>
 
@@ -348,11 +418,19 @@ export default function Product() {
             </button>
             {shipOpen && (
               <div className="paccBody">
-                <p> free 15-day returns.</p>
+                <p>14 Days Free Returns</p>
               </div>
             )}
           </div>
         </aside>
+      </div>
+
+      {/* ✅ Description at the bottom */}
+      <div className="pdescBottom">
+        <h2 className="pdescTitle">Description</h2>
+        <p className="pdescTextBottom">
+          {product.description ? product.description : "No description provided."}
+        </p>
       </div>
     </div>
   );
