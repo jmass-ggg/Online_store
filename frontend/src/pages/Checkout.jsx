@@ -1,3 +1,4 @@
+// Checkout.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "./Checkout.css";
@@ -42,9 +43,28 @@ function readBuyNow() {
   }
 }
 
+// ---------------- Error formatting (Fixes [object Object]) ----------------
+function formatApiError(err) {
+  const detail = err?.detail;
+
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "field";
+        return `${field}: ${d.msg}`;
+      })
+      .join(" | ");
+  }
+
+  return err?.message || "Something went wrong";
+}
+
 /**
  * Nepal address data (simple version).
- * You can expand this list anytime.
+ * Expand anytime.
+ * lat/lng are province center points (approx).
  */
 const NEPAL = {
   provinces: [
@@ -82,7 +102,10 @@ const NEPAL = {
       lng: 83.99,
       cities: [
         { name: "Pokhara", zones: ["Lakeside", "Chipledhunga", "Bagar"] },
-        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk", "New Road Area"] },
+        {
+          name: "Beni",
+          zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk", "New Road Area"],
+        },
       ],
     },
     {
@@ -124,7 +147,6 @@ export default function Checkout() {
   const [countryCode, setCountryCode] = useState("+977");
   const [phone, setPhone] = useState("");
 
-  // Daraz-style
   const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
   const [zone, setZone] = useState("");
@@ -133,6 +155,7 @@ export default function Checkout() {
   const [postalCode, setPostalCode] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [loadingAddress, setLoadingAddress] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [savedAddress, setSavedAddress] = useState(null);
 
@@ -153,6 +176,32 @@ export default function Checkout() {
     };
   }, []);
 
+  // ---------------- Load address list (GET /addresses/) ----------------
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAddresses() {
+      setLoadingAddress(true);
+      setErrorMsg("");
+      try {
+        const list = await apiFetch("/addresses/");
+        if (cancelled) return;
+
+        const arr = Array.isArray(list) ? list : [];
+        setSavedAddress(arr.length ? arr[0] : null); // newest first from backend
+      } catch (e) {
+        if (!cancelled) setErrorMsg(formatApiError(e));
+      } finally {
+        if (!cancelled) setLoadingAddress(false);
+      }
+    }
+
+    loadAddresses();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick]);
+
   // ---------------- Load items: BUY_NOW or CART ----------------
   useEffect(() => {
     let cancelled = false;
@@ -161,6 +210,7 @@ export default function Checkout() {
       setLoadingOrder(true);
       setErrorMsg("");
 
+      // BUY NOW MODE
       if (isBuyNowMode) {
         const bn = readBuyNow();
         if (!bn) {
@@ -187,6 +237,7 @@ export default function Checkout() {
         return;
       }
 
+      // CART MODE
       const localMap = readLocalMapByVariantId();
       try {
         const cart = await apiFetch("/cart/me");
@@ -207,7 +258,7 @@ export default function Checkout() {
       } catch (e) {
         if (!cancelled) {
           setOrderItems([]);
-          setErrorMsg(e?.message || "Failed to load cart");
+          setErrorMsg(formatApiError(e));
         }
       } finally {
         if (!cancelled) setLoadingOrder(false);
@@ -259,26 +310,27 @@ export default function Checkout() {
     setZone("");
   }, [city]);
 
-  // ---------------- Save Address (NO MAP) ----------------
+  // ---------------- Save Address (POST /addresses/) ----------------
   async function saveAddress() {
     setErrorMsg("");
 
     if (!fullName.trim()) return setErrorMsg("Full name is required");
     if (phone.trim().length < 7) return setErrorMsg("Phone number is too short");
-
     if (!province) return setErrorMsg("Please select Province / Region");
     if (!city) return setErrorMsg("Please select City");
     if (!zone) return setErrorMsg("Please select Zone");
     if (!addressLine.trim()) return setErrorMsg("Please enter Address");
 
-    // make lat/lng near province center
     const baseLat = provinceObj?.lat ?? 27.7172;
     const baseLng = provinceObj?.lng ?? 85.3240;
 
+    // IMPORTANT: backend requires full_name and phone_number
     const payload = {
-      region: province, // ✅ region = province
-      line1: addressLine.trim(), // ✅ line1 = address
-      line2: `${zone}, ${city}${landmark.trim() ? `, ${landmark.trim()}` : ""}`, // ✅ extra info
+      full_name: fullName.trim(),
+      phone_number: `${countryCode}${phone.trim()}`, // if backend wants digits only, change to phone.trim()
+      region: province,
+      line1: addressLine.trim(),
+      line2: `${zone}, ${city}${landmark.trim() ? `, ${landmark.trim()}` : ""}`,
       postal_code: postalCode.trim() ? postalCode.trim() : null,
       country: "Nepal",
       latitude: jitterCoord(baseLat, 0.05),
@@ -293,9 +345,12 @@ export default function Checkout() {
         method: "POST",
         body: JSON.stringify(payload),
       });
+
       setSavedAddress(saved);
+      // reload list so UI always matches backend
+      setRefreshTick((t) => t + 1);
     } catch (e) {
-      setErrorMsg(e?.message || "Failed to save address");
+      setErrorMsg(formatApiError(e));
     } finally {
       setSaving(false);
     }
@@ -324,7 +379,7 @@ export default function Checkout() {
       if (res?.payment_url) window.location.href = res.payment_url;
       else alert("Order created. Implement payment redirect here.");
     } catch (e) {
-      setErrorMsg(e?.message || "Failed to proceed to payment");
+      setErrorMsg(formatApiError(e));
     }
   }
 
@@ -348,14 +403,22 @@ export default function Checkout() {
           </nav>
 
           <div className="ck-search">
-            <span className="ck-searchIcon" aria-hidden="true">🔎</span>
+            <span className="ck-searchIcon" aria-hidden="true">
+              🔎
+            </span>
             <input placeholder="Search for products..." />
           </div>
 
           <div className="ck-actions">
-            <button className="ck-iconBtn" aria-label="Cart">🛒</button>
-            <button className="ck-iconBtn" aria-label="Notifications">🔔</button>
-            <button className="ck-avatar" aria-label="Account">👤</button>
+            <button className="ck-iconBtn" aria-label="Cart">
+              🛒
+            </button>
+            <button className="ck-iconBtn" aria-label="Notifications">
+              🔔
+            </button>
+            <button className="ck-avatar" aria-label="Account">
+              👤
+            </button>
           </div>
         </div>
       </header>
@@ -371,7 +434,7 @@ export default function Checkout() {
         </div>
 
         <div className="ck-grid">
-          {/* LEFT - ADDRESS (NO MAP) */}
+          {/* LEFT - ADDRESS */}
           <section className="ck-card ck-left">
             <div className="ck-cardHeader">
               <div className="ck-step">
@@ -381,6 +444,12 @@ export default function Checkout() {
               <div className="ck-stepText">Step 1 of 2</div>
             </div>
 
+            {loadingAddress && (
+              <div className="ck-hint" style={{ marginBottom: 10 }}>
+                Loading saved addresses…
+              </div>
+            )}
+
             {savedAddress && (
               <div className="ship-card">
                 <div className="ship-head">
@@ -389,8 +458,12 @@ export default function Checkout() {
                 </div>
 
                 <div className="ship-nameRow">
-                  <span className="ship-name">{fullName}</span>
-                  <span className="ship-phone">{countryCode} {phone}</span>
+                  <span className="ship-name">
+                    {savedAddress.full_name || fullName}
+                  </span>
+                  <span className="ship-phone">
+                    {savedAddress.phone_number || `${countryCode} ${phone}`}
+                  </span>
                 </div>
 
                 <div className="ship-addrRow">
@@ -406,7 +479,7 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* top row like your current one */}
+            {/* FORM */}
             <div className="ck-formGrid">
               <div className="ck-field">
                 <label>Full Name</label>
@@ -437,7 +510,6 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Daraz-style selects */}
             <div className="ck-formGrid" style={{ marginTop: 10 }}>
               <div className="ck-field">
                 <label>Province / Region</label>
@@ -453,11 +525,7 @@ export default function Checkout() {
 
               <div className="ck-field">
                 <label>City</label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  disabled={!province}
-                >
+                <select value={city} onChange={(e) => setCity(e.target.value)} disabled={!province}>
                   <option value="">Please choose your city</option>
                   {cityOptions.map((c) => (
                     <option key={c.name} value={c.name}>
@@ -469,11 +537,7 @@ export default function Checkout() {
 
               <div className="ck-field">
                 <label>Zone</label>
-                <select
-                  value={zone}
-                  onChange={(e) => setZone(e.target.value)}
-                  disabled={!city}
-                >
+                <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={!city}>
                   <option value="">Please choose your zone</option>
                   {zoneOptions.map((z) => (
                     <option key={z} value={z}>

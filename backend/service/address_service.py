@@ -68,24 +68,24 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: int) -> 
         raise HTTPException(status_code=400, detail="Address line1 is required")
 
     try:
-        with db.begin():
-           
-            if data.get("is_default_shipping"):
-                db.execute(
-                    update(Address)
-                    .where(Address.customer_id == customer_id)
-                    .values(is_default_shipping=False)
-                )
-            if data.get("is_default_billing"):
-                db.execute(
-                    update(Address)
-                    .where(Address.customer_id == customer_id)
-                    .values(is_default_billing=False)
-                )
+      
+        if data.get("is_default_shipping"):
+            db.execute(
+                update(Address)
+                .where(Address.customer_id == customer_id)
+                .values(is_default_shipping=False)
+            )
+        if data.get("is_default_billing"):
+            db.execute(
+                update(Address)
+                .where(Address.customer_id == customer_id)
+                .values(is_default_billing=False)
+            )
 
-            db_address = Address(customer_id=customer_id, **data)
-            db.add(db_address)
+        db_address = Address(customer_id=customer_id, **data)
+        db.add(db_address)
 
+        db.commit()
         db.refresh(db_address)
         return db_address
 
