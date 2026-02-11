@@ -22,14 +22,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import SQLAlchemyError
 
 def create_customer(db: Session, username: str, email: str, 
-                    password: str,phone_number:str,address:str,) -> CustomerRead:
+                    password: str,phone_number:str) -> CustomerRead:
 
     new_user = Customer(
         username=username,
         email=email,
         hashed_password=hashed_pwd(password),
         phone_number=phone_number,
-        address=address,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )

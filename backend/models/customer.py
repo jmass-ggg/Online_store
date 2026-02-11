@@ -13,7 +13,6 @@ class Customer(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False,primary_key=False)
     phone_number: Mapped[str] = mapped_column(String, nullable=False,primary_key=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
-    address: Mapped[str] = mapped_column(String, nullable=False)
 
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

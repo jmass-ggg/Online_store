@@ -1,12 +1,14 @@
+// src/pages/Product.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./Product.css";
 import { apiFetch, joinUrl } from "../api";
 
 const BUY_NOW_KEY = "buy_now_item";
+const CART_KEY = "cart_items";
 
-function toNumber(value) {
-  const n = Number(value);
+function toNumber(v) {
+  const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -16,6 +18,40 @@ function formatMoney(value) {
   );
 }
 
+// ---------- local cart helpers (IMPORTANT for your Checkout.jsx enrichment) ----------
+function readLocalCart() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function upsertLocalCartItem(nextItem) {
+  const arr = readLocalCart();
+  const vid = Number(nextItem.variant_id);
+
+  const idx = arr.findIndex(
+    (x) => Number(x?.variant_id ?? x?.variantId ?? x?.id) === vid
+  );
+
+  if (idx >= 0) {
+    const prevQty = toNumber(arr[idx]?.quantity);
+    arr[idx] = {
+      ...arr[idx],
+      ...nextItem,
+      quantity: prevQty + toNumber(nextItem.quantity),
+      updated_at: Date.now(),
+    };
+  } else {
+    arr.push({ ...nextItem, updated_at: Date.now() });
+  }
+
+  localStorage.setItem(CART_KEY, JSON.stringify(arr));
+}
+
+// ---------- size sort ----------
 const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 function sizeRank(size) {
   const s = String(size || "").trim().toUpperCase();
@@ -32,10 +68,9 @@ export default function Product() {
 
   const [product, setProduct] = useState(null);
   const [activeImg, setActiveImg] = useState("/shoes.jpg");
-  const [selectedVariant, setSelectedVariant] = useState(null);
 
-  // ✅ NEW: color selection
   const [selectedColor, setSelectedColor] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState(null);
 
   const [qty, setQty] = useState(1);
 
@@ -51,14 +86,14 @@ export default function Product() {
     showToast._t = window.setTimeout(() => setToast(""), 2200);
   };
 
-  // ---------- Variants ----------
+  // ---------- variants ----------
   const variants = useMemo(() => {
     if (!product) return [];
     const v = product.variants || product.ProductVariants || [];
     return Array.isArray(v) ? v : [];
   }, [product]);
 
-  // ✅ NEW: unique color options
+  // unique colors (pick a representative variant per color)
   const colorOptions = useMemo(() => {
     const map = new Map();
 
@@ -68,29 +103,29 @@ export default function Product() {
 
       if (!map.has(color)) map.set(color, v);
       else {
-        // prefer in-stock representative for that color
         const cur = map.get(color);
         const vStock = toNumber(v.stock_quantity);
         const cStock = toNumber(cur.stock_quantity);
-        const vIn = vStock > 0;
-        const cIn = cStock > 0;
-        if (vIn && !cIn) map.set(color, v);
+        if (vStock > 0 && cStock <= 0) map.set(color, v);
       }
     }
 
     return Array.from(map.entries()).map(([color, variant]) => ({ color, variant }));
   }, [variants]);
 
-  // ✅ NEW: variants filtered by selected color
+  // variants filtered by selected color
   const filteredVariants = useMemo(() => {
     if (!selectedColor) return variants;
     const pick = String(selectedColor).trim().toLowerCase();
-    return variants.filter((v) => String(v?.color || "").trim().toLowerCase() === pick);
+    return variants.filter(
+      (v) => String(v?.color || "").trim().toLowerCase() === pick
+    );
   }, [variants, selectedColor]);
 
-  // ✅ UPDATED: size options depend on filteredVariants (color)
+  // size options depend on filtered variants
   const sizeOptions = useMemo(() => {
     const map = new Map();
+
     for (const v of filteredVariants) {
       const size = String(v?.size || "").trim();
       if (!size) continue;
@@ -115,6 +150,7 @@ export default function Product() {
       if (ra !== rb) return ra - rb;
       return a.size.localeCompare(b.size, undefined, { numeric: true, sensitivity: "base" });
     });
+
     return arr;
   }, [filteredVariants]);
 
@@ -127,13 +163,14 @@ export default function Product() {
   const chosenVariant = selectedVariant || defaultVariant;
 
   const displayPrice = useMemo(() => toNumber(chosenVariant?.price ?? 0), [chosenVariant]);
-
   const stockMax = useMemo(() => {
     const s = toNumber(chosenVariant?.stock_quantity);
     return s > 0 ? s : 0;
   }, [chosenVariant]);
 
-  // ---------- Load product ----------
+  const outOfStock = stockMax <= 0;
+
+  // ---------- load product ----------
   useEffect(() => {
     let alive = true;
 
@@ -143,6 +180,7 @@ export default function Product() {
       setProduct(null);
       setSelectedVariant(null);
       setSelectedColor("");
+      setQty(1);
 
       try {
         const data = await apiFetch(`/product/slug/${encodeURIComponent(slug)}`);
@@ -164,29 +202,28 @@ export default function Product() {
     };
   }, [slug]);
 
-  // ✅ NEW: pick default color once product loaded
+  // pick default color after load (prefer in-stock)
   useEffect(() => {
     if (!product) return;
     if (selectedColor) return;
     if (colorOptions.length === 0) return;
 
-    // prefer an in-stock color
     const inStockColor = colorOptions.find((x) => toNumber(x.variant.stock_quantity) > 0);
     setSelectedColor((inStockColor || colorOptions[0]).color);
   }, [product, colorOptions, selectedColor]);
 
-  // ✅ UPDATED: set default variant when color changes (or product loads)
+  // when color changes, reset variant so defaultVariant applies for that color
   useEffect(() => {
     if (!product) return;
-    setSelectedVariant(null); // reset so chosenVariant uses defaultVariant for this color
+    setSelectedVariant(null);
   }, [selectedColor, product]);
 
-  // ✅ keep qty valid when chosen variant changes
+  // keep qty within stock when variant changes
   useEffect(() => {
     if (!chosenVariant) return;
     const max = toNumber(chosenVariant.stock_quantity);
     setQty((q) => {
-      const next = Math.max(1, q);
+      const next = Math.max(1, toNumber(q));
       if (max > 0) return Math.min(next, max);
       return 1;
     });
@@ -210,25 +247,41 @@ export default function Product() {
     return { v, variantId, stock, safeQty };
   }
 
-  // Quantity controls
-  const decQty = () => setQty((q) => Math.max(1, q - 1));
-  const incQty = () => setQty((q) => (stockMax > 0 ? Math.min(stockMax, q + 1) : q + 1));
+  // qty controls
+  const decQty = () => setQty((q) => Math.max(1, toNumber(q) - 1));
+  const incQty = () => setQty((q) => (stockMax > 0 ? Math.min(stockMax, toNumber(q) + 1) : toNumber(q) + 1));
   const onQtyInput = (e) => {
-    const raw = e.target.value;
-    const n = Math.max(1, toNumber(raw));
+    const n = Math.max(1, toNumber(e.target.value));
     setQty(stockMax > 0 ? Math.min(stockMax, n) : n);
   };
 
+  // ✅ WORKING Add to Cart: hits backend + updates localStorage(cart_items)
   async function handleAddToCart() {
     const info = getVariantOrToast();
     if (!info) return;
 
     if (busy) return;
     setBusy(true);
+
     try {
+      // backend API you shared: POST /cart/items
       await apiFetch("/cart/items", {
         method: "POST",
         body: JSON.stringify({ variant_id: info.variantId, quantity: info.safeQty }),
+      });
+
+      // IMPORTANT: Checkout.jsx uses localStorage cart_items to show name/image/size
+      upsertLocalCartItem({
+        variant_id: info.variantId,
+        quantity: info.safeQty,
+        price: toNumber(info.v.price),
+        product_id: product.id,
+        product_name: product.product_name,
+        product_category: product.product_category,
+        url_slug: product.url_slug,
+        image_url: activeImg,
+        size: info.v.size,
+        color: info.v.color,
       });
 
       window.dispatchEvent(new Event("cart:updated"));
@@ -256,7 +309,7 @@ export default function Product() {
         url_slug: product.url_slug,
         image_url: activeImg,
         size: info.v.size,
-        color: info.v.color, // ✅ include color
+        color: info.v.color,
         price: toNumber(info.v.price),
       },
     };
@@ -269,8 +322,6 @@ export default function Product() {
   if (loading) return <div className="pwrap">Loading...</div>;
   if (error) return <div className="pwrap error">{error}</div>;
   if (!product) return null;
-
-  const outOfStock = stockMax <= 0;
 
   return (
     <div className="pwrap">
@@ -296,7 +347,7 @@ export default function Product() {
           <p className="pcat">{product.product_category}</p>
           <p className="pprice">{formatMoney(displayPrice)}</p>
 
-          {/* ✅ Color options */}
+          {/* Color */}
           {colorOptions.length > 0 && (
             <div className="pcolorBlock">
               <div className="pcolorRowTop">
@@ -306,7 +357,8 @@ export default function Product() {
 
               <div className="pcolors">
                 {colorOptions.map(({ color }) => {
-                  const chosen = String(selectedColor).toLowerCase() === String(color).toLowerCase();
+                  const chosen =
+                    String(selectedColor).toLowerCase() === String(color).toLowerCase();
                   return (
                     <button
                       key={color}
@@ -324,7 +376,7 @@ export default function Product() {
             </div>
           )}
 
-          {/* Sizes (filtered by color) */}
+          {/* Sizes */}
           <div className="psizes">
             {sizeOptions.map(({ size, variant }) => {
               const chosen = chosenVariant?.id === variant.id;
@@ -383,9 +435,7 @@ export default function Product() {
             </div>
 
             {stockMax > 0 && (
-              <span style={{ opacity: 0.7, fontSize: 13 }}>
-                ({stockMax} available)
-              </span>
+              <span style={{ opacity: 0.7, fontSize: 13 }}>({stockMax} available)</span>
             )}
           </div>
 
@@ -412,10 +462,15 @@ export default function Product() {
 
           {/* Shipping & Returns */}
           <div className="psection paccordion">
-            <button type="button" className="paccHead" onClick={() => setShipOpen((v) => !v)}>
+            <button
+              type="button"
+              className="paccHead"
+              onClick={() => setShipOpen((v) => !v)}
+            >
               <span>Shipping &amp; Returns</span>
               <span className={`pchev ${shipOpen ? "open" : ""}`}>⌃</span>
             </button>
+
             {shipOpen && (
               <div className="paccBody">
                 <p>14 Days Free Returns</p>
@@ -425,7 +480,7 @@ export default function Product() {
         </aside>
       </div>
 
-      {/* ✅ Description at the bottom */}
+      {/* Description */}
       <div className="pdescBottom">
         <h2 className="pdescTitle">Description</h2>
         <p className="pdescTextBottom">

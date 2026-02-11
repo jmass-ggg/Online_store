@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./Shoes.css";
 import { apiFetch, joinUrl } from "../api";
 
@@ -13,7 +13,11 @@ function toNumber(value) {
 
 function formatMoney(value) {
   const n = toNumber(value);
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(n);
 }
 
 function ProductCard({ p }) {
@@ -29,7 +33,12 @@ function ProductCard({ p }) {
       <Link to={`/product/${p.url_slug}`} className="plp-hit" aria-label={p.title} />
 
       <div className="plp-media" aria-hidden="true">
-        <img src={hero} alt="" loading="lazy" onError={(e) => (e.currentTarget.src = "/shoes.jpg")} />
+        <img
+          src={hero}
+          alt=""
+          loading="lazy"
+          onError={(e) => (e.currentTarget.src = "/shoes.jpg")}
+        />
       </div>
 
       {thumbs.length > 1 && (
@@ -64,10 +73,16 @@ function ProductGrid({ products }) {
 }
 
 export default function Shoes() {
+  const navigate = useNavigate();
+
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [error, setError] = useState("");
+
+  // ✅ profile dropdown state
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
 
   const mappedProducts = useMemo(() => {
     return products.map((p) => {
@@ -79,7 +94,6 @@ export default function Shoes() {
         [];
 
       const images = rawImages.length ? rawImages.map((u) => joinUrl(u)) : [image].filter(Boolean);
-
       const price = p.default_price ?? p.defaultPrice ?? p.price ?? p.base_price ?? "0.00";
 
       return {
@@ -98,7 +112,6 @@ export default function Shoes() {
     setError("");
 
     try {
-      // ✅ relative paths (proxy handles backend)
       const url = q.trim()
         ? `/product/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(FOOTWEAR_CATEGORY)}`
         : `/product/?category=${encodeURIComponent(FOOTWEAR_CATEGORY)}`;
@@ -124,17 +137,53 @@ export default function Shoes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // ✅ close dropdown on outside click + ESC
+  useEffect(() => {
+    function onDocMouseDown(e) {
+      if (!profileRef.current) return;
+      if (!profileRef.current.contains(e.target)) setProfileOpen(false);
+    }
+    function onEsc(e) {
+      if (e.key === "Escape") setProfileOpen(false);
+    }
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, []);
+
+  function go(path) {
+    setProfileOpen(false);
+    navigate(path);
+  }
+
+  function logout() {
+    setProfileOpen(false);
+    // ✅ adjust these keys to match your auth
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+    navigate("/login");
+  }
+
   return (
     <div className="shoes-page">
       <header className="top-header">
         <div className="wrap header-row">
           <div className="brand">
-            <a href="#" className="brand-logo">JAMES</a>
+            <Link to="/" className="brand-logo">JAMES</Link>
           </div>
 
           <nav className="top-nav">
-            <a href="#">Men</a><a href="#">Women</a><a href="#">Kids</a><a href="#">Jordan</a>
-            <a href="#">Collections</a><a href="#" className="sale">Sale</a>
+            <a href="#">Men</a>
+            <a href="#">Women</a>
+            <a href="#">Kids</a>
+            <a href="#">Jordan</a>
+            <a href="#">Collections</a>
+            <a href="#" className="sale">Sale</a>
           </nav>
 
           <div className="header-actions">
@@ -147,8 +196,76 @@ export default function Shoes() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <button className="icon-btn" type="button" aria-label="Favorites">♡</button>
-            <button className="icon-btn" type="button" aria-label="Bag">👜</button>
+
+            <button
+              className="icon-btn"
+              type="button"
+              aria-label="Favorites"
+              onClick={() => navigate("/wishlist")}
+              title="Wishlist"
+            >
+              ♡
+            </button>
+
+            <button
+              className="icon-btn"
+              type="button"
+              aria-label="Bag"
+              onClick={() => navigate("/checkout")}
+              title="Cart / Checkout"
+            >
+              👜
+            </button>
+
+            {/* ✅ Profile dropdown */}
+            <div className="profile-wrap" ref={profileRef}>
+              <button
+                className="profile-btn"
+                type="button"
+                aria-label="Account"
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen((v) => !v)}
+                title="Account"
+              >
+                <span className="profile-avatar">👤</span>
+              </button>
+
+              {profileOpen && (
+                <div className="profile-menu" role="menu" aria-label="Account menu">
+                  <button className="profile-item" type="button" role="menuitem" onClick={() => go("/account")}>
+                    <span className="pi-ico">🙂</span>
+                    <span>Manage My Account</span>
+                  </button>
+
+                  <button className="profile-item" type="button" role="menuitem" onClick={() => go("/orders")}>
+                    <span className="pi-ico">🧾</span>
+                    <span>My Orders</span>
+                  </button>
+
+                  <button className="profile-item" type="button" role="menuitem" onClick={() => go("/wishlist")}>
+                    <span className="pi-ico">♡</span>
+                    <span>My Wishlist &amp; Followed Stores</span>
+                  </button>
+
+                  <button className="profile-item" type="button" role="menuitem" onClick={() => go("/reviews")}>
+                    <span className="pi-ico">⭐</span>
+                    <span>My Reviews</span>
+                  </button>
+
+                  <button className="profile-item" type="button" role="menuitem" onClick={() => go("/returns")}>
+                    <span className="pi-ico">↩</span>
+                    <span>My Returns &amp; Cancellations</span>
+                  </button>
+
+                  <div className="profile-divider" />
+
+                  <button className="profile-item danger" type="button" role="menuitem" onClick={logout}>
+                    <span className="pi-ico">⎋</span>
+                    <span>Log out</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

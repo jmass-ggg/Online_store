@@ -1,5 +1,6 @@
 /* =========================================
    Shoes.css — Nike-like PLP (bigger tiles)
+   + Profile dropdown (Daraz-like)
    ========================================= */
 
 html, body {
@@ -23,7 +24,6 @@ a { color: inherit; text-decoration: none; }
   --padX: clamp(14px, 2.2vw, 44px);
   --wrapMax: 1440px;
 
-  /* Grid */
   --gapX: 22px;
   --gapY: 58px;
 }
@@ -44,7 +44,7 @@ a { color: inherit; text-decoration: none; }
   padding-inline: var(--padX);
 }
 
-/* ---------- Header (unchanged layout styles kept) ---------- */
+/* ---------- Header ---------- */
 .top-header{
   border-bottom: 1px solid var(--line);
   background: rgba(255,255,255,.92);
@@ -56,7 +56,7 @@ a { color: inherit; text-decoration: none; }
 
 .header-row{
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) 420px;
+  grid-template-columns: 160px minmax(0, 1fr) 520px; /* ✅ more space for profile */
   align-items: center;
   gap: 14px;
   padding: 12px 0;
@@ -122,6 +122,82 @@ a { color: inherit; text-decoration: none; }
 
 .icon-btn:hover{ background: var(--soft); }
 
+/* ✅ Profile dropdown */
+.profile-wrap{
+  position: relative;
+}
+
+.profile-btn{
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 999px;
+}
+
+.profile-btn:hover{
+  background: var(--soft);
+}
+
+.profile-avatar{
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #f2f2f2;
+  border: 1px solid #e6e6e6;
+  font-size: 18px;
+}
+
+.profile-menu{
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 280px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.12);
+  padding: 10px;
+  z-index: 2000;
+}
+
+.profile-item{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.profile-item:hover{
+  background: #f7f7f7;
+}
+
+.profile-item.danger:hover{
+  background: #ffecec;
+}
+
+.pi-ico{
+  width: 26px;
+  display: inline-flex;
+  justify-content: center;
+  opacity: .75;
+}
+
+.profile-divider{
+  height: 1px;
+  background: var(--line);
+  margin: 8px 0;
+}
+
 /* ---------- Main ---------- */
 .main-wrap{
   padding: 18px 0 64px;
@@ -151,11 +227,7 @@ a { color: inherit; text-decoration: none; }
 
 .state.error{ color: #b00020; }
 
-/* =========================================
-   Nike-style PLP Grid + Card (YOUR CLASSES)
-   ========================================= */
-
-/* 3 / 2 / 1 responsive grid */
+/* ---------- Grid ---------- */
 .plp-grid{
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -166,7 +238,6 @@ a { color: inherit; text-decoration: none; }
   align-items: start;
 }
 
-/* Tablet */
 @media (max-width: 1024px){
   .plp-grid{
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -175,7 +246,6 @@ a { color: inherit; text-decoration: none; }
   }
 }
 
-/* Mobile */
 @media (max-width: 640px){
   .plp-grid{
     grid-template-columns: 1fr;
@@ -184,7 +254,7 @@ a { color: inherit; text-decoration: none; }
   }
 }
 
-/* Card */
+/* ---------- Card ---------- */
 .plp-card{
   position: relative;
   display: flex;
@@ -195,43 +265,33 @@ a { color: inherit; text-decoration: none; }
   align-items: stretch;
 }
 
-/* Full-card clickable overlay */
 .plp-hit{
   position: absolute;
   inset: 0;
   z-index: 1;
-  border-radius: 0;
 }
 
-/* Media tile: big, clean, Nike-like */
 .plp-media{
   aspect-ratio: 1 / 1;
   background: #f5f5f5;
-  border-radius: 0;
   overflow: hidden;
   position: relative;
   display: grid;
   place-items: center;
-  padding: 10px; /* less padding = bigger product */
+  padding: 10px;
 }
 
-/* Bigger product image */
 .plp-media img{
   width: 100%;
   height: 100%;
-
-  object-fit: cover;     /* ✅ IMPORTANT: removes big white margins */
+  object-fit: cover;
   object-position: center;
-
-  transform: none;       /* ✅ remove scaling that can look weird */
-  
 }
 
 .plp-card:hover .plp-media img{
   transform: scale(1.03);
 }
 
-/* Thumbnails: under image, left aligned (Nike-like) */
 .plp-thumbs{
   position: relative;
   z-index: 2;
@@ -243,7 +303,6 @@ a { color: inherit; text-decoration: none; }
   margin-top: -6px;
 }
 
-/* Thumbnail buttons */
 .plp-thumb{
   width: 30px;
   height: 30px;
@@ -274,7 +333,6 @@ a { color: inherit; text-decoration: none; }
   margin-left: 2px;
 }
 
-/* Info: tight, left aligned */
 .plp-info{
   position: relative;
   z-index: 2;
@@ -308,23 +366,10 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.2;
 }
 
-/* Remove any injected carousel controls in media */
-.plp-media .slick-arrow,
-.plp-media .slick-dots,
-.plp-media .swiper-button-prev,
-.plp-media .swiper-button-next,
-.plp-media .splide__arrows,
-.plp-media button,
-.plp-media [role="button"],
-.plp-media [class*="arrow"],
-.plp-media [class*="control"]{
-  display: none !important;
-}
-
 /* ---------- Responsive header tweaks ---------- */
 @media (max-width: 1200px){
   .header-row{
-    grid-template-columns: 160px minmax(0, 1fr) 360px;
+    grid-template-columns: 160px minmax(0, 1fr) 460px;
   }
 }
 

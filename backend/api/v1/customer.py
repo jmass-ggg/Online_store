@@ -20,7 +20,7 @@ router=APIRouter(prefix="/user",tags=["Customer"] )
 
 @router.post("/register",response_model=CustomerRead)
 def register(user:CustomerCreate,db:Session = Depends(get_db)):
-    return create_customer(db,user.username,user.email,user.password,user.phone_number,user.address)
+    return create_customer(db,user.username,user.email,user.password,user.phone_number)
 
 
 
@@ -50,5 +50,7 @@ def get_current_user(token:str=Depends(oauth2_scheme)):
     return get_user(token)
 
 
-
+@router.get("/mine-information",response_model=CustomerRead)
+def get_me(db:Session=Depends(get_db),current_user:Customer=Depends(get_current_customer)):
+    return db.query(Customer).filter(Customer.id == current_user.id).first()
 

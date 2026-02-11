@@ -10,9 +10,8 @@ class CustomerStatus(str, Enum):
 
 class CustomerBase(BaseModel):
     username: str
-    email: EmailStr=Field(..., description="Valid email address")
+    email: EmailStr=Field(..., description="Valid email ")
     phone_number: str=Field(..., description="Contact phone number")
-    address: str=Field(..., description="Residential address")
     
 
     class Config:
@@ -35,7 +34,7 @@ class CustomerRead(BaseModel):
     username: str
     email: EmailStr
     phone_number: str
-    address: str
+
     role_name: str = "Customer"
     status: CustomerStatus
 
