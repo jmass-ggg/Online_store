@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Checkout.css";
 import { apiFetch, joinUrl } from "../api";
 
 const CART_KEY = "cart_items";
 const BUY_NOW_KEY = "buy_now_item";
+
+// ✅ saved for Payment page to read
+const CHECKOUT_CTX_KEY = "checkout_context";
 
 function money(n) {
   const v = Number(n || 0);
@@ -141,6 +144,8 @@ function parseLine2(line2) {
 
 export default function Checkout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
   const isBuyNowMode = new URLSearchParams(location.search).get("mode") === "buy_now";
 
   // ---------------- Form state ----------------
@@ -391,28 +396,35 @@ export default function Checkout() {
     }
   }
 
-  async function proceedToPay() {
+  // ✅ UPDATED: go to /payment like Daraz (store checkout context first)
+  function proceedToPay() {
     setErrorMsg("");
+
     if (!savedAddress) return setErrorMsg("Please save a shipping address to proceed.");
     if (itemsCount <= 0) return setErrorMsg("No items to checkout.");
 
-    try {
-      const payload = {
-        mode: isBuyNowMode ? "BUY_NOW" : "CART",
-        address_id: savedAddress.id,
-        items: isBuyNowMode ? orderItems.map((x) => ({ variant_id: x.variant_id, quantity: x.quantity })) : null,
-      };
+    const checkoutContext = {
+      mode: isBuyNowMode ? "BUY_NOW" : "CART",
+      address_id: savedAddress.id,
+      address: savedAddress, // optional (useful for showing on payment page)
+      items: orderItems.map((x) => ({
+        variant_id: x.variant_id,
+        quantity: x.quantity,
+        price: x.price,
+        product_name: x.product_name,
+        image_url: x.image_url,
+        size: x.size,
+      })),
+      totals: {
+        itemsCount,
+        itemsTotal,
+        deliveryFee: itemsCount > 0 ? deliveryFee : 0,
+        total: itemsCount > 0 ? total : 0,
+      },
+    };
 
-      const res = await apiFetch("/order/checkout", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      if (res?.payment_url) window.location.href = res.payment_url;
-      else alert("Order created. Implement payment redirect here.");
-    } catch (e) {
-      setErrorMsg(formatApiError(e));
-    }
+    sessionStorage.setItem(CHECKOUT_CTX_KEY, JSON.stringify(checkoutContext));
+    navigate("/payment");
   }
 
   const canProceed = itemsCount > 0 && !!savedAddress;
@@ -431,14 +443,22 @@ export default function Checkout() {
           </nav>
 
           <div className="ck-search">
-            <span className="ck-searchIcon" aria-hidden="true">🔎</span>
+            <span className="ck-searchIcon" aria-hidden="true">
+              🔎
+            </span>
             <input placeholder="Search for products..." />
           </div>
 
           <div className="ck-actions">
-            <button className="ck-iconBtn" aria-label="Cart">🛒</button>
-            <button className="ck-iconBtn" aria-label="Notifications">🔔</button>
-            <button className="ck-avatar" aria-label="Account">👤</button>
+            <button className="ck-iconBtn" aria-label="Cart">
+              🛒
+            </button>
+            <button className="ck-iconBtn" aria-label="Notifications">
+              🔔
+            </button>
+            <button className="ck-avatar" aria-label="Account">
+              👤
+            </button>
           </div>
         </div>
       </header>
@@ -493,7 +513,7 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* ✅ Daraz-like product section UNDER address (always stacks, never overlaps) */}
+            {/* Products under address */}
             <div className="ck-itemsUnderAddress">
               <div className="ck-itemsHead">
                 <div className="ck-itemsTitle">Package 1 of 1</div>
@@ -520,9 +540,7 @@ export default function Checkout() {
                         />
 
                         <div className="ck-itemInfo">
-                          <div className="ck-itemName">
-                            {it.product_name ? it.product_name : `Variant #${it.variant_id}`}
-                          </div>
+                          <div className="ck-itemName">{it.product_name ? it.product_name : `Variant #${it.variant_id}`}</div>
 
                           <div className="ck-itemMeta">
                             {it.size ? <span>Size: {it.size}</span> : null}
@@ -537,7 +555,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* ✅ Address form (no overlap now) */}
+            {/* Address form */}
             {(isEditingAddress || !savedAddress) && (
               <>
                 <div className="ck-formGrid">
@@ -682,6 +700,7 @@ export default function Checkout() {
               <div className="ck-vat">VAT included where applicable</div>
             </div>
 
+            {/* ✅ now goes to /payment */}
             <button className="ck-pay" type="button" disabled={!canProceed} onClick={proceedToPay}>
               PROCEED TO PAY
             </button>

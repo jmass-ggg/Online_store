@@ -4,7 +4,8 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Shoes from "./pages/Shoes.jsx";
 import Product from "./pages/Product.jsx";
-import Checkout from "./pages/Checkout.jsx"; // ✅ add
+import Checkout from "./pages/Checkout.jsx";
+import Payment from "./pages/Payment.jsx"; // ✅ add
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 
 export default function App() {
@@ -21,7 +22,6 @@ export default function App() {
         }
       />
 
-      {/* ✅ product detail page */}
       <Route
         path="/product/:slug"
         element={
@@ -31,12 +31,21 @@ export default function App() {
         }
       />
 
-      {/* ✅ checkout page */}
       <Route
         path="/checkout"
         element={
           <ProtectedRoute>
             <Checkout />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ payment page (Daraz-like select payment method) */}
+      <Route
+        path="/payment"
+        element={
+          <ProtectedRoute>
+            <Payment />
           </ProtectedRoute>
         }
       />
