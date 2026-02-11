@@ -7,25 +7,27 @@ from backend.api.v1 import (
     seller_management, esewa_router
 )
 from backend.database import Base, engine
-
+from pathlib import Path
 app = FastAPI()
 
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://unsight-unartificially-mozelle.ngrok-free.dev",  # ✅ your current frontend origin
+    "https://unsight-unartificially-mozelle.ngrok-free.dev", 
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,   # ✅ REQUIRED for cookies
+    allow_credentials=True,  
     allow_methods=["*"],
     allow_headers=["*"],
 )
+BASE_DIR = Path(__file__).resolve().parent         
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-UPLOAD_DIR = "/home/james/james/project/Online_store/backend/uploads"
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 Base.metadata.create_all(bind=engine)
 

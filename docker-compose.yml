@@ -1,74 +1,51 @@
-
-
 services:
-  # db:
-  #   image: postgres:15
-  #   container_name: online_store_db
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: Kanye@12
-  #     POSTGRES_DB: store
-  #   ports:
-  #     - "5434:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-
-  # backend:
-  #   build: 
-  #     context: ./backend  
-  #     dockerfile: Dockerfile
-  #   container_name: online_store_backend
-  #   restart: always
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     - db
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - .:/app
   db:
     image: postgres:15
     container_name: online_store_db
-    restart : always
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "Kanye@12"
-      POSTGRES_DB : store
+      POSTGRES_DB: store
     ports:
-      - "5434:5434"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    
+
   backend:
-      build:
-         context: ./backend 
-         dockerfile: Dockerfile
-      container_name : online_store_backend
-      restart : always
-      env_file:
-        - .env
-      depends_on:
-        - db
-      ports:
-       - "8030:8000"
-      volumes:
-        - .:/app
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: online_store_backend
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - db
+    ports:
+      - "8030:8030"
+    volumes:
+      - .:/app
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8030 --reload
+
+    
 
   frontend:
-    build: 
-      context: ./frontend  
+    build:
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: online_store_frontend
     restart: always
-    environment:
-      - REACT_APP_API_URL=http://backend:8000
     depends_on:
       - backend
     ports:
-      - "3000:80"
+      - "5173:5173"
     volumes:
-      - ./frontend:/app 
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    environment:
+      - VITE_API_URL=http://localhost:8030
+
 volumes:
   postgres_data:
