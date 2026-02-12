@@ -1,9 +1,14 @@
-# seller.py
+
 from datetime import datetime
 from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
+from enum import Enum
 
+class SellerVerification(str,Enum):
+    PENDING="PENDING"
+    REJECTED="REJECTED"
+    APPROVED="APPROVED"
 
 class Seller(Base):
     __tablename__ = "seller"

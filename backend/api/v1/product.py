@@ -68,7 +68,7 @@ def get_product(product_id:int,db:Session=Depends(get_db),
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
     product_name: str = Form(...),
-    url_slug: str = Form(...),
+    
     targetAudience:TargetAudience=Form(...),
     product_category: ProductCategory = Form(...),
     description: str | None = Form(None),

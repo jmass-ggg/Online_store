@@ -6,7 +6,7 @@ __pycache__/
 *.pyd
 *.db
 *.sqlite3
-
+rough.py
 # Backend specific
 backend/utils/__pycache__/
 rough.txt

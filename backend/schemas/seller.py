@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
-
+from backend.models.seller import SellerVerification
 
 class SellerBase(BaseModel):
     username: str
@@ -40,7 +40,7 @@ class TokenResponse(BaseModel):
 
 class SellerReviewUpdate(BaseModel):
     
-    status: str            # "APPROVED" "REJECTED"
+    status: str           
     class Config:
         orm_mode = True
         from_attributes = True
@@ -51,7 +51,7 @@ class SellerResponse(BaseModel):
     email: EmailStr
     phone_number: str
 
-    status: str                   # PENDING, APPROVED, REJECTED
+    status: SellerVerification                   # PENDING, APPROVED, REJECTED
     is_verified: bool
 
     kyc_document_type: str
@@ -93,7 +93,7 @@ class SellerUpdate(BaseModel):
         from_attributes = True
 
 class SellerVerificationUpdate(BaseModel):
-    status:str
+    status:SellerVerification
     is_verified:bool
     class Config:
         orm_mode = True

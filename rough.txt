@@ -1,11 +1,9 @@
+seller
+James@example.com
+Kanye@12
 
-ASDASDASD@example.com
-ASDAASS
- npm run dev --  --host 0.0.0.0 --port 5173
-Numa@example.com
-password:- Jamesss
-Jamesss@example.com
-Hellos
+admin@gmail.com
+Admin@12
 import { useState } from "react";
 https://abcd-...ngrok-free.app/payments/esewa/initiate?order_id=123
 export default function AddressPicker() {
