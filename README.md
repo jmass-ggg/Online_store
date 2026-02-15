@@ -1,38 +1,69 @@
-# 🛍️ Online Store — Centralized Marketplace (FastAPI + React + PostgreSQL)
+# 🛍️ Online Store — Centralized Marketplace (FastAPI + React)
 
-A full-stack **online store / marketplace** built to help **local businesses (with or without physical stores)** sell their items in one centralized platform — **for free**.
+A full-stack **online store / marketplace** that helps **local businesses (with or without physical stores)** sell their items in one centralized platform — **for free**.
 
-It works like a **digital shopping center** where multiple sellers can list products and customers can place orders while the system manages:
-
-**Catalog → Cart → Checkout → Multi-Seller Orders → Payments (eSewa / COD)**
-
----
-
-## ✨ What This Project Does
-
-✅ Centralizes multiple physical/online stores into one marketplace  
-✅ Sellers can register and list products with **variants, images, stock**  
-✅ Customers can browse, search, add to cart, checkout, and review products  
-✅ Multi-seller order fulfillment (each seller handles their own part)  
-✅ Payment options: **Cash on Delivery** + **eSewa integration**  
-✅ Admin workflow for **seller verification / approval**
+This project works like a **digital shopping center**:
+- Sellers list products (with variants, stock, images)
+- Customers browse, add to cart, and checkout
+- Orders can contain items from **multiple sellers**
+- Payments support **Cash on Delivery** and **eSewa**
 
 ---
 
-## 🧠 Core Concepts
+## 🎯 Why This Project Exists
 
-### 👥 Roles
-- **Customer** → browse, cart, checkout, manage address, orders, reviews
-- **Seller** → list products, manage stock/variants, fulfill orders
-- **Admin** → approve sellers and manage the platform
+Many local shops don’t have a strong online presence. This project solves that by providing:
+- A single platform for multiple stores/sellers
+- A complete e-commerce flow (catalog → cart → checkout → payment)
+- A scalable structure for **multi-seller fulfillment**
 
-### 🏬 Multi-Seller Orders (Marketplace Logic)
-When a customer places an order:
-- `Order` = main purchase (belongs to the customer)
-- `OrderItem` = each line item in the order (includes `seller_id`)
-- `OrderFulfillment` = groups items per seller so each seller can accept/hand over their portion
+---
 
-This design makes the marketplace scalable for many sellers.
+## ✨ Key Features
+
+### 👤 Customer
+- Register / Login (JWT)
+- Browse categories: **Clothes, Accessories, Footwear, Jewelry**
+- Search products
+- View product details + variants + images
+- Cart management (add / update / remove)
+- Manage addresses (default shipping/billing)
+- Place orders
+- Write product reviews
+
+### 🧑‍💼 Seller
+- Seller registration/onboarding
+- Upload products + variants (size/color/price/stock)
+- Upload multiple product images
+- Manage own products
+- Handle seller-side fulfillment (accept / hand over / shipped)
+
+### 🛡️ Admin
+- Admin authentication
+- Seller review / verification workflow
+
+### 💳 Payments
+- **Cash on Delivery**
+- ✅ **eSewa Integration**
+  - Payment initiation (auto-submitted form)
+  - Success callback with signature verification
+  - Status verification using eSewa status API
+  - Failure callback
+  - Poll endpoint for frontend status updates
+
+---
+
+## 🧠 Marketplace Order Design (Multi-Seller Support)
+
+This project supports **multi-seller orders** using these tables:
+
+- `Order` → created by a customer
+- `OrderItem` → each purchased item (contains `seller_id`)
+- `OrderFulfillment` → groups all items **per seller** inside one order
+- `OrderAddress` → one shipping address per order
+- `Payment` → stores payment attempts and verification results
+
+This makes it easy for each seller to manage only their part of the order.
 
 ---
 
@@ -40,17 +71,17 @@ This design makes the marketplace scalable for many sellers.
 
 ### Backend
 - **FastAPI**
-- **SQLAlchemy ORM**
-- **JWT Auth** (Access + Refresh Tokens)
-- **Role based permissions**
+- **SQLAlchemy**
 - **PostgreSQL**
-- **Docker Compose**
-- ✅ **eSewa Payment Integration** (initiate/success/failure/poll)
+- **JWT Auth** (Access + Refresh tokens)
+- **Docker**
+- **eSewa Integration**
 
 ### Frontend
-- **React + Vite**
-- Pages: Home, Product listing, Product detail, Checkout, Payment, Login/Register
-- Protected routes for authenticated pages
+- **React**
+- **Vite**
+- Protected routes
+- API client in `src/api.js`
 
 ---
 
@@ -59,112 +90,39 @@ This design makes the marketplace scalable for many sellers.
 ```text
 Online_store/
 ├─ backend/
-│  ├─ api/v1/                 # FastAPI routes
+│  ├─ api/v1/                 # FastAPI routers
 │  ├─ models/                 # SQLAlchemy models
 │  ├─ schemas/                # Pydantic schemas
 │  ├─ service/                # Business logic layer
 │  ├─ utils/                  # JWT + hashing helpers
 │  ├─ config/                 # Settings + eSewa utils
+│  ├─ core/                   # permissions, settings, helpers
 │  ├─ uploads/                # Uploaded images
-│  ├─ database.py             # DB session/engine
-│  └─ main.py                 # FastAPI entry
+│  ├─ database.py             # DB engine/session
+│  └─ main.py                 # FastAPI entry point
 │
 ├─ frontend/
-│  ├─ public/
+│  ├─ public/                 # Static images
 │  └─ src/
-│     ├─ pages/
-│     ├─ routes/
-│     ├─ api.js
-│     └─ App.jsx
+│     ├─ pages/               # UI pages (Home, Product, Checkout, Payment)
+│     ├─ routes/              # ProtectedRoute
+│     ├─ api.js               # API helper
+│     └─ App.jsx              # Routes/layout
 │
 ├─ docker-compose.yml
 ├─ .env
 └─ README.md
-🔥 Main Features
-✅ Customer Features
-Register/Login (JWT)
 
-Browse categories: Clothes, Accessories, Footwear, Jewelry
+🚀 Quick Start (Docker — Recommended)
+✅ Requirements
 
-Search products
+Docker + Docker Compose installed
 
-View product details + variants + images
+1️⃣ Create .env (in project root)
 
-Cart: add/update/remove items
+Create a file named .env in the root folder:
 
-Address management (default shipping/billing)
-
-Place Order / Buy Now
-
-Product reviews
-
-✅ Seller Features
-Apply to become a seller
-
-Upload products + variants + images
-
-Manage own products
-
-Accept / handover orders (Seller Management APIs)
-
-✅ Admin Features
-Admin authentication
-
-Approve/review sellers
-
-✅ Payment Features
-Cash on Delivery
-
-✅ eSewa Payment
-
-initiate payment form
-
-success callback (signature verify + status verify)
-
-failure callback
-
-poll payment status
-
-🧾 Backend API Modules
-Located at: backend/api/v1/
-
-login.py → login / refresh / logout
-
-customer.py → register / update / profile
-
-seller.py → seller apply / seller profile
-
-product.py → products + search + variants + images
-
-cart.py → cart operations
-
-order.py → place order / buy now
-
-review.py → product reviews
-
-address.py → customer addresses
-
-seller_management.py → seller order management
-
-esewa_router.py → ✅ eSewa payment routes
-
-Swagger Docs (Docker):
-
-http://localhost:8030/docs
-
-🐳 Run With Docker (Recommended)
-This project includes a complete Docker Compose setup with:
-
-PostgreSQL (db)
-
-FastAPI backend
-
-React frontend
-
-1) Create .env in project root
-✅ Copy and paste this into .env:
-
-# Database (Docker)
+# PostgreSQL inside Docker (IMPORTANT: password must be URL-encoded)
 DATABASE_URL=postgresql://postgres:Kanye%4012@db:5432/store
 
 # JWT
@@ -172,377 +130,122 @@ SECRET_KEY=secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
-Note: %4012 is the URL-encoded form of @12.
 
-2) Start all services
+
+Kanye%4012 is Kanye@12 (because @ must be encoded in URLs).
+
+2️⃣ Start the project
+
 From the root folder (Online_store/):
 
 docker compose up --build
-✅ After running:
 
-Frontend → http://localhost:5173
+✅ Open the app
 
-Backend → http://localhost:8030
+Frontend: http://localhost:5173
 
-Swagger API Docs → http://localhost:8030/docs
+Backend: http://localhost:8030
 
-Postgres exposed at → localhost:5434
+Swagger Docs: http://localhost:8030/docs
 
-3) Stop services
+PostgreSQL exposed: localhost:5434
+
+3️⃣ Stop the project
 docker compose down
-To also delete database data:
 
+4️⃣ Stop and delete DB data (reset everything)
 docker compose down -v
-▶️ Run Locally (Without Docker)
-Backend
+
+🧑‍💻 Run Locally (Without Docker)
+Backend (FastAPI)
 cd backend
 python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
-Backend:
+
+
+Backend runs at:
 
 http://localhost:8000
 
-Docs:
+Docs: http://localhost:8000/docs
 
-http://localhost:8000/docs
-
-Frontend
+Frontend (React)
 cd frontend
 npm install
 npm run dev
-Frontend:
+
+
+Frontend runs at:
 
 http://localhost:5173
 
-🧩 ER Diagram (Mermaid)
-GitHub supports Mermaid.
-If it doesn’t render, use: https://mermaid.live
+🧾 Docker Configuration
+docker-compose.yml (Ports)
 
-erDiagram
-    ROLES {
-        int id PK
-        string role_name UK
-        string descripted
-    }
+Frontend: 5173:5173
 
-    ADMIN {
-        int id PK
-        string username UK
-        string email UK
-        string hashed_password
-        datetime created_at
-        datetime updated_at
-        string role_name FK
-    }
+Backend: 8030:8030
 
-    CUSTOMER {
-        int id PK
-        string username
-        string email UK
-        string phone_number
-        string hashed_password
-        datetime created_at
-        datetime updated_at
-        string status
-        string role_name FK
-    }
+Postgres: 5434:5432
 
-    SELLER {
-        int id PK
-        string username
-        string email UK
-        string phone_number UK
-        string hashed_password
-        string business_name
-        string business_type
-        string business_address
-        string kyc_document_type
-        bigint kyc_document_number
-        string bank_account_name
-        bigint bank_account_number
-        string bank_name
-        string bank_branch
-        datetime created_at
-        datetime updated_at
-        string status
-        bool is_verified
-        string role_name FK
-    }
+📚 API Documentation
 
-    ADDRESS {
-        int id PK
-        int customer_id FK
-        string full_name
-        string phone_number
-        string region
-        string line1
-        string line2
-        string postal_code
-        string country
-        float latitude
-        float longitude
-        bool is_default_shipping
-        bool is_default_billing
-        datetime created_at
-        datetime updated_at
-    }
+Swagger UI is available at:
 
-    PRODUCT {
-        int id PK
-        string product_name
-        string url_slug UK
-        string product_category
-        string target_audience
-        text description
-        string image_url
-        string status
-        int seller_id FK
-        datetime created_at
-        datetime updated_at
-    }
+➡️ http://localhost:8030/docs
 
-    PRODUCT_VARIANTS {
-        int id PK
-        int product_id FK
-        string sku UK
-        string color
-        string size
-        decimal price
-        int stock_quantity
-        bool is_active
-        datetime created_at
-        datetime updated_at
-    }
+💳 eSewa Integration (Backend)
 
-    PRODUCT_IMAGES {
-        int id PK
-        int product_id FK
-        string color
-        string image_url
-        bool is_primary
-        int sort_order
-        datetime created_at
-    }
+The eSewa integration is implemented in:
 
-    REVIEW {
-        int id PK
-        int rating
-        text comment
-        int product_id FK
-        int user_id FK
-    }
+📍 backend/api/v1/esewa_router.py
 
-    CARTS {
-        int id PK
-        int buyer_id FK
-        string status
-        datetime created_at
-        datetime updated_at
-    }
+✅ Payment Flow
 
-    CART_ITEMS {
-        int id PK
-        int cart_id FK
-        int variant_id FK
-        int quantity
-        decimal price
-    }
+Customer places an order → Order is created
 
-    ORDERS {
-        int id PK
-        int buyer_id FK
-        string status
-        decimal total_price
-        string payment_Method
-        datetime order_placed
-        datetime created_at
-        datetime updated_at
-    }
+Frontend calls initiate endpoint
 
-    ORDER_ADDRESSES {
-        int id PK
-        int order_id FK
-        string full_name
-        string phone_number
-        string region
-        string line1
-        string line2
-        string postal_code
-        string country
-        float latitude
-        float longitude
-        datetime created_at
-    }
+Backend creates a Payment record and returns an auto-submit HTML form to eSewa
 
-    ORDER_ITEMS {
-        int id PK
-        int order_id FK
-        int seller_id FK
-        int product_id FK
-        int variant_id FK
-        int quantity
-        decimal unit_price
-        decimal line_total
-        string item_status
-        datetime created_at
-        datetime updated_at
-    }
+eSewa redirects to success or failure
 
-    ORDER_FULFILLMENTS {
-        int id PK
-        int order_id FK
-        int seller_id FK
-        string fulfillment_status
-        decimal seller_subtotal
-        datetime accepted_at
-        datetime packed_at
-        datetime shipped_at
-        datetime delivered_at
-        datetime created_at
-        datetime updated_at
-    }
+On success:
 
-    PAYMENTS {
-        int id PK
-        int order_id FK
-        string provider
-        string status
-        decimal amount
-        string ref_id
-        string transaction_uuid UK
-        datetime initiated_at
-        datetime verified_at
-        datetime created_at
-        datetime updated_at
-    }
+signature is verified
 
-    REFRESH_TOKENS {
-        int id PK
-        string token_hash UK
-        string role
-        int owner_id
-        datetime expires_at
-        bool revoked
-    }
+payment status is confirmed via eSewa status API
 
-    ROLES ||--o{ ADMIN : "role_name"
-    ROLES ||--o{ CUSTOMER : "role_name"
-    ROLES ||--o{ SELLER : "role_name"
+payment + order status are updated
 
-    CUSTOMER ||--o{ ADDRESS : has
-    CUSTOMER ||--o{ CARTS : has
-    CUSTOMER ||--o{ ORDERS : places
-    CUSTOMER ||--o{ REVIEW : writes
+Frontend can call poll to update payment status
 
-    SELLER ||--o{ PRODUCT : lists
-    SELLER ||--o{ ORDER_ITEMS : receives
-    SELLER ||--o{ ORDER_FULFILLMENTS : fulfills
+✅ eSewa Endpoints
 
-    PRODUCT ||--o{ PRODUCT_VARIANTS : has
-    PRODUCT ||--o{ PRODUCT_IMAGES : has
-    PRODUCT ||--o{ REVIEW : receives
-    PRODUCT ||--o{ ORDER_ITEMS : appears_in
+GET /payments/esewa/initiate?order_id={id}
 
-    PRODUCT_VARIANTS ||--o{ CART_ITEMS : in_cart
-    PRODUCT_VARIANTS ||--o{ ORDER_ITEMS : purchased_as
+GET/POST /payments/esewa/success
 
-    CARTS ||--o{ CART_ITEMS : contains
+GET/POST /payments/esewa/failure
 
-    ORDERS ||--|| ORDER_ADDRESSES : ships_to
-    ORDERS ||--o{ ORDER_ITEMS : contains
-    ORDERS ||--o{ ORDER_FULFILLMENTS : grouped_by_seller
-    ORDERS ||--o{ PAYMENTS : paid_by
-✅ Docker Files & Compose (Copy/Paste Ready)
-✅ docker-compose.yml
-services:
-  db:
-    image: postgres:15
-    container_name: online_store_db
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "Kanye@12"
-      POSTGRES_DB: store
-    ports:
-      - "5434:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+GET /payments/esewa/poll/{order_id}
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: online_store_backend
-    restart: always
-    env_file:
-      - .env
-    depends_on:
-      - db
-    ports:
-      - "8030:8030"
-    volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8030 --reload
+🗄️ Database Overview (Main Tables)
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: online_store_frontend
-    restart: always
-    depends_on:
-      - backend
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0 --port 5173
-    environment:
-      - DOCKER=true
-      - VITE_API_URL=http://backend:8030
-      - VITE_API_BASE_URL=/api
+roles, admin, customer, seller
 
-volumes:
-  postgres_data:
-✅ backend/Dockerfile
-FROM python:3.11-slim
+addresses
 
-WORKDIR /app
+products, product_variants, product_images
 
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+carts, cart_items
 
-COPY . .
+orders, order_items, order_fulfillments, order_addresses
 
-EXPOSE 8030
+payments
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8030", "--reload"]
-✅ frontend/Dockerfile
-FROM node:20-alpine
+reviews
 
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-
-EXPOSE 5173
-
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
-✅ eSewa Integration (Backend)
-This project includes full eSewa integration in the backend:
-
-GET /payments/esewa/initiate?order_id=... → creates payment attempt and redirects to eSewa form
-
-GET/POST /payments/esewa/success → validates signature + checks eSewa status API and marks payment/order
-
-GET/POST /payments/esewa/failure → returns failure response
-
-GET /payments/esewa/poll/{order_id} → checks current payment status from eSewa status endpoint
-
-File: backend/api/v1/esewa_router.py
-
+refresh_tokens
