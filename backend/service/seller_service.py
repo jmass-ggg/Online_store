@@ -11,7 +11,7 @@ from backend.schemas.seller import (
    SellerResponse,
    SellerUpdate,SellerVerificationUpdate
 )
-from fastapi import status
+
 from jose import JWTError, ExpiredSignatureError
 from jwt import ExpiredSignatureError, InvalidTokenError
 from backend.schemas.seller import TokenResponse
@@ -21,10 +21,10 @@ from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
 from backend.utils.jwt import  verify_token,create_refresh_token
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import SQLAlchemyError,IntegrityError
+
 from typing import Dict
-from fastapi import status
+
 
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
     seller = Seller(

@@ -31,7 +31,6 @@ def list_my_addresses(
 ):
     return list_addresses(db, user.id)
 
-
 @router.patch("/{address_id}", response_model=AddressResponse)
 def patch_address(
     address_id: int,

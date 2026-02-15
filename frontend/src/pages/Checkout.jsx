@@ -281,7 +281,6 @@ export default function Checkout() {
     };
   }, [refreshTick, isBuyNowMode]);
 
-  // ---------------- Totals ----------------
   const itemsCount = useMemo(
     () => orderItems.reduce((sum, it) => sum + Number(it.quantity || 0), 0),
     [orderItems]
@@ -295,7 +294,6 @@ export default function Checkout() {
   const deliveryFee = 4.5;
   const total = Math.max(0, itemsTotal + (itemsCount > 0 ? deliveryFee : 0));
 
-  // ---------------- Province/City/Zone lists ----------------
   const provinceObj = useMemo(() => NEPAL.provinces.find((p) => p.name === province) || null, [province]);
   const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
   const cityObj = useMemo(() => cityOptions.find((c) => c.name === city) || null, [cityOptions, city]);
@@ -310,7 +308,6 @@ export default function Checkout() {
     setZone("");
   }, [city]);
 
-  // ---------------- Edit address ----------------
   function startEdit() {
     if (savedAddress) {
       setFullName(savedAddress.full_name || "");
@@ -396,7 +393,6 @@ export default function Checkout() {
     }
   }
 
-  // ✅ UPDATED: go to /payment like Daraz (store checkout context first)
   function proceedToPay() {
     setErrorMsg("");
 
@@ -406,7 +402,7 @@ export default function Checkout() {
     const checkoutContext = {
       mode: isBuyNowMode ? "BUY_NOW" : "CART",
       address_id: savedAddress.id,
-      address: savedAddress, // optional (useful for showing on payment page)
+      address: savedAddress, 
       items: orderItems.map((x) => ({
         variant_id: x.variant_id,
         quantity: x.quantity,
