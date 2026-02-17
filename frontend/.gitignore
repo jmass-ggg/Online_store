@@ -11,7 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
+Er_Diagram.txt
+project.txt
 
+package-lock.json
+package.json
+nextplan.txt
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
