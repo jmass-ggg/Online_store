@@ -13,7 +13,7 @@ rough.txt
 project.txt
 # Environment variables
 .env
-
+rough.txt
 # Docker
 *.log
 docker-compose.override.yml

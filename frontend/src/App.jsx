@@ -1,18 +1,27 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+
 import Home from "./pages/Home.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+
 import Shoes from "./pages/Shoes.jsx";
 import Product from "./pages/Product.jsx";
+
+import Cart from "./pages/Cart.jsx";        // ✅ add
 import Checkout from "./pages/Checkout.jsx";
-import Payment from "./pages/Payment.jsx"; // ✅ add
+import Payment from "./pages/Payment.jsx";
+
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 
 export default function App() {
   return (
     <Routes>
+      {/* Public */}
       <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
+      {/* Protected */}
       <Route
         path="/shoes"
         element={
@@ -31,6 +40,17 @@ export default function App() {
         }
       />
 
+      {/* ✅ Cart page */}
+      <Route
+        path="/cart"
+        element={
+          <ProtectedRoute>
+            <Cart />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* If you still use this page */}
       <Route
         path="/checkout"
         element={
@@ -40,7 +60,7 @@ export default function App() {
         }
       />
 
-      {/* ✅ payment page (Daraz-like select payment method) */}
+      {/* ✅ Payment page */}
       <Route
         path="/payment"
         element={
@@ -50,8 +70,8 @@ export default function App() {
         }
       />
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
