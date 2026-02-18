@@ -1,13 +1,13 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import Home from "./pages/Home.jsx";
+import AllProduct from "./pages/AllProduct.jsx"; // ✅ NEW home page
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 
 import Shoes from "./pages/Shoes.jsx";
 import Product from "./pages/Product.jsx";
 
-import Cart from "./pages/Cart.jsx";        // ✅ add
+import Cart from "./pages/Cart.jsx";
 import Checkout from "./pages/Checkout.jsx";
 import Payment from "./pages/Payment.jsx";
 
@@ -17,7 +17,7 @@ export default function App() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<AllProduct />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
@@ -40,7 +40,6 @@ export default function App() {
         }
       />
 
-      {/* ✅ Cart page */}
       <Route
         path="/cart"
         element={
@@ -50,7 +49,6 @@ export default function App() {
         }
       />
 
-      {/* If you still use this page */}
       <Route
         path="/checkout"
         element={
@@ -60,7 +58,6 @@ export default function App() {
         }
       />
 
-      {/* ✅ Payment page */}
       <Route
         path="/payment"
         element={
