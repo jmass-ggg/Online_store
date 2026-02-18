@@ -25,11 +25,21 @@ function makeId() {
 }
 
 function normalizeProduct(p) {
+  const audience = p?.target_audience || "";
+  const category = p?.product_category ?? "Other";
+
+  // small helper to make the subtitle match “Men’s Shoes” look
+  const subLabel =
+    category.toLowerCase().includes("footwear") || category.toLowerCase().includes("shoe")
+      ? `${audience ? `${audience}'s ` : ""}Shoes`
+      : category;
+
   return {
     id: p?.id ?? makeId(),
     name: p?.product_name ?? "Untitled Product",
     slug: p?.url_slug ?? String(p?.id ?? makeId()),
-    category: p?.product_category ?? "Other",
+    category,
+    subLabel,
     price: Number(p?.default_price ?? 0),
     image: joinUrl(p?.image_url || ""),
     status: p?.status ?? "active",
@@ -54,13 +64,9 @@ export default function AllProduct() {
   const [cartCount, setCartCount] = useState(0);
   const [toasts, setToasts] = useState([]);
 
-  // cart count
   useEffect(() => {
     const cart = safeJsonParse(localStorage.getItem(CART_KEY), []);
-    const total = (Array.isArray(cart) ? cart : []).reduce(
-      (acc, item) => acc + (item.quantity || 0),
-      0
-    );
+    const total = (Array.isArray(cart) ? cart : []).reduce((acc, item) => acc + (item.quantity || 0), 0);
     setCartCount(total);
   }, []);
 
@@ -71,7 +77,7 @@ export default function AllProduct() {
 
       const skip = reset ? 0 : products.length;
 
-      // ✅ FastAPI route you confirmed: /product/
+      // ✅ Your backend route is /product/
       let path = `/product/?skip=${skip}&limit=${PAGE_SIZE}`;
       if (serverCategory !== "All") path += `&category=${encodeURIComponent(serverCategory)}`;
 
@@ -91,7 +97,6 @@ export default function AllProduct() {
     }
   }
 
-  // initial + category change
   useEffect(() => {
     fetchProducts({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -116,13 +121,10 @@ export default function AllProduct() {
 
     if (sortBy === "price-low") return [...list].sort((a, b) => a.price - b.price);
     if (sortBy === "price-high") return [...list].sort((a, b) => b.price - a.price);
-    return list; // newest = backend order
+    return list;
   }, [products, searchQuery, sortBy]);
 
-  const resultCountText = useMemo(
-    () => `Showing ${filteredProducts.length} items`,
-    [filteredProducts.length]
-  );
+  const resultCountText = useMemo(() => `Showing ${filteredProducts.length} items`, [filteredProducts.length]);
 
   function showToast(message) {
     const id = makeId();
@@ -172,7 +174,6 @@ export default function AllProduct() {
 
   return (
     <div className="ap">
-      {/* NAV */}
       <nav className="apNav">
         <div className="apNavLeft">
           <button className="apBrand" onClick={() => navigate("/")} type="button">
@@ -191,12 +192,9 @@ export default function AllProduct() {
       </nav>
 
       <main>
-        {/* HERO */}
         <section className="apHero">
           <h1 className="apHeroTitle">JAMES</h1>
-          <p className="apHeroSub">
-            Curated essentials for the modern lifestyle. Minimal design, maximal impact.
-          </p>
+          <p className="apHeroSub">Curated essentials for the modern lifestyle. Minimal design, maximal impact.</p>
 
           <div className="apSearchWrap">
             <span className="apSearchIcon" aria-hidden="true">🔎</span>
@@ -211,7 +209,6 @@ export default function AllProduct() {
           {errorHint ? <div className="apHint">{errorHint}</div> : null}
         </section>
 
-        {/* CATEGORIES */}
         <section className="apCats">
           <h3>Shop by Category</h3>
           <div className="apCatGrid">
@@ -231,7 +228,6 @@ export default function AllProduct() {
           </div>
         </section>
 
-        {/* PRODUCT GRID */}
         <section className="apFeed" ref={gridRef}>
           <div className="apFeedHead">
             <div>
@@ -239,11 +235,7 @@ export default function AllProduct() {
               <p>{resultCountText}</p>
             </div>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              aria-label="Sort products"
-            >
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Sort products">
               <option value="newest">Newest Arrivals</option>
               <option value="price-low">Price: Low to High</option>
               <option value="price-high">Price: High to Low</option>
@@ -258,46 +250,38 @@ export default function AllProduct() {
           ) : (
             <div className="apGrid">
               {loading
-                ? Array.from({ length: 8 }).map((_, i) => (
+                ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="apCard skeletonCard">
                       <div className="skeletonMedia" />
                       <div className="skeletonText" />
                       <div className="skeletonText w70" />
-                      <div className="skeletonText w50" />
                     </div>
                   ))
                 : filteredProducts.map((p) => (
                     <article key={p.id} className="apCard">
-                      <div
-                        className="apMedia"
-                        onClick={() => openProduct(p)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") openProduct(p);
-                        }}
-                      >
+                      <button type="button" className="apMedia" onClick={() => openProduct(p)}>
                         <img src={p.image} alt={p.name} />
-                        <button
-                          type="button"
-                          className="apAdd"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(p);
-                          }}
-                        >
-                          Add to Cart
-                        </button>
-                      </div>
+                      </button>
 
                       <div className="apInfo">
-                        <div className="apCat">{p.category}</div>
+                        <div className="apSub">{p.subLabel}</div>
+
                         <button type="button" className="apName" onClick={() => openProduct(p)}>
                           {p.name}
                         </button>
+
                         <div className="apPriceRow">
                           <div className="apPrice">{money(p.price)}</div>
                         </div>
+
+                        <button
+                          type="button"
+                          className="apAddBtn"
+                          onClick={() => addToCart(p)}
+                          disabled={p.status !== "active"}
+                        >
+                          {p.status === "active" ? "Add to Cart" : "Out of Stock"}
+                        </button>
                       </div>
                     </article>
                   ))}
@@ -305,19 +289,13 @@ export default function AllProduct() {
           )}
 
           <div className="apLoadMoreWrap">
-            <button
-              className="apLoadMore"
-              type="button"
-              onClick={loadMore}
-              disabled={!hasMore || loading || loadingMore}
-            >
+            <button className="apLoadMore" type="button" onClick={loadMore} disabled={!hasMore || loading || loadingMore}>
               {loadingMore ? "Loading..." : hasMore ? "Load More Products" : "No More Products"}
             </button>
           </div>
         </section>
       </main>
 
-      {/* TOASTS */}
       <div className="apToastWrap" aria-live="polite" aria-atomic="true">
         {toasts.map((t) => (
           <div key={t.id} className="apToast">{t.message}</div>

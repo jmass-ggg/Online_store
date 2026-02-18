@@ -289,84 +289,101 @@ body{
 .apFeedHead select:focus{
   box-shadow: 0 0 0 4px rgba(20,20,20,.08);
 }
-
-/* GRID */
 .apGrid{
   width: min(1200px, calc(100% - 36px));
   margin: 0 auto;
   display:grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 26px;
 }
+
+/* Card becomes clean (like footwear page) */
 .apCard{
-  background:#fff;
-  border: 1px solid var(--border);
-  border-radius: var(--r16);
-  overflow:hidden;
-  box-shadow: none;
-  transition: transform .25s ease, box-shadow .25s ease;
-}
-.apCard:hover{
-  transform: translateY(-6px);
-  box-shadow: var(--shadow);
-}
-
-.apMedia{
-  position:relative;
-  border:0;
-  background: var(--surface);
-  width:100%;
-  padding:0;
-  cursor:pointer;
-  display:block;
-  aspect-ratio: 4 / 5;
-  overflow:hidden;
-}
-.apMedia img{
-  width:100%;
-  height:100%;
-  object-fit: cover;
-  transition: transform .5s ease;
-  display:block;
-}
-.apCard:hover .apMedia img{ transform: scale(1.08); }
-
-.apBadge{
-  position:absolute;
-  top: 14px;
-  left: 14px;
-  background: var(--primary);
-  color:#fff;
-  font-size: 10px;
-  font-weight: 900;
-  padding: 6px 8px;
-  border-radius: 10px;
-}
-
-.apAdd{
-  position:absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 14px;
+  background: transparent;
   border: 0;
-  background: rgba(255,255,255,.92);
-  backdrop-filter: blur(10px);
-  color: var(--primary);
-  padding: 12px 10px;
-  border-radius: var(--r12);
-  font-weight: 900;
-  font-size: 13px;
-  cursor:pointer;
-  transform: translateY(10px);
-  opacity: 0;
-  transition: transform .25s ease, opacity .25s ease;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+  transition: none;
 }
-.apCard:hover .apAdd{
-  transform: translateY(0);
-  opacity: 1;
-}
-.apAdd:active{ transform: scale(.98); }
 
+/* Big square image box */
+.apMedia{
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border);
+  background: #f5f5f5;
+  padding: 28px;
+  cursor: pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* IMPORTANT: show full shoe (no crop) */
+.apMedia img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display:block;
+}
+
+/* Text section under image */
+.apInfo{
+  padding: 14px 2px 0;
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+}
+
+.apSub{
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Bigger name like your other page */
+.apName{
+  border:0;
+  background:transparent;
+  text-align:left;
+  font-weight: 800;
+  font-size: 15px;
+  cursor:pointer;
+  padding:0;
+}
+
+.apPriceRow{
+  display:flex;
+  align-items:baseline;
+  gap: 10px;
+}
+
+.apPrice{
+  font-weight: 900;
+  font-size: 18px;
+}
+
+/* Add to cart button under price */
+.apAddBtn{
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  cursor: pointer;
+  width: fit-content;
+}
+.apAddBtn:hover{
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.apAddBtn:disabled{
+  opacity: .5;
+  cursor: not-allowed;
+}
 .apInfo{
   padding: 14px 14px 16px;
   display:flex;
@@ -608,8 +625,8 @@ body{
   .apLinks{ display:flex; }
   .apCatGrid{ grid-template-columns: repeat(6, 1fr); }
   .apGrid{ grid-template-columns: repeat(2, 1fr); }
-  .apFootGrid{ grid-template-columns: repeat(4, 1fr); }
 }
+
 @media (min-width: 1024px){
-  .apGrid{ grid-template-columns: repeat(4, 1fr); }
+  .apGrid{ grid-template-columns: repeat(3, 1fr); }
 }
