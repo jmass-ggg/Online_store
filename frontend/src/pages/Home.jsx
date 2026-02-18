@@ -89,9 +89,10 @@ export default function Home() {
         </nav>
 
         <div className="logo-wrap">
-          <Link className="logo" to="/" aria-label="Home">
-            JAMES
-          </Link>
+          <Link className="logo" to="/products" aria-label="All Products">
+  JAMES
+</Link>
+
         </div>
 
         <div className="actions" role="group" aria-label="Quick actions">
@@ -173,10 +174,14 @@ export default function Home() {
             as it feels.
           </p>
 
-          <div className="btn-row">
-            <button className="btn">Shop now ///</button>
-            <button className="btn btn-outline">Learn more</button>
-          </div>
+          
+            <div className="btn-row">
+  <button className="btn" type="button" onClick={() => nav("/products")}>
+  Shop now ///
+</button>
+  <button className="btn btn-outline">Learn more</button>
+</div>
+
         </div>
       </main>
 

@@ -1,22 +1,15 @@
+// src/pages/AllProduct.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AllProduct.css";
+import { apiFetch, joinUrl } from "../api";
 
-/**
- * Backend:
- * - Default: /api/products?skip=0&limit=12
- * - You can set VITE_API_URL in .env (example: VITE_API_URL=http://localhost:8000)
- */
-const API_BASE = import.meta.env.VITE_API_URL || "";
-const PRODUCTS_ENDPOINT = `${API_BASE}/api/products`;
 const PAGE_SIZE = 12;
-
 const CART_KEY = "cart_items";
 
 function money(n) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    Number(n || 0)
-  );
+  const num = Number(n || 0);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
 }
 
 function safeJsonParse(value, fallback) {
@@ -27,225 +20,91 @@ function safeJsonParse(value, fallback) {
   }
 }
 
-function normalizeProduct(p) {
-  const id = p.id ?? p._id ?? crypto.randomUUID();
-  const name = p.product_name ?? p.name ?? p.title ?? "Untitled Product";
-  const price = Number(p.price ?? p.current_price ?? 0);
-  const oldPrice = Number(p.old_price ?? p.previous_price ?? 0);
-  const image =
-    p.image_url ??
-    p.image ??
-    (Array.isArray(p.images) ? p.images?.[0] : null) ??
-    "https://via.placeholder.com/800x800?text=Product";
-  const slug = p.url_slug ?? p.slug ?? String(id);
-  const category = p.product_category ?? p.category ?? "Other";
-  const createdAt = p.created_at ?? p.date ?? null;
+function makeId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
+function normalizeProduct(p) {
   return {
-    id,
-    name,
-    price,
-    oldPrice,
-    image,
-    slug,
-    category,
-    createdAt,
-    spotlight: Boolean(p.spotlight),
+    id: p?.id ?? makeId(),
+    name: p?.product_name ?? "Untitled Product",
+    slug: p?.url_slug ?? String(p?.id ?? makeId()),
+    category: p?.product_category ?? "Other",
+    price: Number(p?.default_price ?? 0),
+    image: joinUrl(p?.image_url || ""),
+    status: p?.status ?? "active",
   };
 }
-
-function discountPercent(price, oldPrice) {
-  if (!oldPrice || oldPrice <= price) return 0;
-  return Math.round(((oldPrice - price) / oldPrice) * 100);
-}
-
-// Fallback demo products (only used if API fails)
-const DEMO_PRODUCTS = [
-  {
-    id: "1",
-    name: "Signature Minimal Tee",
-    price: 45,
-    oldPrice: 60,
-    image:
-      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80",
-    slug: "signature-minimal-tee",
-    category: "Apparel",
-    spotlight: true,
-    createdAt: "2023-11-01",
-  },
-  {
-    id: "2",
-    name: "Aluminum Desk Lamp",
-    price: 120,
-    oldPrice: 0,
-    image:
-      "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=80",
-    slug: "aluminum-desk-lamp",
-    category: "Lifestyle",
-    spotlight: true,
-    createdAt: "2023-11-05",
-  },
-  {
-    id: "3",
-    name: "Cognac Leather Wallet",
-    price: 85,
-    oldPrice: 95,
-    image:
-      "https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=900&q=80",
-    slug: "cognac-leather-wallet",
-    category: "Accessories",
-    spotlight: true,
-    createdAt: "2023-10-20",
-  },
-  {
-    id: "4",
-    name: "Nylon Weekender Bag",
-    price: 180,
-    oldPrice: 210,
-    image:
-      "https://images.unsplash.com/photo-1547949003-9792a18a2601?auto=format&fit=crop&w=900&q=80",
-    slug: "nylon-weekender-bag",
-    category: "Accessories",
-    spotlight: true,
-    createdAt: "2023-11-12",
-  },
-  {
-    id: "5",
-    name: "Merino Wool Beanie",
-    price: 35,
-    oldPrice: 0,
-    image:
-      "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&w=900&q=80",
-    slug: "merino-wool-beanie",
-    category: "Apparel",
-    spotlight: true,
-    createdAt: "2023-11-02",
-  },
-  {
-    id: "6",
-    name: "Hardcover Journal",
-    price: 32,
-    oldPrice: 40,
-    image:
-      "https://images.unsplash.com/photo-1531346878377-a5be20888e57?auto=format&fit=crop&w=900&q=80",
-    slug: "hardcover-journal",
-    category: "Stationery",
-    spotlight: true,
-    createdAt: "2023-11-14",
-  },
-  {
-    id: "7",
-    name: "Stainless Water Bottle",
-    price: 40,
-    oldPrice: 0,
-    image:
-      "https://images.unsplash.com/photo-1602143399827-bd95951c3455?auto=format&fit=crop&w=900&q=80",
-    slug: "stainless-water-bottle",
-    category: "Lifestyle",
-    spotlight: true,
-    createdAt: "2023-11-15",
-  },
-  {
-    id: "8",
-    name: "Matte Black Pen",
-    price: 22,
-    oldPrice: 0,
-    image:
-      "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=900&q=80",
-    slug: "matte-black-pen",
-    category: "Stationery",
-    spotlight: false,
-    createdAt: "2023-11-04",
-  },
-];
 
 export default function AllProduct() {
   const navigate = useNavigate();
   const gridRef = useRef(null);
 
-  // Data state
   const [products, setProducts] = useState([]);
   const [hasMore, setHasMore] = useState(true);
 
-  // UI state
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorHint, setErrorHint] = useState("");
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentCategory, setCurrentCategory] = useState("All");
-  const [sortBy, setSortBy] = useState("newest"); // newest | price-low | price-high
+  const [serverCategory, setServerCategory] = useState("All");
+  const [sortBy, setSortBy] = useState("newest");
 
-  // Cart + toast
   const [cartCount, setCartCount] = useState(0);
   const [toasts, setToasts] = useState([]);
 
-  // Initial load
-  useEffect(() => {
-    let alive = true;
-
-    async function loadInitial() {
-      setLoading(true);
-      setErrorHint("");
-      try {
-        const url = new URL(PRODUCTS_ENDPOINT, window.location.origin);
-        url.searchParams.set("skip", "0");
-        url.searchParams.set("limit", String(PAGE_SIZE));
-
-        const res = await fetch(url.toString(), { credentials: "include" });
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.items ?? data.products ?? [];
-        const normalized = list.map(normalizeProduct);
-
-        if (!alive) return;
-
-        setProducts(normalized);
-        setHasMore(normalized.length >= PAGE_SIZE);
-      } catch (e) {
-        if (!alive) return;
-        setProducts(DEMO_PRODUCTS);
-        setHasMore(false);
-        setErrorHint("Using demo products (API not reachable). Set VITE_API_URL or verify /api/products.");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    }
-
-    loadInitial();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // Cart count from localStorage
+  // cart count
   useEffect(() => {
     const cart = safeJsonParse(localStorage.getItem(CART_KEY), []);
-    const total = (Array.isArray(cart) ? cart : []).reduce((acc, item) => acc + (item.quantity || 0), 0);
+    const total = (Array.isArray(cart) ? cart : []).reduce(
+      (acc, item) => acc + (item.quantity || 0),
+      0
+    );
     setCartCount(total);
   }, []);
+
+  async function fetchProducts({ reset }) {
+    try {
+      setErrorHint("");
+      if (reset) setLoading(true);
+
+      const skip = reset ? 0 : products.length;
+
+      // ✅ FastAPI route you confirmed: /product/
+      let path = `/product/?skip=${skip}&limit=${PAGE_SIZE}`;
+      if (serverCategory !== "All") path += `&category=${encodeURIComponent(serverCategory)}`;
+
+      const data = await apiFetch(path);
+      const list = Array.isArray(data) ? data : data?.items ?? [];
+      const normalized = list.map(normalizeProduct);
+
+      setProducts((prev) => (reset ? normalized : [...prev, ...normalized]));
+      setHasMore(normalized.length === PAGE_SIZE);
+    } catch (e) {
+      setProducts([]);
+      setHasMore(false);
+      setErrorHint(e?.message || "Failed to load products");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }
+
+  // initial + category change
+  useEffect(() => {
+    fetchProducts({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverCategory]);
 
   const categories = useMemo(() => {
     const set = new Set(products.map((p) => p.category).filter(Boolean));
     return ["All", ...Array.from(set)];
   }, [products]);
 
-  const spotlight = useMemo(() => {
-    const flagged = products.filter((p) => p.spotlight);
-    if (flagged.length >= 6) return flagged.slice(0, 8);
-    return products.slice(0, 8);
-  }, [products]);
-
   const filteredProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-
     let list = products;
-
-    if (currentCategory !== "All") {
-      list = list.filter((p) => p.category === currentCategory);
-    }
 
     if (q) {
       list = list.filter((p) => {
@@ -255,35 +114,20 @@ export default function AllProduct() {
       });
     }
 
-    // sort
-    if (sortBy === "price-low") {
-      list = [...list].sort((a, b) => a.price - b.price);
-    } else if (sortBy === "price-high") {
-      list = [...list].sort((a, b) => b.price - a.price);
-    } else {
-      // newest
-      list = [...list].sort((a, b) => {
-        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return db - da;
-      });
-    }
+    if (sortBy === "price-low") return [...list].sort((a, b) => a.price - b.price);
+    if (sortBy === "price-high") return [...list].sort((a, b) => b.price - a.price);
+    return list; // newest = backend order
+  }, [products, searchQuery, sortBy]);
 
-    return list;
-  }, [products, currentCategory, searchQuery, sortBy]);
-
-  const resultCountText = useMemo(() => {
-    if (!searchQuery && currentCategory === "All") return `Showing ${filteredProducts.length} items`;
-    return `Showing ${filteredProducts.length} items (filtered)`;
-  }, [filteredProducts.length, searchQuery, currentCategory]);
+  const resultCountText = useMemo(
+    () => `Showing ${filteredProducts.length} items`,
+    [filteredProducts.length]
+  );
 
   function showToast(message) {
-    const id = crypto.randomUUID();
+    const id = makeId();
     setToasts((prev) => [...prev, { id, message }]);
-
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2800);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2400);
   }
 
   function addToCart(product) {
@@ -291,27 +135,21 @@ export default function AllProduct() {
     const list = Array.isArray(cart) ? cart : [];
 
     const existing = list.find((i) => String(i.id) === String(product.id));
-    if (existing) {
-      existing.quantity = (existing.quantity || 1) + 1;
-    } else {
-      // Store in a shape that works with your Cart page
+    if (existing) existing.quantity = (existing.quantity || 1) + 1;
+    else {
       list.push({
         id: product.id,
         productName: product.name,
         price: product.price,
-        oldPrice: product.oldPrice || 0,
         imageUrl: product.image,
-        url_slug: product.slug,
-        product_category: product.category,
         quantity: 1,
-        inStock: true,
+        inStock: product.status === "active",
       });
     }
 
     localStorage.setItem(CART_KEY, JSON.stringify(list));
-    const total = list.reduce((acc, item) => acc + (item.quantity || 0), 0);
-    setCartCount(total);
-    showToast(`${product.name} added to cart!`);
+    setCartCount(list.reduce((acc, item) => acc + (item.quantity || 0), 0));
+    showToast(`${product.name} added to cart`);
   }
 
   function openProduct(p) {
@@ -322,39 +160,14 @@ export default function AllProduct() {
     navigate("/cart");
   }
 
-  function resetFilters() {
-    setCurrentCategory("All");
-    setSearchQuery("");
-    setSortBy("newest");
+  function scrollToGrid() {
+    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function loadMore() {
-    if (!hasMore || loadingMore) return;
-
+    if (!hasMore || loadingMore || loading) return;
     setLoadingMore(true);
-    try {
-      const url = new URL(PRODUCTS_ENDPOINT, window.location.origin);
-      url.searchParams.set("skip", String(products.length));
-      url.searchParams.set("limit", String(PAGE_SIZE));
-
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) throw new Error(`Fetch more failed: ${res.status}`);
-
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data.items ?? data.products ?? [];
-      const normalized = list.map(normalizeProduct);
-
-      setProducts((prev) => [...prev, ...normalized]);
-      setHasMore(normalized.length >= PAGE_SIZE);
-    } catch {
-      setHasMore(false);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  function scrollToGrid() {
-    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    await fetchProducts({ reset: false });
   }
 
   return (
@@ -373,12 +186,7 @@ export default function AllProduct() {
         </div>
 
         <button className="apCartBtn" type="button" onClick={goCart} aria-label="Open cart">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M16 10a4 4 0 0 1-8 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="apCartCount">{cartCount}</span>
+          👜 <span className="apCartCount">{cartCount}</span>
         </button>
       </nav>
 
@@ -391,12 +199,7 @@ export default function AllProduct() {
           </p>
 
           <div className="apSearchWrap">
-            <span className="apSearchIcon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.5" />
-                <path d="m21 21-4.3-4.3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </span>
+            <span className="apSearchIcon" aria-hidden="true">🔎</span>
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -408,43 +211,6 @@ export default function AllProduct() {
           {errorHint ? <div className="apHint">{errorHint}</div> : null}
         </section>
 
-        {/* SPOTLIGHT */}
-        <section className="apSpotlight">
-          <div className="apSectionHead">
-            <div>
-              <h2>Spotlight</h2>
-              <p>Hand-picked favorites of the week</p>
-            </div>
-            <button className="apLink" type="button" onClick={scrollToGrid}>
-              View All
-            </button>
-          </div>
-
-          <div className="apSpotRow">
-            {loading ? (
-              Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="apSpotItem skeletonBox" />
-              ))
-            ) : (
-              spotlight.map((p) => (
-                <button
-                  key={p.id}
-                  className="apSpotItem"
-                  type="button"
-                  onClick={() => openProduct(p)}
-                  aria-label={`Open ${p.name}`}
-                >
-                  <div className="apSpotImg">
-                    <img src={p.image} alt={p.name} />
-                  </div>
-                  <div className="apSpotName" title={p.name}>{p.name}</div>
-                  <div className="apSpotPrice">{money(p.price)}</div>
-                </button>
-              ))
-            )}
-          </div>
-        </section>
-
         {/* CATEGORIES */}
         <section className="apCats">
           <h3>Shop by Category</h3>
@@ -453,9 +219,9 @@ export default function AllProduct() {
               <button
                 key={cat}
                 type="button"
-                className={`apCatTile ${currentCategory === cat ? "active" : ""}`}
+                className={`apCatTile ${serverCategory === cat ? "active" : ""}`}
                 onClick={() => {
-                  setCurrentCategory(cat);
+                  setServerCategory(cat);
                   scrollToGrid();
                 }}
               >
@@ -484,20 +250,10 @@ export default function AllProduct() {
             </select>
           </div>
 
-          {/* Empty state */}
           {!loading && filteredProducts.length === 0 ? (
             <div className="apEmpty">
-              <div className="apEmptyIcon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
-                  <path d="m21 21-4.3-4.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </div>
               <h4>No results found</h4>
-              <p>Try adjusting your search or filters to find what you're looking for.</p>
-              <button className="apClear" type="button" onClick={resetFilters}>
-                Clear all filters
-              </button>
+              <p>Try adjusting your search.</p>
             </div>
           ) : (
             <div className="apGrid">
@@ -510,46 +266,41 @@ export default function AllProduct() {
                       <div className="skeletonText w50" />
                     </div>
                   ))
-                : filteredProducts.map((p) => {
-                    const off = discountPercent(p.price, p.oldPrice);
-                    return (
-                      <article key={p.id} className="apCard">
+                : filteredProducts.map((p) => (
+                    <article key={p.id} className="apCard">
+                      <div
+                        className="apMedia"
+                        onClick={() => openProduct(p)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") openProduct(p);
+                        }}
+                      >
+                        <img src={p.image} alt={p.name} />
                         <button
                           type="button"
-                          className="apMedia"
-                          onClick={() => openProduct(p)}
-                          aria-label={`Open ${p.name}`}
+                          className="apAdd"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p);
+                          }}
                         >
-                          <img src={p.image} alt={p.name} />
-                          {off > 0 ? <span className="apBadge">-{off}%</span> : null}
-                          <button
-                            type="button"
-                            className="apAdd"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addToCart(p);
-                            }}
-                          >
-                            Add to Cart
-                          </button>
+                          Add to Cart
                         </button>
+                      </div>
 
-                        <div className="apInfo">
-                          <div className="apCat">{p.category}</div>
-                          <button type="button" className="apName" onClick={() => openProduct(p)}>
-                            {p.name}
-                          </button>
-
-                          <div className="apPriceRow">
-                            <div className="apPrice">{money(p.price)}</div>
-                            {p.oldPrice && p.oldPrice > p.price ? (
-                              <div className="apOld">{money(p.oldPrice)}</div>
-                            ) : null}
-                          </div>
+                      <div className="apInfo">
+                        <div className="apCat">{p.category}</div>
+                        <button type="button" className="apName" onClick={() => openProduct(p)}>
+                          {p.name}
+                        </button>
+                        <div className="apPriceRow">
+                          <div className="apPrice">{money(p.price)}</div>
                         </div>
-                      </article>
-                    );
-                  })}
+                      </div>
+                    </article>
+                  ))}
             </div>
           )}
 
@@ -566,54 +317,10 @@ export default function AllProduct() {
         </section>
       </main>
 
-      {/* FOOTER */}
-      <footer className="apFooter">
-        <div className="apFootGrid">
-          <div>
-            <div className="apFootBrand">JAMES</div>
-            <p className="apFootText">
-              Defining the standard of modern retail through thoughtful design and premium quality.
-            </p>
-          </div>
-
-          <div>
-            <div className="apFootTitle">Shop</div>
-            <ul>
-              <li><button type="button" onClick={scrollToGrid}>New Arrivals</button></li>
-              <li><button type="button" onClick={scrollToGrid}>Best Sellers</button></li>
-              <li><button type="button" onClick={scrollToGrid}>Gift Cards</button></li>
-            </ul>
-          </div>
-
-          <div>
-            <div className="apFootTitle">Support</div>
-            <ul>
-              <li><button type="button">Order Tracking</button></li>
-              <li><button type="button">Shipping Policy</button></li>
-              <li><button type="button">Returns & Exchanges</button></li>
-            </ul>
-          </div>
-
-          <div>
-            <div className="apFootTitle">Connect</div>
-            <div className="apSocial">
-              <button type="button">IG</button>
-              <button type="button">TW</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="apCopy">
-          © {new Date().getFullYear()} JAMES. All rights reserved.
-        </div>
-      </footer>
-
       {/* TOASTS */}
       <div className="apToastWrap" aria-live="polite" aria-atomic="true">
         {toasts.map((t) => (
-          <div key={t.id} className="apToast">
-            {t.message}
-          </div>
+          <div key={t.id} className="apToast">{t.message}</div>
         ))}
       </div>
     </div>
