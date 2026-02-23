@@ -306,27 +306,41 @@ body{
   box-shadow: none;
   transition: none;
 }
-
+.apCard:hover .apMedia img{
+  transform: scale(1.03);     /* same hover zoom as Shoes.css */
+}
 /* Big square image box */
+/* === Same image display as Shoes.css (.plp-media) === */
 .apMedia{
   width: 100%;
   aspect-ratio: 1 / 1;
-  border: 1px solid var(--border);
   background: #f5f5f5;
-  padding: 28px;
+  overflow: hidden;
+  position: relative;
+
+  display: grid;
+  place-items: center;
+
+  padding: 10px;              /* same as Shoes.css */
+  border: 1px solid var(--border);
   cursor: pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+
+  /* because apMedia is a button */
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 0;
 }
 
-/* IMPORTANT: show full shoe (no crop) */
 .apMedia img{
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  display:block;
+  object-fit: cover;          /* SAME as Shoes.css (covers the box) */
+  object-position: center;
+  display: block;
+
+  transition: transform .25s ease;
 }
+
 
 /* Text section under image */
 .apInfo{
