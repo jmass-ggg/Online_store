@@ -1,18 +1,46 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Payment.css";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const CHECKOUT_CTX_KEY = "checkout_context";
 
 const Payment = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [selectedMethod, setSelectedMethod] = useState("esewa");
   const [search, setSearch] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const profileRef = useRef(null);
 
-  const subtotal = 1000004.5;
-  const codFee = selectedMethod === "cod" ? subtotal * 0.02 : 0;
-  const totalAmount = useMemo(() => subtotal + codFee, [subtotal, codFee]);
+  const checkoutContext = useMemo(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(CHECKOUT_CTX_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const orderId = String(
+    location.state?.orderId ||
+      localStorage.getItem("current_order_id") ||
+      checkoutContext?.order_id ||
+      ""
+  );
+
+  const itemsTotal = Number(checkoutContext?.totals?.itemsTotal || 0);
+  const deliveryFee = Number(checkoutContext?.totals?.deliveryFee || 0);
+  const baseTotal = Number(
+    location.state?.totalAmount ||
+      sessionStorage.getItem("current_order_total") ||
+      checkoutContext?.totals?.total ||
+      0
+  );
+
+  const codFee = selectedMethod === "cod" ? Number((baseTotal * 0.02).toFixed(2)) : 0;
+  const totalAmount = useMemo(() => baseTotal + codFee, [baseTotal, codFee]);
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -37,30 +65,6 @@ const Payment = () => {
     };
   }, []);
 
-  const handleConfirmPayment = () => {
-    if (!selectedMethod) {
-      alert("Please select a payment method");
-      return;
-    }
-
-    if (selectedMethod === "esewa") {
-      alert("Redirecting to eSewa...");
-      return;
-    }
-
-    if (selectedMethod === "cod") {
-      alert("Order confirmed with Cash on Delivery");
-      return;
-    }
-
-    if (selectedMethod === "khalti") {
-      alert("Redirecting to Khalti by IME...");
-      return;
-    }
-
-    alert("Proceeding to card payment...");
-  };
-
   const go = (path) => {
     setProfileOpen(false);
     navigate(path);
@@ -72,6 +76,43 @@ const Payment = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("refresh_token");
     navigate("/login");
+  };
+
+  const handleEsewaPayment = () => {
+    if (!orderId) {
+      alert("Order ID not found. Please go back to checkout.");
+      return;
+    }
+
+    setLoading(true);
+
+    window.location.assign(
+      `${API_BASE_URL}/payments/esewa/initiate?order_id=${encodeURIComponent(orderId)}`
+    );
+  };
+
+  const handleConfirmPayment = () => {
+    if (!selectedMethod) {
+      alert("Please select a payment method");
+      return;
+    }
+
+    if (selectedMethod === "esewa") {
+      handleEsewaPayment();
+      return;
+    }
+
+    if (selectedMethod === "cod") {
+      alert("Order confirmed with Cash on Delivery");
+      return;
+    }
+
+    if (selectedMethod === "khalti") {
+      alert("Khalti payment integration not connected yet.");
+      return;
+    }
+
+    alert("Card payment integration not connected yet.");
   };
 
   return (
@@ -111,11 +152,7 @@ const Payment = () => {
               🛒
             </button>
 
-            <button
-              className="payment-icon-btn"
-              type="button"
-              title="Notifications"
-            >
+            <button className="payment-icon-btn" type="button" title="Notifications">
               🔔
             </button>
 
@@ -183,9 +220,7 @@ const Payment = () => {
           <div className="payment-left">
             <div className="payment-method-tabs">
               <button
-                className={`payment-method-tab ${
-                  selectedMethod === "card" ? "active" : ""
-                }`}
+                className={`payment-method-tab ${selectedMethod === "card" ? "active" : ""}`}
                 onClick={() => setSelectedMethod("card")}
                 type="button"
               >
@@ -197,9 +232,7 @@ const Payment = () => {
               </button>
 
               <button
-                className={`payment-method-tab ${
-                  selectedMethod === "esewa" ? "active" : ""
-                }`}
+                className={`payment-method-tab ${selectedMethod === "esewa" ? "active" : ""}`}
                 onClick={() => setSelectedMethod("esewa")}
                 type="button"
               >
@@ -211,9 +244,7 @@ const Payment = () => {
               </button>
 
               <button
-                className={`payment-method-tab ${
-                  selectedMethod === "khalti" ? "active" : ""
-                }`}
+                className={`payment-method-tab ${selectedMethod === "khalti" ? "active" : ""}`}
                 onClick={() => setSelectedMethod("khalti")}
                 type="button"
               >
@@ -225,9 +256,7 @@ const Payment = () => {
               </button>
 
               <button
-                className={`payment-method-tab ${
-                  selectedMethod === "cod" ? "active" : ""
-                }`}
+                className={`payment-method-tab ${selectedMethod === "cod" ? "active" : ""}`}
                 onClick={() => setSelectedMethod("cod")}
                 type="button"
               >
@@ -247,11 +276,7 @@ const Payment = () => {
               {selectedMethod === "esewa" && (
                 <div className="payment-detail-content">
                   <div className="detail-head">
-                    <img
-                      src="/eswea.png"
-                      alt="eSewa"
-                      className="detail-brand-logo"
-                    />
+                    <img src="/eswea.png" alt="eSewa" className="detail-brand-logo" />
                     <div>
                       <h3>Pay with eSewa</h3>
                       <p>Fast and secure wallet payment</p>
@@ -259,17 +284,12 @@ const Payment = () => {
                   </div>
 
                   <p className="detail-intro">
-                    You will be redirected to your eSewa account to complete your
-                    payment:
+                    You will be redirected to your eSewa account to complete your payment:
                   </p>
 
                   <ol className="detail-list ordered">
-                    <li>
-                      Login to your eSewa account using your eSewa ID and password.
-                    </li>
-                    <li>
-                      Make sure your account is active and has sufficient balance.
-                    </li>
+                    <li>Login to your eSewa account using your eSewa ID and password.</li>
+                    <li>Make sure your account is active and has sufficient balance.</li>
                     <li>Enter OTP sent to your registered mobile number.</li>
                   </ol>
 
@@ -281,8 +301,9 @@ const Payment = () => {
                     className="detail-action-btn"
                     type="button"
                     onClick={handleConfirmPayment}
+                    disabled={loading || !orderId}
                   >
-                    Pay Now
+                    {loading ? "Redirecting..." : "Pay Now"}
                   </button>
                 </div>
               )}
@@ -302,20 +323,10 @@ const Payment = () => {
                   </div>
 
                   <ul className="detail-list">
-                    <li>
-                      You may pay in cash to our courier upon receiving your parcel
-                      at the doorstep.
-                    </li>
-                    <li>
-                      A 2% cash handling fee is applied for Cash on Delivery orders.
-                    </li>
-                    <li>
-                      Before receiving the parcel, confirm the delivery status is
-                      updated.
-                    </li>
-                    <li>
-                      Check the parcel details before making payment to the courier.
-                    </li>
+                    <li>You may pay in cash to our courier upon receiving your parcel.</li>
+                    <li>A 2% cash handling fee is applied for Cash on Delivery orders.</li>
+                    <li>Before receiving the parcel, confirm the delivery status is updated.</li>
+                    <li>Check the parcel details before making payment to the courier.</li>
                   </ul>
 
                   <button
@@ -343,17 +354,9 @@ const Payment = () => {
                   </p>
 
                   <ul className="detail-list">
-                    <li>
-                      Enter your card number, expiry date, and CVV on the next
-                      screen.
-                    </li>
-                    <li>
-                      Your payment will be processed through a secure checkout
-                      gateway.
-                    </li>
-                    <li>
-                      Please make sure your card supports online transactions.
-                    </li>
+                    <li>Enter your card number, expiry date, and CVV on the next screen.</li>
+                    <li>Your payment will be processed through a secure checkout gateway.</li>
+                    <li>Please make sure your card supports online transactions.</li>
                   </ul>
 
                   <button
@@ -369,20 +372,14 @@ const Payment = () => {
               {selectedMethod === "khalti" && (
                 <div className="payment-detail-content">
                   <div className="detail-head">
-                    <img
-                      src="/ime.png"
-                      alt="Khalti by IME"
-                      className="detail-brand-logo"
-                    />
+                    <img src="/ime.png" alt="Khalti by IME" className="detail-brand-logo" />
                     <div>
                       <h3>Khalti by IME</h3>
                       <p>Wallet payment option</p>
                     </div>
                   </div>
 
-                  <p className="detail-intro">
-                    Pay quickly using your Khalti wallet.
-                  </p>
+                  <p className="detail-intro">Pay quickly using your Khalti wallet.</p>
 
                   <ul className="detail-list">
                     <li>Login to your Khalti wallet account.</li>
@@ -406,8 +403,18 @@ const Payment = () => {
             <h3>Order Summary</h3>
 
             <div className="summary-line">
-              <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>Order ID</span>
+              <span>{orderId || "N/A"}</span>
+            </div>
+
+            <div className="summary-line">
+              <span>Items Total</span>
+              <span>${itemsTotal.toFixed(2)}</span>
+            </div>
+
+            <div className="summary-line">
+              <span>Delivery Fee</span>
+              <span>${deliveryFee.toFixed(2)}</span>
             </div>
 
             {selectedMethod === "cod" && (
@@ -428,8 +435,11 @@ const Payment = () => {
               className="summary-main-btn"
               type="button"
               onClick={handleConfirmPayment}
+              disabled={loading || !orderId}
             >
-              {selectedMethod === "esewa"
+              {loading
+                ? "PLEASE WAIT..."
+                : selectedMethod === "esewa"
                 ? "PROCEED TO ESEWA"
                 : selectedMethod === "cod"
                 ? "CONFIRM ORDER"

@@ -5,7 +5,6 @@ import { apiFetch, joinUrl } from "../api";
 
 const CART_KEY = "cart_items";
 const BUY_NOW_KEY = "buy_now_item";
-
 const CHECKOUT_CTX_KEY = "checkout_context";
 
 function money(n) {
@@ -25,10 +24,14 @@ function readLocalCartArray() {
 function readLocalMapByVariantId() {
   const arr = readLocalCartArray();
   const map = new Map();
+
   for (const x of arr) {
     const vid = Number(x?.variant_id ?? x?.variantId ?? x?.id);
-    if (Number.isFinite(vid)) map.set(vid, x);
+    if (Number.isFinite(vid)) {
+      map.set(vid, x);
+    }
   }
+
   return map;
 }
 
@@ -130,7 +133,9 @@ function jitterCoord(base, maxDelta = 0.03) {
 function parseLine2(line2) {
   const s = String(line2 || "").trim();
   if (!s) return { zone: "", city: "", landmark: "" };
+
   const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+
   return {
     zone: parts[0] || "",
     city: parts[1] || "",
@@ -144,7 +149,6 @@ export default function Checkout() {
 
   const isBuyNowMode = new URLSearchParams(location.search).get("mode") === "buy_now";
 
-  // ---------------- Form state ----------------
   const [fullName, setFullName] = useState("");
   const [countryCode, setCountryCode] = useState("+977");
   const [phone, setPhone] = useState("");
@@ -157,22 +161,23 @@ export default function Checkout() {
   const [postalCode, setPostalCode] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
   const [loadingAddress, setLoadingAddress] = useState(false);
+  const [loadingOrder, setLoadingOrder] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const [savedAddress, setSavedAddress] = useState(null);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
-
-  // ---------------- Order Items ----------------
   const [orderItems, setOrderItems] = useState([]);
-  const [loadingOrder, setLoadingOrder] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     const bump = () => setRefreshTick((t) => t + 1);
+
     window.addEventListener("cart:updated", bump);
     window.addEventListener("storage", bump);
     window.addEventListener("buy_now:updated", bump);
+
     return () => {
       window.removeEventListener("cart:updated", bump);
       window.removeEventListener("storage", bump);
@@ -180,23 +185,22 @@ export default function Checkout() {
     };
   }, []);
 
-  // ---------------- Load addresses ----------------
   useEffect(() => {
     let cancelled = false;
 
     async function loadAddresses() {
       setLoadingAddress(true);
       setErrorMsg("");
+
       try {
         const list = await apiFetch("/addresses/");
         if (cancelled) return;
 
         const arr = Array.isArray(list) ? list : [];
         const newest = arr.length ? arr[0] : null;
-        setSavedAddress(newest);
 
-        if (newest) setIsEditingAddress(false);
-        else setIsEditingAddress(true);
+        setSavedAddress(newest);
+        setIsEditingAddress(!newest);
       } catch (e) {
         if (!cancelled) setErrorMsg(formatApiError(e));
       } finally {
@@ -205,12 +209,12 @@ export default function Checkout() {
     }
 
     loadAddresses();
+
     return () => {
       cancelled = true;
     };
   }, [refreshTick]);
 
-  // ---------------- Load items ----------------
   useEffect(() => {
     let cancelled = false;
 
@@ -220,6 +224,7 @@ export default function Checkout() {
 
       if (isBuyNowMode) {
         const bn = readBuyNow();
+
         if (!bn) {
           if (!cancelled) setOrderItems([]);
           setLoadingOrder(false);
@@ -240,11 +245,13 @@ export default function Checkout() {
             },
           ]);
         }
+
         setLoadingOrder(false);
         return;
       }
 
       const localMap = readLocalMapByVariantId();
+
       try {
         const cart = await apiFetch("/cart/me");
         if (cancelled) return;
@@ -272,6 +279,7 @@ export default function Checkout() {
     }
 
     loadOrder();
+
     return () => {
       cancelled = true;
     };
@@ -290,9 +298,18 @@ export default function Checkout() {
   const deliveryFee = 4.5;
   const total = Math.max(0, itemsTotal + (itemsCount > 0 ? deliveryFee : 0));
 
-  const provinceObj = useMemo(() => NEPAL.provinces.find((p) => p.name === province) || null, [province]);
+  const provinceObj = useMemo(
+    () => NEPAL.provinces.find((p) => p.name === province) || null,
+    [province]
+  );
+
   const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
-  const cityObj = useMemo(() => cityOptions.find((c) => c.name === city) || null, [cityOptions, city]);
+
+  const cityObj = useMemo(
+    () => cityOptions.find((c) => c.name === city) || null,
+    [cityOptions, city]
+  );
+
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
 
   useEffect(() => {
@@ -307,6 +324,7 @@ export default function Checkout() {
   function startEdit() {
     if (savedAddress) {
       setFullName(savedAddress.full_name || "");
+
       const pn = String(savedAddress.phone_number || "");
       if (pn.startsWith("+977")) {
         setCountryCode("+977");
@@ -364,7 +382,7 @@ export default function Checkout() {
       region: province,
       line1: addressLine.trim(),
       line2: `${zone}, ${city}${landmark.trim() ? `, ${landmark.trim()}` : ""}`,
-      postal_code: postalCode.trim() ? postalCode.trim() : null,
+      postal_code: postalCode.trim() || null,
       country: "Nepal",
       latitude: jitterCoord(baseLat, 0.05),
       longitude: jitterCoord(baseLng, 0.05),
@@ -373,6 +391,7 @@ export default function Checkout() {
     };
 
     setSaving(true);
+
     try {
       const saved = await apiFetch("/addresses/", {
         method: "POST",
@@ -389,20 +408,27 @@ export default function Checkout() {
     }
   }
 
-  function proceedToPay() {
+  async function proceedToPay() {
     setErrorMsg("");
 
-    if (!savedAddress) return setErrorMsg("Please save a shipping address to proceed.");
-    if (itemsCount <= 0) return setErrorMsg("No items to checkout.");
+    if (!savedAddress) {
+      setErrorMsg("Please save a shipping address to proceed.");
+      return;
+    }
+
+    if (itemsCount <= 0) {
+      setErrorMsg("No items to checkout.");
+      return;
+    }
 
     const checkoutContext = {
       mode: isBuyNowMode ? "BUY_NOW" : "CART",
       address_id: savedAddress.id,
-      address: savedAddress, 
+      address: savedAddress,
       items: orderItems.map((x) => ({
-        variant_id: x.variant_id,
-        quantity: x.quantity,
-        price: x.price,
+        variant_id: Number(x.variant_id),
+        quantity: Number(x.quantity),
+        price: Number(x.price),
         product_name: x.product_name,
         image_url: x.image_url,
         size: x.size,
@@ -416,7 +442,44 @@ export default function Checkout() {
     };
 
     sessionStorage.setItem(CHECKOUT_CTX_KEY, JSON.stringify(checkoutContext));
-    navigate("/payment");
+
+    setPlacingOrder(true);
+
+    try {
+      // Change "/orders/" only if your create-order backend route is different
+      const createdOrder = await apiFetch("/orders/", {
+        method: "POST",
+        body: JSON.stringify({
+          address_id: savedAddress.id,
+          mode: isBuyNowMode ? "BUY_NOW" : "CART",
+          items: orderItems.map((x) => ({
+            variant_id: Number(x.variant_id),
+            quantity: Number(x.quantity),
+          })),
+        }),
+      });
+
+      const nextOrderId = createdOrder?.id ?? createdOrder?.order_id;
+      const nextTotal = Number(createdOrder?.total_price ?? total);
+
+      if (!nextOrderId) {
+        throw new Error("Order created, but order id was not returned.");
+      }
+
+      localStorage.setItem("current_order_id", String(nextOrderId));
+      sessionStorage.setItem("current_order_total", String(nextTotal));
+
+      navigate("/payment", {
+        state: {
+          orderId: nextOrderId,
+          totalAmount: nextTotal,
+        },
+      });
+    } catch (e) {
+      setErrorMsg(formatApiError(e));
+    } finally {
+      setPlacingOrder(false);
+    }
   }
 
   const canProceed = itemsCount > 0 && !!savedAddress;
@@ -466,7 +529,6 @@ export default function Checkout() {
         </div>
 
         <div className="ck-grid">
-          {/* LEFT */}
           <section className="ck-card ck-left">
             <div className="ck-cardHeader">
               <div className="ck-step">
@@ -505,7 +567,6 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Products under address */}
             <div className="ck-itemsUnderAddress">
               <div className="ck-itemsHead">
                 <div className="ck-itemsTitle">Package 1 of 1</div>
@@ -517,22 +578,29 @@ export default function Checkout() {
               <div className="ck-itemsBody">
                 {loadingOrder && <div className="ck-hint">Loading items…</div>}
 
-                {!loadingOrder && orderItems.length === 0 && <div className="ck-hint">No items to show.</div>}
+                {!loadingOrder && orderItems.length === 0 && (
+                  <div className="ck-hint">No items to show.</div>
+                )}
 
                 {!loadingOrder &&
                   orderItems.map((it) => {
                     const src = joinUrl(it.image_url || "") || "/shoes.jpg";
+
                     return (
                       <div className="ck-itemRow" key={`left_${it.id}`}>
                         <img
                           className="ck-itemImg"
                           src={src}
                           alt={it.product_name || "Product"}
-                          onError={(e) => (e.currentTarget.src = "/shoes.jpg")}
+                          onError={(e) => {
+                            e.currentTarget.src = "/shoes.jpg";
+                          }}
                         />
 
                         <div className="ck-itemInfo">
-                          <div className="ck-itemName">{it.product_name ? it.product_name : `Variant #${it.variant_id}`}</div>
+                          <div className="ck-itemName">
+                            {it.product_name || `Variant #${it.variant_id}`}
+                          </div>
 
                           <div className="ck-itemMeta">
                             {it.size ? <span>Size: {it.size}</span> : null}
@@ -540,29 +608,44 @@ export default function Checkout() {
                           </div>
                         </div>
 
-                        <div className="ck-itemPrice">{money(Number(it.price) * Number(it.quantity))}</div>
+                        <div className="ck-itemPrice">
+                          {money(Number(it.price) * Number(it.quantity))}
+                        </div>
                       </div>
                     );
                   })}
               </div>
             </div>
 
-            {/* Address form */}
             {(isEditingAddress || !savedAddress) && (
               <>
                 <div className="ck-formGrid">
                   <div className="ck-field">
                     <label>Full Name</label>
-                    <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. James Gurung" />
+                    <input
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g. James Gurung"
+                    />
                   </div>
 
                   <div className="ck-field">
                     <label>Phone Number</label>
                     <div className="ck-phoneRow">
-                      <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} aria-label="Country code">
+                      <select
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                        aria-label="Country code"
+                      >
                         <option value="+977">+977</option>
                       </select>
-                      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98XXXXXXXX" inputMode="numeric" />
+
+                      <input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="98XXXXXXXX"
+                        inputMode="numeric"
+                      />
                     </div>
                   </div>
                 </div>
@@ -582,7 +665,11 @@ export default function Checkout() {
 
                   <div className="ck-field">
                     <label>City</label>
-                    <select value={city} onChange={(e) => setCity(e.target.value)} disabled={!province}>
+                    <select
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      disabled={!province}
+                    >
                       <option value="">Please choose your city</option>
                       {cityOptions.map((c) => (
                         <option key={c.name} value={c.name}>
@@ -594,7 +681,11 @@ export default function Checkout() {
 
                   <div className="ck-field">
                     <label>Zone</label>
-                    <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={!city}>
+                    <select
+                      value={zone}
+                      onChange={(e) => setZone(e.target.value)}
+                      disabled={!city}
+                    >
                       <option value="">Please choose your zone</option>
                       {zoneOptions.map((z) => (
                         <option key={z} value={z}>
@@ -606,17 +697,29 @@ export default function Checkout() {
 
                   <div className="ck-field">
                     <label>Landmark (Optional)</label>
-                    <input value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="e.g. beside train station" />
+                    <input
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="e.g. beside train station"
+                    />
                   </div>
 
                   <div className="ck-field ck-fieldFull">
                     <label>Address</label>
-                    <input value={addressLine} onChange={(e) => setAddressLine(e.target.value)} placeholder="Please enter your address" />
+                    <input
+                      value={addressLine}
+                      onChange={(e) => setAddressLine(e.target.value)}
+                      placeholder="Please enter your address"
+                    />
                   </div>
 
                   <div className="ck-field">
                     <label>Postal Code (Optional)</label>
-                    <input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="44600" />
+                    <input
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder="44600"
+                    />
                   </div>
                 </div>
 
@@ -624,21 +727,33 @@ export default function Checkout() {
 
                 <div className="ck-footerRow" style={{ gap: 10 }}>
                   {savedAddress && (
-                    <button className="ck-secondary" type="button" onClick={cancelEdit} disabled={saving}>
+                    <button
+                      className="ck-secondary"
+                      type="button"
+                      onClick={cancelEdit}
+                      disabled={saving}
+                    >
                       CANCEL
                     </button>
                   )}
-                  <button className="ck-primary" type="button" onClick={saveAddress} disabled={saving}>
+
+                  <button
+                    className="ck-primary"
+                    type="button"
+                    onClick={saveAddress}
+                    disabled={saving}
+                  >
                     {saving ? "SAVING..." : "SAVE ADDRESS"}
                   </button>
                 </div>
               </>
             )}
 
-            {!isEditingAddress && savedAddress && errorMsg && <div className="ck-error">{errorMsg}</div>}
+            {!isEditingAddress && savedAddress && errorMsg && (
+              <div className="ck-error">{errorMsg}</div>
+            )}
           </section>
 
-          {/* RIGHT */}
           <aside className="ck-card ck-right">
             <h3 className="ck-h3">Order Detail</h3>
 
@@ -661,7 +776,7 @@ export default function Checkout() {
                 orderItems.map((it) => (
                   <div className="ck-line" key={it.id}>
                     <span>
-                      {it.product_name ? it.product_name : `Variant #${it.variant_id}`}
+                      {it.product_name || `Variant #${it.variant_id}`}
                       {it.size ? ` (${it.size})` : ""} × {it.quantity}
                     </span>
                     <span>{money(Number(it.price) * Number(it.quantity))}</span>
@@ -692,9 +807,13 @@ export default function Checkout() {
               <div className="ck-vat">VAT included where applicable</div>
             </div>
 
-            {/* ✅ now goes to /payment */}
-            <button className="ck-pay" type="button" disabled={!canProceed} onClick={proceedToPay}>
-              PROCEED TO PAY
+            <button
+              className="ck-pay"
+              type="button"
+              disabled={!canProceed || placingOrder}
+              onClick={proceedToPay}
+            >
+              {placingOrder ? "CREATING ORDER..." : "PROCEED TO PAY"}
             </button>
 
             {!savedAddress && (
