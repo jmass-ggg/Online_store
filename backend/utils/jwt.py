@@ -72,8 +72,6 @@ def verify_token(token: str) -> dict:
     except JWTError:
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
 
-
-
 def create_refresh_token(db: Session, user_id: int, role: str) -> str:
     raw = secrets.token_urlsafe(48)
     token_hash = _hash_token(raw)

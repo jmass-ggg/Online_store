@@ -6,7 +6,6 @@ import { apiFetch, joinUrl } from "../api";
 const CART_KEY = "cart_items";
 const BUY_NOW_KEY = "buy_now_item";
 
-// ✅ saved for Payment page to read
 const CHECKOUT_CTX_KEY = "checkout_context";
 
 function money(n) {
@@ -60,9 +59,6 @@ function formatApiError(err) {
   return err?.message || "Something went wrong";
 }
 
-/**
- * Nepal address data (simple version).
- */
 const NEPAL = {
   provinces: [
     {
