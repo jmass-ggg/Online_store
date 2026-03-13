@@ -19,6 +19,7 @@ from sqlalchemy import (
     and_,
     text,
 )
+
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
