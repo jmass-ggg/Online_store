@@ -180,10 +180,7 @@ def buy_now_service(
     quantity: int,
     paymentmethod: str,
 ) -> Tuple[Order, Decimal, int]:
-    """
-    Creates single-item order with delivery charge.
-    Returns: (order, items_subtotal, seller_count)
-    """
+   
     try:
         if quantity <= 0:
             raise error_handler(400, "Quantity must be at least 1")
@@ -275,8 +272,8 @@ def buy_now_service(
             )
             if res.rowcount != 1:
                 raise error_handler(400, "Insufficient stock")
-            db.commit()
-        return order, items_subtotal, 1
+            
+        return order, grand_total, 1
     except IntegrityError:
         db.rollback()
         raise HTTPException(

@@ -1,43 +1,51 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./Payment.css";
+import { apiFetch } from "../api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 const CHECKOUT_CTX_KEY = "checkout_context";
+const BUY_NOW_KEY = "buy_now_item";
+const CART_KEY = "cart_items";
+
+function readCheckoutContext() {
+  try {
+    return JSON.parse(sessionStorage.getItem(CHECKOUT_CTX_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function toApiUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = API_BASE_URL.replace(/\/+$/, "");
+  const clean = String(path).startsWith("/") ? path : `/${path}`;
+  return `${base}${clean}`;
+}
+
+function resolveBackendPaymentMethod(selectedMethod) {
+  if (selectedMethod === "esewa") return "ESEWA";
+  if (selectedMethod === "cod") return "COD";
+  return null;
+}
 
 const Payment = () => {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [selectedMethod, setSelectedMethod] = useState("esewa");
   const [search, setSearch] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const profileRef = useRef(null);
 
-  const checkoutContext = useMemo(() => {
-    try {
-      return JSON.parse(sessionStorage.getItem(CHECKOUT_CTX_KEY) || "{}");
-    } catch {
-      return {};
-    }
-  }, []);
+  const checkoutContext = useMemo(() => readCheckoutContext(), []);
 
-  const orderId = String(
-    location.state?.orderId ||
-      localStorage.getItem("current_order_id") ||
-      checkoutContext?.order_id ||
-      ""
-  );
-
+  const items = Array.isArray(checkoutContext?.items) ? checkoutContext.items : [];
   const itemsTotal = Number(checkoutContext?.totals?.itemsTotal || 0);
   const deliveryFee = Number(checkoutContext?.totals?.deliveryFee || 0);
-  const baseTotal = Number(
-    location.state?.totalAmount ||
-      sessionStorage.getItem("current_order_total") ||
-      checkoutContext?.totals?.total ||
-      0
-  );
+  const baseTotal = Number(checkoutContext?.totals?.total || 0);
 
   const codFee = selectedMethod === "cod" ? Number((baseTotal * 0.02).toFixed(2)) : 0;
   const totalAmount = useMemo(() => baseTotal + codFee, [baseTotal, codFee]);
@@ -78,42 +86,85 @@ const Payment = () => {
     navigate("/login");
   };
 
-  const handleEsewaPayment = () => {
-    if (!orderId) {
-      alert("Order ID not found. Please go back to checkout.");
+  async function handleConfirmPayment() {
+    setErrorMsg("");
+
+    const backendPaymentMethod = resolveBackendPaymentMethod(selectedMethod);
+    if (!backendPaymentMethod) {
+      setErrorMsg("This payment method is not connected yet.");
+      return;
+    }
+
+    if (!checkoutContext?.address_id) {
+      setErrorMsg("Shipping address missing. Please return to checkout.");
+      return;
+    }
+
+    if (!items.length) {
+      setErrorMsg("No checkout items found. Please return to checkout.");
       return;
     }
 
     setLoading(true);
 
-    window.location.assign(
-      `${API_BASE_URL}/payments/esewa/initiate?order_id=${encodeURIComponent(orderId)}`
-    );
-  };
+    try {
+      let createdOrder;
 
-  const handleConfirmPayment = () => {
-    if (!selectedMethod) {
-      alert("Please select a payment method");
-      return;
+      if (checkoutContext.mode === "BUY_NOW") {
+        const item = items[0];
+
+        createdOrder = await apiFetch("/orders/buy-now", {
+          method: "POST",
+          body: JSON.stringify({
+            address_id: Number(checkoutContext.address_id),
+            variant_id: Number(item.variant_id),
+            quantity: Number(item.quantity),
+            payment_method: backendPaymentMethod,
+          }),
+        });
+
+        localStorage.removeItem(BUY_NOW_KEY);
+        window.dispatchEvent(new Event("buy_now:updated"));
+      } else {
+        createdOrder = await apiFetch("/orders/order", {
+          method: "POST",
+          body: JSON.stringify({
+            address_id: Number(checkoutContext.address_id),
+            payment_method: backendPaymentMethod,
+          }),
+        });
+
+        localStorage.removeItem(CART_KEY);
+        window.dispatchEvent(new Event("cart:updated"));
+      }
+
+      const nextOrderId = createdOrder?.order_id;
+      const nextTotal = Number(createdOrder?.total_price ?? baseTotal);
+      const paymentRedirectUrl = createdOrder?.payment_redirect_url || null;
+
+      if (!nextOrderId) {
+        throw new Error("Order created, but order id was not returned.");
+      }
+
+      localStorage.setItem("current_order_id", String(nextOrderId));
+      sessionStorage.setItem("current_order_total", String(nextTotal));
+
+      if (paymentRedirectUrl) {
+        window.location.assign(toApiUrl(paymentRedirectUrl));
+        return;
+      }
+
+      navigate("/orders");
+    } catch (e) {
+      const detail = e?.detail;
+      if (typeof detail === "string") setErrorMsg(detail);
+      else setErrorMsg(e?.message || "Failed to create order");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    if (selectedMethod === "esewa") {
-      handleEsewaPayment();
-      return;
-    }
-
-    if (selectedMethod === "cod") {
-      alert("Order confirmed with Cash on Delivery");
-      return;
-    }
-
-    if (selectedMethod === "khalti") {
-      alert("Khalti payment integration not connected yet.");
-      return;
-    }
-
-    alert("Card payment integration not connected yet.");
-  };
+  const canProceed = !!checkoutContext?.address_id && items.length > 0;
 
   return (
     <div className="payment-shell">
@@ -216,6 +267,21 @@ const Payment = () => {
 
         <h2 className="payment-title">Select Payment Method</h2>
 
+        {!!errorMsg && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              borderRadius: 10,
+              background: "#ffe7e7",
+              color: "#b00020",
+              border: "1px solid #ffcdcd",
+            }}
+          >
+            {errorMsg}
+          </div>
+        )}
+
         <div className="payment-main-grid">
           <div className="payment-left">
             <div className="payment-method-tabs">
@@ -227,7 +293,7 @@ const Payment = () => {
                 <div className="method-icon-emoji">💳</div>
                 <div className="method-text">
                   <h4>Credit / Debit Card</h4>
-                  <p>Credit / Debit Card</p>
+                  <p>Not connected yet</p>
                 </div>
               </button>
 
@@ -251,7 +317,7 @@ const Payment = () => {
                 <img src="/ime.png" alt="Khalti by IME" className="method-icon" />
                 <div className="method-text">
                   <h4>Khalti by IME</h4>
-                  <p>Mobile Wallet</p>
+                  <p>Not connected yet</p>
                 </div>
               </button>
 
@@ -284,24 +350,20 @@ const Payment = () => {
                   </div>
 
                   <p className="detail-intro">
-                    You will be redirected to your eSewa account to complete your payment:
+                    Your order will be created first, then you will be redirected to eSewa.
                   </p>
 
                   <ol className="detail-list ordered">
-                    <li>Login to your eSewa account using your eSewa ID and password.</li>
-                    <li>Make sure your account is active and has sufficient balance.</li>
-                    <li>Enter OTP sent to your registered mobile number.</li>
+                    <li>Click Pay Now.</li>
+                    <li>Your order will be created with ESEWA payment method.</li>
+                    <li>You will be redirected to eSewa to complete payment.</li>
                   </ol>
-
-                  <p className="detail-note">
-                    Login using your eSewa mobile number and password.
-                  </p>
 
                   <button
                     className="detail-action-btn"
                     type="button"
                     onClick={handleConfirmPayment}
-                    disabled={loading || !orderId}
+                    disabled={loading || !canProceed}
                   >
                     {loading ? "Redirecting..." : "Pay Now"}
                   </button>
@@ -324,17 +386,17 @@ const Payment = () => {
 
                   <ul className="detail-list">
                     <li>You may pay in cash to our courier upon receiving your parcel.</li>
-                    <li>A 2% cash handling fee is applied for Cash on Delivery orders.</li>
-                    <li>Before receiving the parcel, confirm the delivery status is updated.</li>
-                    <li>Check the parcel details before making payment to the courier.</li>
+                    <li>A 2% cash handling fee is shown here for UI only.</li>
+                    <li>Your order will be created immediately after confirmation.</li>
                   </ul>
 
                   <button
                     className="detail-action-btn"
                     type="button"
                     onClick={handleConfirmPayment}
+                    disabled={loading || !canProceed}
                   >
-                    Confirm Order
+                    {loading ? "Creating Order..." : "Confirm Order"}
                   </button>
                 </div>
               )}
@@ -345,27 +407,13 @@ const Payment = () => {
                     <div className="detail-icon-box">💳</div>
                     <div>
                       <h3>Credit / Debit Card</h3>
-                      <p>Visa, MasterCard supported</p>
+                      <p>Not connected yet</p>
                     </div>
                   </div>
 
                   <p className="detail-intro">
-                    Secure card payment is available for this order.
+                    This payment method is not connected to the backend yet.
                   </p>
-
-                  <ul className="detail-list">
-                    <li>Enter your card number, expiry date, and CVV on the next screen.</li>
-                    <li>Your payment will be processed through a secure checkout gateway.</li>
-                    <li>Please make sure your card supports online transactions.</li>
-                  </ul>
-
-                  <button
-                    className="detail-action-btn"
-                    type="button"
-                    onClick={handleConfirmPayment}
-                  >
-                    Continue
-                  </button>
                 </div>
               )}
 
@@ -375,25 +423,13 @@ const Payment = () => {
                     <img src="/ime.png" alt="Khalti by IME" className="detail-brand-logo" />
                     <div>
                       <h3>Khalti by IME</h3>
-                      <p>Wallet payment option</p>
+                      <p>Not connected yet</p>
                     </div>
                   </div>
 
-                  <p className="detail-intro">Pay quickly using your Khalti wallet.</p>
-
-                  <ul className="detail-list">
-                    <li>Login to your Khalti wallet account.</li>
-                    <li>Verify the payment amount before confirmation.</li>
-                    <li>Complete the payment using OTP or MPIN.</li>
-                  </ul>
-
-                  <button
-                    className="detail-action-btn"
-                    type="button"
-                    onClick={handleConfirmPayment}
-                  >
-                    Continue
-                  </button>
+                  <p className="detail-intro">
+                    This payment method is not connected to the backend yet.
+                  </p>
                 </div>
               )}
             </div>
@@ -403,8 +439,13 @@ const Payment = () => {
             <h3>Order Summary</h3>
 
             <div className="summary-line">
-              <span>Order ID</span>
-              <span>{orderId || "N/A"}</span>
+              <span>Mode</span>
+              <span>{checkoutContext?.mode || "N/A"}</span>
+            </div>
+
+            <div className="summary-line">
+              <span>Items</span>
+              <span>{items.length}</span>
             </div>
 
             <div className="summary-line">
@@ -435,7 +476,7 @@ const Payment = () => {
               className="summary-main-btn"
               type="button"
               onClick={handleConfirmPayment}
-              disabled={loading || !orderId}
+              disabled={loading || !canProceed}
             >
               {loading
                 ? "PLEASE WAIT..."
@@ -443,9 +484,7 @@ const Payment = () => {
                 ? "PROCEED TO ESEWA"
                 : selectedMethod === "cod"
                 ? "CONFIRM ORDER"
-                : selectedMethod === "khalti"
-                ? "PROCEED TO KHALTI"
-                : "CONFIRM PAYMENT"}
+                : "NOT AVAILABLE"}
             </button>
           </aside>
         </div>

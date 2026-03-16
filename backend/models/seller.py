@@ -53,6 +53,9 @@ class Seller(Base):
         "OrderFulfillment", back_populates="seller"
         
     )
+    delivery:Mapped[list["DeliveryCharge"]]=relationship(
+        "DeliveryCharge",back_populates="seller", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Seller(username={self.username}, business={self.business_name})>"

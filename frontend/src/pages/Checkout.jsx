@@ -164,7 +164,6 @@ export default function Checkout() {
   const [postalCode, setPostalCode] = useState("");
 
   const [saving, setSaving] = useState(false);
-  const [placingOrder, setPlacingOrder] = useState(false);
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -239,12 +238,13 @@ export default function Checkout() {
           setOrderItems([
             {
               id: `buy_now_${it.variant_id}`,
-              variant_id: it.variant_id,
-              quantity: it.quantity ?? 1,
-              price: it.price ?? 0,
+              variant_id: Number(it.variant_id),
+              quantity: Number(it.quantity ?? 1),
+              price: Number(it.price ?? 0),
               product_name: it.product_name,
               image_url: it.image_url,
               size: it.size,
+              color: it.color,
             },
           ]);
         }
@@ -265,9 +265,13 @@ export default function Checkout() {
           return {
             ...it,
             id: it.id ?? `cart_${it.variant_id}`,
-            product_name: local?.product_name,
-            image_url: local?.image_url,
-            size: local?.size,
+            variant_id: Number(it.variant_id),
+            quantity: Number(it.quantity),
+            price: Number(it.price ?? local?.price ?? 0),
+            product_name: local?.product_name || it.product_name,
+            image_url: local?.image_url || it.image_url,
+            size: local?.size || it.size,
+            color: local?.color || it.color,
           };
         });
 
@@ -299,7 +303,8 @@ export default function Checkout() {
     [orderItems]
   );
 
-  const deliveryFee = 4.5;
+  // keep this same as backend if you want matching totals
+  const deliveryFee = 100;
   const total = Math.max(0, itemsTotal + (itemsCount > 0 ? deliveryFee : 0));
 
   const provinceObj = useMemo(
@@ -316,14 +321,16 @@ export default function Checkout() {
 
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
 
-  useEffect(() => {
+  function handleProvinceChange(value) {
+    setProvince(value);
     setCity("");
     setZone("");
-  }, [province]);
+  }
 
-  useEffect(() => {
+  function handleCityChange(value) {
+    setCity(value);
     setZone("");
-  }, [city]);
+  }
 
   function startEdit() {
     if (savedAddress) {
@@ -435,10 +442,10 @@ export default function Checkout() {
     }
   }
 
-  async function proceedToPay() {
+  function proceedToPayment() {
     setErrorMsg("");
 
-    if (!savedAddress) {
+    if (!savedAddress?.id) {
       setErrorMsg("Please save a shipping address to proceed.");
       return;
     }
@@ -450,7 +457,7 @@ export default function Checkout() {
 
     const checkoutContext = {
       mode: isBuyNowMode ? "BUY_NOW" : "CART",
-      address_id: savedAddress.id,
+      address_id: Number(savedAddress.id),
       address: savedAddress,
       items: orderItems.map((x) => ({
         variant_id: Number(x.variant_id),
@@ -459,6 +466,7 @@ export default function Checkout() {
         product_name: x.product_name,
         image_url: x.image_url,
         size: x.size,
+        color: x.color,
       })),
       totals: {
         itemsCount,
@@ -469,65 +477,7 @@ export default function Checkout() {
     };
 
     sessionStorage.setItem(CHECKOUT_CTX_KEY, JSON.stringify(checkoutContext));
-
-    setPlacingOrder(true);
-
-    try {
-      let createdOrder;
-
-      if (isBuyNowMode) {
-        const item = orderItems[0];
-
-        if (!item) {
-          throw new Error("No buy now item found.");
-        }
-
-        createdOrder = await apiFetch("/orders/buy-now", {
-          method: "POST",
-          body: JSON.stringify({
-            address_id: Number(savedAddress.id),
-            variant_id: Number(item.variant_id),
-            quantity: Number(item.quantity),
-            payment_method: "COD",
-          }),
-        });
-      } else {
-        createdOrder = await apiFetch("/orders/order", {
-          method: "POST",
-          body: JSON.stringify({
-            address_id: Number(savedAddress.id),
-            payment_method: "COD",
-          }),
-        });
-      }
-
-      const nextOrderId = createdOrder?.order_id;
-      const nextTotal = Number(createdOrder?.total_price ?? total);
-      const paymentRedirectUrl = createdOrder?.payment_redirect_url || null;
-
-      if (!nextOrderId) {
-        throw new Error("Order created, but order id was not returned.");
-      }
-
-      localStorage.setItem("current_order_id", String(nextOrderId));
-      sessionStorage.setItem("current_order_total", String(nextTotal));
-
-      if (paymentRedirectUrl) {
-        navigate(paymentRedirectUrl);
-        return;
-      }
-
-      navigate("/payment", {
-        state: {
-          orderId: nextOrderId,
-          totalAmount: nextTotal,
-        },
-      });
-    } catch (e) {
-      setErrorMsg(formatApiError(e));
-    } finally {
-      setPlacingOrder(false);
-    }
+    navigate("/payment");
   }
 
   const canProceed = itemsCount > 0 && !!savedAddress;
@@ -701,7 +651,7 @@ export default function Checkout() {
                 <div className="ck-formGrid" style={{ marginTop: 10 }}>
                   <div className="ck-field">
                     <label>Province / Region</label>
-                    <select value={province} onChange={(e) => setProvince(e.target.value)}>
+                    <select value={province} onChange={(e) => handleProvinceChange(e.target.value)}>
                       <option value="">Please choose your province / region</option>
                       {NEPAL.provinces.map((p) => (
                         <option key={p.name} value={p.name}>
@@ -715,7 +665,7 @@ export default function Checkout() {
                     <label>City</label>
                     <select
                       value={city}
-                      onChange={(e) => setCity(e.target.value)}
+                      onChange={(e) => handleCityChange(e.target.value)}
                       disabled={!province}
                     >
                       <option value="">Please choose your city</option>
@@ -852,10 +802,10 @@ export default function Checkout() {
             <button
               className="ck-pay"
               type="button"
-              disabled={!canProceed || placingOrder}
-              onClick={proceedToPay}
+              disabled={!canProceed}
+              onClick={proceedToPayment}
             >
-              {placingOrder ? "CREATING ORDER..." : "PROCEED TO PAY"}
+              PROCEED TO PAYMENT
             </button>
 
             {!savedAddress && (
