@@ -81,6 +81,19 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: int) -> 
                 .where(Address.customer_id == customer_id)
                 .values(is_default_billing=False)
             )
+        existing = (
+        db.query(Address)
+        .filter(
+            Address.customer_id == customer_id,
+            Address.line1 == data["line1"],
+            Address.latitude == lat,
+            Address.longitude == lng,
+            )
+            .first()
+        )
+
+        if existing:
+            raise HTTPException(status_code=400, detail="Address already exists")
 
         db_address = Address(customer_id=customer_id, **data)
         db.add(db_address)

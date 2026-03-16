@@ -279,9 +279,9 @@ def buy_now_service(
         return order, items_subtotal, 1
     except IntegrityError:
         db.rollback()
-        return HTTPException(
+        raise HTTPException(
             status_code=400,
-            detail="Depulciated order"
+            detail="Duplicated order"
         )
     except SQLAlchemyError:
         db.rollback()

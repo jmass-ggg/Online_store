@@ -134,7 +134,10 @@ function parseLine2(line2) {
   const s = String(line2 || "").trim();
   if (!s) return { zone: "", city: "", landmark: "" };
 
-  const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+  const parts = s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 
   return {
     zone: parts[0] || "",
@@ -261,6 +264,7 @@ export default function Checkout() {
           const local = localMap.get(Number(it.variant_id));
           return {
             ...it,
+            id: it.id ?? `cart_${it.variant_id}`,
             product_name: local?.product_name,
             image_url: local?.image_url,
             size: local?.size,
@@ -365,12 +369,35 @@ export default function Checkout() {
   async function saveAddress() {
     setErrorMsg("");
 
-    if (!fullName.trim()) return setErrorMsg("Full name is required");
-    if (phone.trim().length < 7) return setErrorMsg("Phone number is too short");
-    if (!province) return setErrorMsg("Please select Province / Region");
-    if (!city) return setErrorMsg("Please select City");
-    if (!zone) return setErrorMsg("Please select Zone");
-    if (!addressLine.trim()) return setErrorMsg("Please enter Address");
+    if (!fullName.trim()) {
+      setErrorMsg("Full name is required");
+      return;
+    }
+
+    if (phone.trim().length < 7) {
+      setErrorMsg("Phone number is too short");
+      return;
+    }
+
+    if (!province) {
+      setErrorMsg("Please select Province / Region");
+      return;
+    }
+
+    if (!city) {
+      setErrorMsg("Please select City");
+      return;
+    }
+
+    if (!zone) {
+      setErrorMsg("Please select Zone");
+      return;
+    }
+
+    if (!addressLine.trim()) {
+      setErrorMsg("Please enter Address");
+      return;
+    }
 
     const pObj = NEPAL.provinces.find((p) => p.name === province) || null;
     const baseLat = pObj?.lat ?? 27.7172;
@@ -446,21 +473,37 @@ export default function Checkout() {
     setPlacingOrder(true);
 
     try {
-      // Change "/orders/" only if your create-order backend route is different
-      const createdOrder = await apiFetch("/orders/", {
-        method: "POST",
-        body: JSON.stringify({
-          address_id: savedAddress.id,
-          mode: isBuyNowMode ? "BUY_NOW" : "CART",
-          items: orderItems.map((x) => ({
-            variant_id: Number(x.variant_id),
-            quantity: Number(x.quantity),
-          })),
-        }),
-      });
+      let createdOrder;
 
-      const nextOrderId = createdOrder?.id ?? createdOrder?.order_id;
+      if (isBuyNowMode) {
+        const item = orderItems[0];
+
+        if (!item) {
+          throw new Error("No buy now item found.");
+        }
+
+        createdOrder = await apiFetch("/orders/buy-now", {
+          method: "POST",
+          body: JSON.stringify({
+            address_id: Number(savedAddress.id),
+            variant_id: Number(item.variant_id),
+            quantity: Number(item.quantity),
+            payment_method: "COD",
+          }),
+        });
+      } else {
+        createdOrder = await apiFetch("/orders/order", {
+          method: "POST",
+          body: JSON.stringify({
+            address_id: Number(savedAddress.id),
+            payment_method: "COD",
+          }),
+        });
+      }
+
+      const nextOrderId = createdOrder?.order_id;
       const nextTotal = Number(createdOrder?.total_price ?? total);
+      const paymentRedirectUrl = createdOrder?.payment_redirect_url || null;
 
       if (!nextOrderId) {
         throw new Error("Order created, but order id was not returned.");
@@ -468,6 +511,11 @@ export default function Checkout() {
 
       localStorage.setItem("current_order_id", String(nextOrderId));
       sessionStorage.setItem("current_order_total", String(nextTotal));
+
+      if (paymentRedirectUrl) {
+        navigate(paymentRedirectUrl);
+        return;
+      }
 
       navigate("/payment", {
         state: {
@@ -681,11 +729,7 @@ export default function Checkout() {
 
                   <div className="ck-field">
                     <label>Zone</label>
-                    <select
-                      value={zone}
-                      onChange={(e) => setZone(e.target.value)}
-                      disabled={!city}
-                    >
+                    <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={!city}>
                       <option value="">Please choose your zone</option>
                       {zoneOptions.map((z) => (
                         <option key={z} value={z}>
@@ -749,9 +793,7 @@ export default function Checkout() {
               </>
             )}
 
-            {!isEditingAddress && savedAddress && errorMsg && (
-              <div className="ck-error">{errorMsg}</div>
-            )}
+            {!isEditingAddress && savedAddress && errorMsg && <div className="ck-error">{errorMsg}</div>}
           </section>
 
           <aside className="ck-card ck-right">
