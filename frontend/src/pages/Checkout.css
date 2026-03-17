@@ -21,7 +21,13 @@ body {
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Arial,
+    sans-serif;
   color: var(--text);
   background: var(--bg);
 }
@@ -106,6 +112,11 @@ a:hover {
   font-size: 14px;
 }
 
+.ck-searchIcon {
+  opacity: 0.65;
+  font-size: 15px;
+}
+
 .ck-actions {
   display: flex;
   justify-content: flex-end;
@@ -114,12 +125,15 @@ a:hover {
 }
 
 .ck-iconBtn {
-  border: none;
-  background: transparent;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  background: #fff;
   cursor: pointer;
-  font-size: 18px;
-  padding: 8px 10px;
+  font-size: 17px;
   border-radius: 999px;
+  display: grid;
+  place-items: center;
 }
 
 .ck-iconBtn:hover {
@@ -127,12 +141,19 @@ a:hover {
 }
 
 .ck-avatar {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: #fff;
   cursor: pointer;
+  font-size: 17px;
+  display: grid;
+  place-items: center;
+}
+
+.ck-avatar:hover {
+  background: var(--soft);
 }
 
 /* Main */
@@ -146,7 +167,7 @@ a:hover {
   align-items: center;
   color: var(--muted);
   font-size: 13px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .ck-current {
@@ -156,6 +177,11 @@ a:hover {
 
 .ck-sep {
   opacity: 0.7;
+}
+
+.ck-buyNowFlag {
+  margin-left: 4px;
+  opacity: 0.75;
 }
 
 .ck-grid {
@@ -199,28 +225,6 @@ a:hover {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 0;
-}
-
-.ck-step {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.ck-stepDot {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: black;
-  color: white;
-  font-weight: 900;
-}
-
-.ck-stepText {
-  color: var(--muted);
-  font-size: 13px;
 }
 
 .ck-h2 {
@@ -306,6 +310,7 @@ a:hover {
   border-radius: 14px;
   background: #fff;
   padding: 14px;
+  margin-top: 24px;
 }
 
 .ck-itemsHead {
@@ -520,13 +525,6 @@ a:hover {
   font-weight: 1000;
   color: black;
   letter-spacing: -0.02em;
-}
-
-.ck-vat {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  text-align: right;
 }
 
 .ck-pay {
