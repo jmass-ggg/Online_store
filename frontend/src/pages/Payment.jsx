@@ -1,496 +1,377 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { API_BASE_URL, apiFetch } from "../api";
 import "./Payment.css";
-import { apiFetch } from "../api";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 const CHECKOUT_CTX_KEY = "checkout_context";
 const BUY_NOW_KEY = "buy_now_item";
 const CART_KEY = "cart_items";
 
-function readCheckoutContext() {
+const PAYMENT_METHODS = {
+  ESEWA: "ESEWA",
+  COD: "CASH ON DELIVERY",
+};
+
+function safeParse(raw) {
   try {
-    return JSON.parse(sessionStorage.getItem(CHECKOUT_CTX_KEY) || "{}");
+    return JSON.parse(raw);
   } catch {
-    return {};
+    return null;
   }
 }
 
-function toApiUrl(path) {
+function money(n) {
+  return Number(n || 0).toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+  });
+}
+
+function formatApiError(err) {
+  const detail = err?.detail;
+
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "field";
+        return `${field}: ${d.msg}`;
+      })
+      .join(" | ");
+  }
+
+  return err?.message || "Something went wrong";
+}
+
+function buildBackendUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  const base = API_BASE_URL.replace(/\/+$/, "");
-  const clean = String(path).startsWith("/") ? path : `/${path}`;
-  return `${base}${clean}`;
+
+  const base = String(API_BASE_URL || "").replace(/\/+$/, "");
+  const rel = String(path).startsWith("/") ? path : `/${path}`;
+
+  return `${base}${rel}`;
 }
 
-function resolveBackendPaymentMethod(selectedMethod) {
-  if (selectedMethod === "esewa") return "ESEWA";
-  if (selectedMethod === "cod") return "COD";
-  return null;
+function cleanupAfterCod(mode) {
+  sessionStorage.removeItem(CHECKOUT_CTX_KEY);
+
+  if (mode === "BUY_NOW") {
+    localStorage.removeItem(BUY_NOW_KEY);
+    window.dispatchEvent(new Event("buy_now:updated"));
+    return;
+  }
+
+  localStorage.removeItem(CART_KEY);
+  window.dispatchEvent(new Event("cart:updated"));
 }
 
-const Payment = () => {
+export default function Payment() {
   const navigate = useNavigate();
 
-  const [selectedMethod, setSelectedMethod] = useState("esewa");
-  const [search, setSearch] = useState("");
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const profileRef = useRef(null);
-
-  const checkoutContext = useMemo(() => readCheckoutContext(), []);
-
-  const items = Array.isArray(checkoutContext?.items) ? checkoutContext.items : [];
-  const itemsTotal = Number(checkoutContext?.totals?.itemsTotal || 0);
-  const deliveryFee = Number(checkoutContext?.totals?.deliveryFee || 0);
-  const baseTotal = Number(checkoutContext?.totals?.total || 0);
-
-  const codFee = selectedMethod === "cod" ? Number((baseTotal * 0.02).toFixed(2)) : 0;
-  const totalAmount = useMemo(() => baseTotal + codFee, [baseTotal, codFee]);
+  const [checkoutCtx, setCheckoutCtx] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS.ESEWA);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [error, setError] = useState("");
+  const [successData, setSuccessData] = useState(null);
 
   useEffect(() => {
-    function onDocMouseDown(e) {
-      if (!profileRef.current) return;
-      if (!profileRef.current.contains(e.target)) {
-        setProfileOpen(false);
-      }
+    const raw = sessionStorage.getItem(CHECKOUT_CTX_KEY);
+    const parsed = safeParse(raw);
+
+    if (!parsed || !parsed.address_id || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+      setError("Checkout data is missing. Please go back to checkout.");
+      return;
     }
 
-    function onEsc(e) {
-      if (e.key === "Escape") {
-        setProfileOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", onDocMouseDown);
-    window.addEventListener("keydown", onEsc);
-
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      window.removeEventListener("keydown", onEsc);
-    };
+    setCheckoutCtx(parsed);
   }, []);
 
-  const go = (path) => {
-    setProfileOpen(false);
-    navigate(path);
-  };
+  const totals = useMemo(() => checkoutCtx?.totals || {}, [checkoutCtx]);
 
-  const logout = () => {
-    setProfileOpen(false);
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-    navigate("/login");
-  };
+  async function handlePlaceOrder() {
+    setError("");
 
-  async function handleConfirmPayment() {
-    setErrorMsg("");
-
-    const backendPaymentMethod = resolveBackendPaymentMethod(selectedMethod);
-    if (!backendPaymentMethod) {
-      setErrorMsg("This payment method is not connected yet.");
+    if (!checkoutCtx) {
+      setError("Checkout data is missing.");
       return;
     }
 
-    if (!checkoutContext?.address_id) {
-      setErrorMsg("Shipping address missing. Please return to checkout.");
+    if (!checkoutCtx.address_id) {
+      setError("Address is missing.");
       return;
     }
 
-    if (!items.length) {
-      setErrorMsg("No checkout items found. Please return to checkout.");
-      return;
-    }
-
-    setLoading(true);
+    setPlacingOrder(true);
 
     try {
-      let createdOrder;
+      let res;
 
-      if (checkoutContext.mode === "BUY_NOW") {
-        const item = items[0];
+      if (checkoutCtx.mode === "BUY_NOW") {
+        const item = checkoutCtx.items?.[0];
 
-        createdOrder = await apiFetch("/orders/buy-now", {
+        if (!item?.variant_id || !item?.quantity) {
+          throw new Error("Buy now item is missing.");
+        }
+
+        res = await apiFetch("/orders/buy-now", {
           method: "POST",
           body: JSON.stringify({
-            address_id: Number(checkoutContext.address_id),
+            address_id: Number(checkoutCtx.address_id),
             variant_id: Number(item.variant_id),
             quantity: Number(item.quantity),
-            payment_method: backendPaymentMethod,
+            payment_method: paymentMethod,
           }),
         });
-
-        localStorage.removeItem(BUY_NOW_KEY);
-        window.dispatchEvent(new Event("buy_now:updated"));
       } else {
-        createdOrder = await apiFetch("/orders/order", {
+        res = await apiFetch("/orders/order", {
           method: "POST",
           body: JSON.stringify({
-            address_id: Number(checkoutContext.address_id),
-            payment_method: backendPaymentMethod,
+            address_id: Number(checkoutCtx.address_id),
+            payment_method: paymentMethod,
           }),
         });
-
-        localStorage.removeItem(CART_KEY);
-        window.dispatchEvent(new Event("cart:updated"));
       }
 
-      const nextOrderId = createdOrder?.order_id;
-      const nextTotal = Number(createdOrder?.total_price ?? baseTotal);
-      const paymentRedirectUrl = createdOrder?.payment_redirect_url || null;
+      if (paymentMethod === PAYMENT_METHODS.ESEWA) {
+        const redirectUrl = res?.payment_redirect_url;
 
-      if (!nextOrderId) {
-        throw new Error("Order created, but order id was not returned.");
-      }
+        if (!redirectUrl) {
+          throw new Error("Backend did not return eSewa redirect URL.");
+        }
 
-      localStorage.setItem("current_order_id", String(nextOrderId));
-      sessionStorage.setItem("current_order_total", String(nextTotal));
+        const finalUrl = buildBackendUrl(redirectUrl);
 
-      if (paymentRedirectUrl) {
-        window.location.assign(toApiUrl(paymentRedirectUrl));
+        // IMPORTANT:
+        // This must be a real browser redirect because backend /payments/esewa/initiate
+        // returns HTML with auto-submit form, not JSON and not a React page.
+        window.location.href = finalUrl;
         return;
       }
 
-      navigate("/orders");
+      // COD success
+      cleanupAfterCod(checkoutCtx.mode);
+      setSuccessData(res);
     } catch (e) {
-      const detail = e?.detail;
-      if (typeof detail === "string") setErrorMsg(detail);
-      else setErrorMsg(e?.message || "Failed to create order");
+      setError(formatApiError(e));
     } finally {
-      setLoading(false);
+      setPlacingOrder(false);
     }
   }
 
-  const canProceed = !!checkoutContext?.address_id && items.length > 0;
+  if (successData) {
+    return (
+      <div className="payment-page">
+        <div className="payment-wrap">
+          <h1>Order Placed Successfully</h1>
+
+          <div className="payment-card">
+            <p><strong>Order ID:</strong> {successData.order_id}</p>
+            <p><strong>Status:</strong> {successData.status}</p>
+            <p><strong>Total:</strong> {money(successData.total_price)}</p>
+            <p><strong>Payment Method:</strong> CASH ON DELIVERY</p>
+          </div>
+
+          <div className="payment-actions" style={{ marginTop: 16, display: "flex", gap: 12 }}>
+            <button type="button" onClick={() => navigate("/products")}>
+              Continue Shopping
+            </button>
+            <Link to="/checkout">Back to Checkout</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!checkoutCtx) {
+    return (
+      <div className="payment-page">
+        <div className="payment-wrap">
+          <h1>Payment</h1>
+
+          <div className="payment-card">
+            <p style={{ color: "red" }}>{error || "Checkout data is missing."}</p>
+          </div>
+
+          <div className="payment-actions" style={{ marginTop: 16, display: "flex", gap: 12 }}>
+            <button type="button" onClick={() => navigate("/checkout")}>
+              Back to Checkout
+            </button>
+            <Link to="/">Home</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="payment-shell">
-      <header className="payment-top-header">
-        <div className="payment-wrap payment-header-row">
-          <div className="payment-brand">
-            <Link to="/" className="payment-brand-logo">
-              JAMES
-            </Link>
-          </div>
-
-          <nav className="payment-top-nav">
-            <Link to="/">Categories</Link>
-            <Link to="/">Flash Sale</Link>
-          </nav>
-
-          <div className="payment-header-actions">
-            <div className="payment-search">
-              <span className="payment-search-icon" aria-hidden="true">
-                🔎
-              </span>
-              <input
-                type="text"
-                placeholder="Search for products..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            <button
-              className="payment-icon-btn"
-              type="button"
-              title="Cart"
-              onClick={() => navigate("/checkout")}
-            >
-              🛒
-            </button>
-
-            <button className="payment-icon-btn" type="button" title="Notifications">
-              🔔
-            </button>
-
-            <div className="payment-profile-wrap" ref={profileRef}>
-              <button
-                className="payment-profile-btn"
-                type="button"
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((prev) => !prev)}
-                title="Account"
-              >
-                <span className="payment-profile-avatar">👤</span>
-              </button>
-
-              {profileOpen && (
-                <div className="payment-profile-menu" role="menu">
-                  <button
-                    className="payment-profile-item"
-                    type="button"
-                    onClick={() => go("/account")}
-                  >
-                    Manage My Account
-                  </button>
-
-                  <button
-                    className="payment-profile-item"
-                    type="button"
-                    onClick={() => go("/orders")}
-                  >
-                    My Orders
-                  </button>
-
-                  <button
-                    className="payment-profile-item"
-                    type="button"
-                    onClick={() => go("/wishlist")}
-                  >
-                    Wishlist
-                  </button>
-
-                  <div className="payment-profile-divider" />
-
-                  <button
-                    className="payment-profile-item danger"
-                    type="button"
-                    onClick={logout}
-                  >
-                    Log out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div className="payment-page">
       <div className="payment-wrap">
-        <div className="payment-breadcrumb">
-          Home <span>›</span> Cart <span>›</span> <strong>Payment</strong>
+        <div className="payment-breadcrumb" style={{ marginBottom: 16 }}>
+          <Link to="/">Home</Link> <span>›</span> <Link to="/checkout">Checkout</Link> <span>›</span> <span>Payment</span>
         </div>
 
-        <h2 className="payment-title">Select Payment Method</h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.2fr 0.8fr",
+            gap: 20,
+            alignItems: "start",
+          }}
+        >
+          <section className="payment-card">
+            <h2>Choose Payment Method</h2>
 
-        {!!errorMsg && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: "12px 14px",
-              borderRadius: 10,
-              background: "#ffe7e7",
-              color: "#b00020",
-              border: "1px solid #ffcdcd",
-            }}
-          >
-            {errorMsg}
-          </div>
-        )}
-
-        <div className="payment-main-grid">
-          <div className="payment-left">
-            <div className="payment-method-tabs">
-              <button
-                className={`payment-method-tab ${selectedMethod === "card" ? "active" : ""}`}
-                onClick={() => setSelectedMethod("card")}
-                type="button"
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: 14,
+                  border: "1px solid #ddd",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                }}
               >
-                <div className="method-icon-emoji">💳</div>
-                <div className="method-text">
-                  <h4>Credit / Debit Card</h4>
-                  <p>Not connected yet</p>
-                </div>
-              </button>
-
-              <button
-                className={`payment-method-tab ${selectedMethod === "esewa" ? "active" : ""}`}
-                onClick={() => setSelectedMethod("esewa")}
-                type="button"
-              >
-                <img src="/eswea.png" alt="eSewa" className="method-icon" />
-                <div className="method-text">
-                  <h4>eSewa Mobile Wallet</h4>
-                  <p>Mobile Wallet</p>
-                </div>
-              </button>
-
-              <button
-                className={`payment-method-tab ${selectedMethod === "khalti" ? "active" : ""}`}
-                onClick={() => setSelectedMethod("khalti")}
-                type="button"
-              >
-                <img src="/ime.png" alt="Khalti by IME" className="method-icon" />
-                <div className="method-text">
-                  <h4>Khalti by IME</h4>
-                  <p>Not connected yet</p>
-                </div>
-              </button>
-
-              <button
-                className={`payment-method-tab ${selectedMethod === "cod" ? "active" : ""}`}
-                onClick={() => setSelectedMethod("cod")}
-                type="button"
-              >
-                <img
-                  src="/cash_delivery.png"
-                  alt="Cash on Delivery"
-                  className="method-icon"
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value={PAYMENT_METHODS.ESEWA}
+                  checked={paymentMethod === PAYMENT_METHODS.ESEWA}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
                 />
-                <div className="method-text">
-                  <h4>Cash on Delivery</h4>
-                  <p>Cash on Delivery</p>
-                </div>
-              </button>
+                <span><strong>eSewa</strong> — Pay online now</span>
+              </label>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: 14,
+                  border: "1px solid #ddd",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value={PAYMENT_METHODS.COD}
+                  checked={paymentMethod === PAYMENT_METHODS.COD}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                />
+                <span><strong>Cash on Delivery</strong></span>
+              </label>
             </div>
 
-            <div className="payment-detail-panel">
-              {selectedMethod === "esewa" && (
-                <div className="payment-detail-content">
-                  <div className="detail-head">
-                    <img src="/eswea.png" alt="eSewa" className="detail-brand-logo" />
-                    <div>
-                      <h3>Pay with eSewa</h3>
-                      <p>Fast and secure wallet payment</p>
+            <hr style={{ margin: "20px 0" }} />
+
+            <h3>Shipping Address</h3>
+            <p><strong>{checkoutCtx.address?.full_name}</strong></p>
+            <p>{checkoutCtx.address?.phone_number}</p>
+            <p>
+              {checkoutCtx.address?.line1}
+              {checkoutCtx.address?.line2 ? `, ${checkoutCtx.address.line2}` : ""}
+              {checkoutCtx.address?.region ? `, ${checkoutCtx.address.region}` : ""}
+              {checkoutCtx.address?.postal_code ? `, ${checkoutCtx.address.postal_code}` : ""}
+              {checkoutCtx.address?.country ? `, ${checkoutCtx.address.country}` : ""}
+            </p>
+
+            {error ? (
+              <div style={{ marginTop: 16, color: "red" }}>{error}</div>
+            ) : null}
+          </section>
+
+          <aside className="payment-card">
+            <h2>Order Summary</h2>
+
+            <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+              {checkoutCtx.items.map((item, index) => (
+                <div
+                  key={`${item.variant_id}_${index}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    borderBottom: "1px solid #eee",
+                    paddingBottom: 10,
+                  }}
+                >
+                  <div>
+                    <div>{item.product_name}</div>
+                    <div style={{ fontSize: 13, opacity: 0.75 }}>
+                      {item.size ? `Size: ${item.size} ` : ""}
+                      {item.color ? `Color: ${item.color} ` : ""}
+                      Qty: {item.quantity}
                     </div>
                   </div>
-
-                  <p className="detail-intro">
-                    Your order will be created first, then you will be redirected to eSewa.
-                  </p>
-
-                  <ol className="detail-list ordered">
-                    <li>Click Pay Now.</li>
-                    <li>Your order will be created with ESEWA payment method.</li>
-                    <li>You will be redirected to eSewa to complete payment.</li>
-                  </ol>
-
-                  <button
-                    className="detail-action-btn"
-                    type="button"
-                    onClick={handleConfirmPayment}
-                    disabled={loading || !canProceed}
-                  >
-                    {loading ? "Redirecting..." : "Pay Now"}
-                  </button>
+                  <div>{money(Number(item.price) * Number(item.quantity))}</div>
                 </div>
-              )}
+              ))}
 
-              {selectedMethod === "cod" && (
-                <div className="payment-detail-content">
-                  <div className="detail-head">
-                    <img
-                      src="/cash_delivery.png"
-                      alt="Cash on Delivery"
-                      className="detail-brand-logo"
-                    />
-                    <div>
-                      <h3>Cash on Delivery</h3>
-                      <p>Pay when the parcel arrives</p>
-                    </div>
-                  </div>
-
-                  <ul className="detail-list">
-                    <li>You may pay in cash to our courier upon receiving your parcel.</li>
-                    <li>A 2% cash handling fee is shown here for UI only.</li>
-                    <li>Your order will be created immediately after confirmation.</li>
-                  </ul>
-
-                  <button
-                    className="detail-action-btn"
-                    type="button"
-                    onClick={handleConfirmPayment}
-                    disabled={loading || !canProceed}
-                  >
-                    {loading ? "Creating Order..." : "Confirm Order"}
-                  </button>
-                </div>
-              )}
-
-              {selectedMethod === "card" && (
-                <div className="payment-detail-content">
-                  <div className="detail-head">
-                    <div className="detail-icon-box">💳</div>
-                    <div>
-                      <h3>Credit / Debit Card</h3>
-                      <p>Not connected yet</p>
-                    </div>
-                  </div>
-
-                  <p className="detail-intro">
-                    This payment method is not connected to the backend yet.
-                  </p>
-                </div>
-              )}
-
-              {selectedMethod === "khalti" && (
-                <div className="payment-detail-content">
-                  <div className="detail-head">
-                    <img src="/ime.png" alt="Khalti by IME" className="detail-brand-logo" />
-                    <div>
-                      <h3>Khalti by IME</h3>
-                      <p>Not connected yet</p>
-                    </div>
-                  </div>
-
-                  <p className="detail-intro">
-                    This payment method is not connected to the backend yet.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <aside className="payment-summary-card">
-            <h3>Order Summary</h3>
-
-            <div className="summary-line">
-              <span>Mode</span>
-              <span>{checkoutContext?.mode || "N/A"}</span>
-            </div>
-
-            <div className="summary-line">
-              <span>Items</span>
-              <span>{items.length}</span>
-            </div>
-
-            <div className="summary-line">
-              <span>Items Total</span>
-              <span>${itemsTotal.toFixed(2)}</span>
-            </div>
-
-            <div className="summary-line">
-              <span>Delivery Fee</span>
-              <span>${deliveryFee.toFixed(2)}</span>
-            </div>
-
-            {selectedMethod === "cod" && (
-              <div className="summary-line">
-                <span>Cash Payment Fee (2%)</span>
-                <span>${codFee.toFixed(2)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                <span>Items</span>
+                <span>{totals.itemsCount || 0}</span>
               </div>
-            )}
 
-            <div className="summary-divider" />
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Items Total</span>
+                <span>{money(totals.itemsTotal || 0)}</span>
+              </div>
 
-            <div className="summary-line total">
-              <span>Total Amount</span>
-              <span>${totalAmount.toFixed(2)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Delivery Fee</span>
+                <span>{money(totals.deliveryFee || 0)}</span>
+              </div>
+
+              <hr />
+
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                <span>Total</span>
+                <span>{money(totals.total || 0)}</span>
+              </div>
             </div>
 
             <button
-              className="summary-main-btn"
               type="button"
-              onClick={handleConfirmPayment}
-              disabled={loading || !canProceed}
+              onClick={handlePlaceOrder}
+              disabled={placingOrder}
+              style={{
+                marginTop: 20,
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: 10,
+                border: "none",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
             >
-              {loading
-                ? "PLEASE WAIT..."
-                : selectedMethod === "esewa"
-                ? "PROCEED TO ESEWA"
-                : selectedMethod === "cod"
-                ? "CONFIRM ORDER"
-                : "NOT AVAILABLE"}
+              {placingOrder
+                ? "PROCESSING..."
+                : paymentMethod === PAYMENT_METHODS.ESEWA
+                ? "PAY WITH ESEWA"
+                : "PLACE ORDER"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/checkout")}
+              style={{
+                marginTop: 10,
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: 10,
+                cursor: "pointer",
+              }}
+            >
+              BACK TO CHECKOUT
             </button>
           </aside>
         </div>
       </div>
     </div>
   );
-};
-
-export default Payment;
+}

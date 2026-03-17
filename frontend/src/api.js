@@ -1,5 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const ASSET_ORIGIN = import.meta.env.VITE_ASSET_ORIGIN || ""; // optional
+const ASSET_ORIGIN = import.meta.env.VITE_ASSET_ORIGIN || "";
 
 const ACCESS_TOKEN_KEY = "access_token";
 const AUTH_TOKEN_KEY = "auth_token";

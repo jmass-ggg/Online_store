@@ -24,7 +24,6 @@ def place_order_api(
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_customer),
 ):
-   
     order, total_price, seller_count = place_order_service(
         db,
         user_id=current_user.id,
@@ -33,8 +32,7 @@ def place_order_api(
     )
 
     payment_redirect_url = None
-    if payload.payment_method == PaymentMethod.ESEWA:
-       
+    if str(payload.payment_method) == str(PaymentMethod.ESEWA):
         payment_redirect_url = f"/payments/esewa/initiate?order_id={order.id}"
 
     return PlaceOrderResponse(
@@ -63,7 +61,7 @@ def buy_now_api(
     )
 
     payment_redirect_url = None
-    if payload.payment_method == PaymentMethod.ESEWA:
+    if str(payload.payment_method) == str(PaymentMethod.ESEWA):
         payment_redirect_url = f"/payments/esewa/initiate?order_id={order.id}"
 
     return BuyNowResponse(
@@ -71,6 +69,6 @@ def buy_now_api(
         status=str(order.status),
         total_price=total_price,
         seller_count=seller_count,
-        paymentmethod=str(payload.payment_method),
-        payment_redirect_url=payment_redirect_url,  
+        payment_method=str(order.payment_Method),
+        payment_redirect_url=payment_redirect_url,
     )

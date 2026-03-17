@@ -1,35 +1,41 @@
 from __future__ import annotations
 
-from uuid import uuid4
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Optional
+from urllib.parse import urlencode
+from uuid import uuid4
 import hmac
 import html
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from backend.core.error_handler import error_handler
 from backend.database import get_db
 from backend.models.order import Order, OrderStatus
-from backend.models.payment import Payment, PaymentStatus, PaymentProvider
-from backend.config.esewa_utils import canonical_message, hmac_sha256_base64, decode_esewa_data
+from backend.models.payment import Payment, PaymentProvider, PaymentStatus
+from backend.config.esewa_utils import (
+    canonical_message,
+    decode_esewa_data,
+    hmac_sha256_base64,
+)
 from backend.core.settings_esewa import (
-    ESEWA_SECRET_KEY,
+    ESEWA_FORM_URL,
     ESEWA_PRODUCT_CODE,
-    ESEWA_FORM_URL,    # ePay v2 form endpoint (rc/prod)
-    ESEWA_STATUS_URL,  # ePay v2 status endpoint (uat/prod)
+    ESEWA_SECRET_KEY,
+    ESEWA_STATUS_URL,
 )
 
 router = APIRouter(prefix="/payments/esewa", tags=["eSewa"])
 
+# change this in production
+FRONTEND_BASE_URL = "http://localhost:5173"
 
 
 def money_str(amount: Decimal) -> str:
-
     s = f"{Decimal(str(amount)).quantize(Decimal('0.01')):f}"
     if "." in s:
         s = s.rstrip("0").rstrip(".")
@@ -43,17 +49,45 @@ def auto_submit_form(action_url: str, fields: Dict[str, str]) -> str:
     )
     return f"""<!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting to eSewa...</title>
+  </head>
   <body>
+    <p>Redirecting to eSewa...</p>
     <form id="f" action="{html.escape(action_url)}" method="POST">
       {inputs}
+      <noscript>
+        <button type="submit">Continue to eSewa</button>
+      </noscript>
     </form>
-    <script>document.getElementById("f").submit();</script>
+    <script>
+      document.getElementById("f").submit();
+    </script>
   </body>
 </html>""".strip()
 
 
 def _safe_eq(a: str, b: str) -> bool:
     return hmac.compare_digest((a or "").encode("utf-8"), (b or "").encode("utf-8"))
+
+
+def build_frontend_result_url(
+    *,
+    order_id: int,
+    payment_status: str,
+    esewa_status: str = "",
+    ref_id: Optional[str] = None,
+) -> str:
+    params = {
+        "order_id": order_id,
+        "payment_status": payment_status,
+        "esewa_status": esewa_status,
+    }
+    if ref_id:
+        params["ref_id"] = ref_id
+
+    return f"{FRONTEND_BASE_URL}/payment/esewa/result?{urlencode(params)}"
 
 
 def _create_payment_attempt(db: Session, order: Order) -> Payment:
@@ -71,24 +105,33 @@ def _create_payment_attempt(db: Session, order: Order) -> Payment:
     return payment
 
 
-async def status_check(*, product_code: str, total_amount: str, transaction_uuid: str) -> Dict[str, Any]:
- 
+async def status_check(
+    *,
+    product_code: str,
+    total_amount: str,
+    transaction_uuid: str,
+) -> Dict[str, Any]:
     params = {
-        "total_amount": total_amount,
         "product_code": product_code,
+        "total_amount": total_amount,
         "transaction_uuid": transaction_uuid,
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-        r = await client.get(ESEWA_STATUS_URL, params=params)
-        r.raise_for_status()
-        data = r.json()
-        if not isinstance(data, dict):
-            raise HTTPException(502, "Unexpected response from eSewa status API")
-        return data
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(ESEWA_STATUS_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"eSewa status API error: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="Unexpected response from eSewa status API")
+
+    return data
 
 
 def _apply_esewa_status(payment: Payment, status: str, ref_id: Optional[str]) -> None:
-
     s = (status or "").upper().strip()
 
     if s == "COMPLETE":
@@ -98,21 +141,53 @@ def _apply_esewa_status(payment: Payment, status: str, ref_id: Optional[str]) ->
         payment.order.status = OrderStatus.COMPLETED
         return
 
-    if s in {"PENDING", "AMBIGUOUS"}:
-        payment.status = PaymentStatus.AMBIGUOUS if s == "AMBIGUOUS" else PaymentStatus.PENDING
+    if s == "PENDING":
+        payment.status = PaymentStatus.PENDING
+        return
+
+    if s == "AMBIGUOUS":
+        payment.status = PaymentStatus.AMBIGUOUS
         return
 
     if s == "CANCELED":
+        payment.status = PaymentStatus.FAILED
+        payment.order.status = OrderStatus.CANCELLED
+        return
+
+    if s == "NOT_FOUND":
         payment.status = PaymentStatus.NOT_FOUND
         payment.order.status = OrderStatus.CANCELLED
         return
 
-    if s in {"FULL_REFUND", "PARTIAL_REFUND"}:
-        payment.status = PaymentStatus.FULL_REFUND if s == "FULL_REFUND" else PaymentStatus.PARTIAL_REFUND
+    if s == "FULL_REFUND":
+        payment.status = PaymentStatus.FULL_REFUND
+        return
+
+    if s == "PARTIAL_REFUND":
+        payment.status = PaymentStatus.PARTIAL_REFUND
         return
 
     payment.status = PaymentStatus.FAILED
     payment.order.status = OrderStatus.CANCELLED
+
+
+def _mark_latest_order_payment_failed(db: Session, order_id: int) -> None:
+    payment = (
+        db.query(Payment)
+        .filter(
+            Payment.order_id == order_id,
+            Payment.provider == PaymentProvider.ESEWA,
+        )
+        .order_by(Payment.id.desc())
+        .first()
+    )
+
+    if payment:
+        payment.status = PaymentStatus.FAILED
+        if payment.order:
+            payment.order.status = OrderStatus.CANCELLED
+        db.commit()
+
 
 @router.get("/initiate", response_class=HTMLResponse)
 def initiate(order_id: int, request: Request, db: Session = Depends(get_db)):
@@ -126,10 +201,12 @@ def initiate(order_id: int, request: Request, db: Session = Depends(get_db)):
     tax_amount = Decimal("0.00")
     product_service_charge = Decimal("0.00")
     product_delivery_charge = Decimal("0.00")
-    total_amount = (amount + tax_amount + product_service_charge + product_delivery_charge).quantize(Decimal("0.01"))
+    total_amount = (
+        amount + tax_amount + product_service_charge + product_delivery_charge
+    ).quantize(Decimal("0.01"))
 
-    success_url = str(request.url_for("esewa_success"))
-    failure_url = str(request.url_for("esewa_failure"))
+    success_url = f"{request.url_for('esewa_success')}?order_id={order.id}"
+    failure_url = f"{request.url_for('esewa_failure')}?order_id={order.id}"
 
     signed_field_names = "total_amount,transaction_uuid,product_code"
 
@@ -146,14 +223,15 @@ def initiate(order_id: int, request: Request, db: Session = Depends(get_db)):
         "signed_field_names": signed_field_names,
     }
 
-    msg = canonical_message(fields, signed_field_names)
-    fields["signature"] = hmac_sha256_base64(msg, ESEWA_SECRET_KEY)
+    message = canonical_message(fields, signed_field_names)
+    fields["signature"] = hmac_sha256_base64(message, ESEWA_SECRET_KEY)
 
     return auto_submit_form(ESEWA_FORM_URL, fields)
 
 
 @router.api_route("/success", methods=["GET", "POST"], name="esewa_success")
 async def success(request: Request, db: Session = Depends(get_db)):
+    order_id_from_query = request.query_params.get("order_id")
 
     data = request.query_params.get("data")
     if not data and request.method == "POST":
@@ -161,6 +239,15 @@ async def success(request: Request, db: Session = Depends(get_db)):
         data = form.get("data")
 
     if not data:
+        if order_id_from_query and order_id_from_query.isdigit():
+            return RedirectResponse(
+                url=build_frontend_result_url(
+                    order_id=int(order_id_from_query),
+                    payment_status="FAILED",
+                    esewa_status="FAILED",
+                ),
+                status_code=303,
+            )
         raise error_handler(400, "Missing data")
 
     decoded = decode_esewa_data(data)
@@ -173,51 +260,74 @@ async def success(request: Request, db: Session = Depends(get_db)):
     if not signed_field_names or not received_sig:
         raise error_handler(400, "Missing signature fields")
 
-    msg = canonical_message(decoded, signed_field_names)
-    computed_sig = hmac_sha256_base64(msg, ESEWA_SECRET_KEY)
+    message = canonical_message(decoded, signed_field_names)
+    computed_sig = hmac_sha256_base64(message, ESEWA_SECRET_KEY)
 
     if not _safe_eq(computed_sig, received_sig):
-        raise HTTPException(400, "Invalid signature")
+        raise HTTPException(status_code=400, detail="Invalid signature")
 
     tx_uuid = decoded.get("transaction_uuid")
     if not tx_uuid:
-        raise HTTPException(400, "Missing transaction_uuid")
+        raise HTTPException(status_code=400, detail="Missing transaction_uuid")
 
-    payment: Optional[Payment] = db.query(Payment).filter(Payment.transaction_uuid == tx_uuid).first()
+    payment: Optional[Payment] = (
+        db.query(Payment)
+        .filter(Payment.transaction_uuid == tx_uuid)
+        .first()
+    )
     if not payment:
-        raise HTTPException(404, "Payment not found")
+        raise HTTPException(status_code=404, detail="Payment not found")
 
-
-    product_code = str(decoded.get("product_code") or "")
-    total_amount = str(decoded.get("total_amount") or "")
+    product_code = str(decoded.get("product_code") or ESEWA_PRODUCT_CODE)
+    total_amount = str(decoded.get("total_amount") or "").strip()
     if not total_amount:
-       
         total_amount = money_str(Decimal(str(payment.amount)).quantize(Decimal("0.01")))
 
-    st = await status_check(
+    status_response = await status_check(
         product_code=product_code,
         total_amount=total_amount,
         transaction_uuid=tx_uuid,
     )
 
-    st_status = str(st.get("status") or "AMBIGUOUS")
-    st_ref_id = st.get("ref_id")
+    esewa_status = str(status_response.get("status") or "AMBIGUOUS").upper().strip()
+    ref_id = status_response.get("ref_id")
 
-    _apply_esewa_status(payment, st_status, st_ref_id)
+    _apply_esewa_status(payment, esewa_status, ref_id)
     db.commit()
+    db.refresh(payment)
 
-    return {
-        "ok": True,
-        "order_id": payment.order_id,
-        "payment_status": str(payment.status),
-        "esewa_status": st_status,
-        "ref_id": st_ref_id,
-    }
+    return RedirectResponse(
+        url=build_frontend_result_url(
+            order_id=payment.order_id,
+            payment_status=str(payment.status),
+            esewa_status=esewa_status,
+            ref_id=ref_id,
+        ),
+        status_code=303,
+    )
 
 
 @router.api_route("/failure", methods=["GET", "POST"], name="esewa_failure")
 async def failure(request: Request, db: Session = Depends(get_db)):
-    return {"ok": False, "message": "Payment failed or cancelled"}
+    order_id = request.query_params.get("order_id")
+
+    if order_id and order_id.isdigit():
+        numeric_order_id = int(order_id)
+        _mark_latest_order_payment_failed(db, numeric_order_id)
+
+        return RedirectResponse(
+            url=build_frontend_result_url(
+                order_id=numeric_order_id,
+                payment_status="FAILED",
+                esewa_status="CANCELED",
+            ),
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        url=f"{FRONTEND_BASE_URL}/payment/esewa/result?payment_status=FAILED&esewa_status=CANCELED",
+        status_code=303,
+    )
 
 
 @router.get("/poll/{order_id}")
@@ -235,9 +345,23 @@ async def poll(order_id: int, db: Session = Depends(get_db)):
         raise error_handler(404, "Payment not found")
 
     total_amount = money_str(Decimal(str(payment.amount)).quantize(Decimal("0.01")))
-    st = await status_check(
+
+    status_response = await status_check(
         product_code=ESEWA_PRODUCT_CODE,
         total_amount=total_amount,
         transaction_uuid=payment.transaction_uuid,
     )
-    return {"order_id": order_id, "status": st.get("status"), "ref_id": st.get("ref_id")}
+
+    esewa_status = str(status_response.get("status") or "AMBIGUOUS").upper().strip()
+    ref_id = status_response.get("ref_id")
+
+    _apply_esewa_status(payment, esewa_status, ref_id)
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "order_id": order_id,
+        "payment_status": str(payment.status),
+        "status": esewa_status,
+        "ref_id": ref_id,
+    }

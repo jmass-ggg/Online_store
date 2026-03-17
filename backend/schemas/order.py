@@ -66,3 +66,5 @@ class BuyNowResponse(BaseModel):
     status: str
     total_price: Decimal
     seller_count: int
+    payment_method: str
+    payment_redirect_url: Optional[str] = None

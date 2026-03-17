@@ -8,8 +8,27 @@ const BUY_NOW_KEY = "buy_now_item";
 const CHECKOUT_CTX_KEY = "checkout_context";
 
 function money(n) {
-  const v = Number(n || 0);
-  return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return Number(n || 0).toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+  });
+}
+
+function formatApiError(err) {
+  const detail = err?.detail;
+
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "field";
+        return `${field}: ${d.msg}`;
+      })
+      .join(" | ");
+  }
+
+  return err?.message || "Something went wrong";
 }
 
 function readLocalCartArray() {
@@ -45,21 +64,25 @@ function readBuyNow() {
   }
 }
 
-function formatApiError(err) {
-  const detail = err?.detail;
+function parseLine2(line2) {
+  const s = String(line2 || "").trim();
+  if (!s) return { zone: "", city: "", landmark: "" };
 
-  if (typeof detail === "string") return detail;
+  const parts = s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 
-  if (Array.isArray(detail)) {
-    return detail
-      .map((d) => {
-        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "field";
-        return `${field}: ${d.msg}`;
-      })
-      .join(" | ");
-  }
+  return {
+    zone: parts[0] || "",
+    city: parts[1] || "",
+    landmark: parts.slice(2).join(", ") || "",
+  };
+}
 
-  return err?.message || "Something went wrong";
+function jitterCoord(base, maxDelta = 0.03) {
+  const r = (Math.random() * 2 - 1) * maxDelta;
+  return Number((base + r).toFixed(6));
 }
 
 const NEPAL = {
@@ -98,7 +121,7 @@ const NEPAL = {
       lng: 83.99,
       cities: [
         { name: "Pokhara", zones: ["Lakeside", "Chipledhunga", "Bagar"] },
-        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk", "New Road Area"] },
+        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk"] },
       ],
     },
     {
@@ -114,7 +137,9 @@ const NEPAL = {
       name: "Karnali Province",
       lat: 28.6,
       lng: 81.6,
-      cities: [{ name: "Birendranagar", zones: ["Yarichowk", "Mangalgadhi", "Airport Area"] }],
+      cities: [
+        { name: "Birendranagar", zones: ["Yarichowk", "Mangalgadhi", "Airport Area"] },
+      ],
     },
     {
       name: "Sudurpashchim Province",
@@ -125,27 +150,6 @@ const NEPAL = {
   ],
 };
 
-function jitterCoord(base, maxDelta = 0.03) {
-  const r = (Math.random() * 2 - 1) * maxDelta;
-  return Number((base + r).toFixed(6));
-}
-
-function parseLine2(line2) {
-  const s = String(line2 || "").trim();
-  if (!s) return { zone: "", city: "", landmark: "" };
-
-  const parts = s
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-
-  return {
-    zone: parts[0] || "",
-    city: parts[1] || "",
-    landmark: parts.slice(2).join(", ") || "",
-  };
-}
-
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -155,7 +159,6 @@ export default function Checkout() {
   const [fullName, setFullName] = useState("");
   const [countryCode, setCountryCode] = useState("+977");
   const [phone, setPhone] = useState("");
-
   const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
   const [zone, setZone] = useState("");
@@ -163,27 +166,27 @@ export default function Checkout() {
   const [addressLine, setAddressLine] = useState("");
   const [postalCode, setPostalCode] = useState("");
 
-  const [saving, setSaving] = useState(false);
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [loadingOrder, setLoadingOrder] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [savedAddress, setSavedAddress] = useState(null);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [orderItems, setOrderItems] = useState([]);
+  const [errorMsg, setErrorMsg] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     const bump = () => setRefreshTick((t) => t + 1);
 
     window.addEventListener("cart:updated", bump);
-    window.addEventListener("storage", bump);
     window.addEventListener("buy_now:updated", bump);
+    window.addEventListener("storage", bump);
 
     return () => {
       window.removeEventListener("cart:updated", bump);
-      window.removeEventListener("storage", bump);
       window.removeEventListener("buy_now:updated", bump);
+      window.removeEventListener("storage", bump);
     };
   }, []);
 
@@ -198,11 +201,32 @@ export default function Checkout() {
         const list = await apiFetch("/addresses/");
         if (cancelled) return;
 
-        const arr = Array.isArray(list) ? list : [];
-        const newest = arr.length ? arr[0] : null;
+        const arr = Array.isArray(list) ? [...list] : [];
+        arr.sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
 
+        const newest = arr[0] || null;
         setSavedAddress(newest);
         setIsEditingAddress(!newest);
+
+        if (newest) {
+          const pn = String(newest.phone_number || "");
+          setFullName(newest.full_name || "");
+          setProvince(newest.region || "");
+          setAddressLine(newest.line1 || "");
+          setPostalCode(newest.postal_code || "");
+
+          if (pn.startsWith("+977")) {
+            setCountryCode("+977");
+            setPhone(pn.slice(4));
+          } else {
+            setPhone(pn);
+          }
+
+          const parsed = parseLine2(newest.line2);
+          setZone(parsed.zone);
+          setCity(parsed.city);
+          setLandmark(parsed.landmark);
+        }
       } catch (e) {
         if (!cancelled) setErrorMsg(formatApiError(e));
       } finally {
@@ -228,12 +252,15 @@ export default function Checkout() {
         const bn = readBuyNow();
 
         if (!bn) {
-          if (!cancelled) setOrderItems([]);
-          setLoadingOrder(false);
+          if (!cancelled) {
+            setOrderItems([]);
+            setLoadingOrder(false);
+          }
           return;
         }
 
         const it = bn.item;
+
         if (!cancelled) {
           setOrderItems([
             {
@@ -247,9 +274,9 @@ export default function Checkout() {
               color: it.color,
             },
           ]);
+          setLoadingOrder(false);
         }
 
-        setLoadingOrder(false);
         return;
       }
 
@@ -262,11 +289,12 @@ export default function Checkout() {
         const items = Array.isArray(cart?.items) ? cart.items : [];
         const enriched = items.map((it) => {
           const local = localMap.get(Number(it.variant_id));
+
           return {
             ...it,
             id: it.id ?? `cart_${it.variant_id}`,
             variant_id: Number(it.variant_id),
-            quantity: Number(it.quantity),
+            quantity: Number(it.quantity ?? 1),
             price: Number(it.price ?? local?.price ?? 0),
             product_name: local?.product_name || it.product_name,
             image_url: local?.image_url || it.image_url,
@@ -293,32 +321,29 @@ export default function Checkout() {
     };
   }, [refreshTick, isBuyNowMode]);
 
-  const itemsCount = useMemo(
-    () => orderItems.reduce((sum, it) => sum + Number(it.quantity || 0), 0),
-    [orderItems]
-  );
+  const itemsCount = useMemo(() => {
+    return orderItems.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+  }, [orderItems]);
 
-  const itemsTotal = useMemo(
-    () => orderItems.reduce((sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 0), 0),
-    [orderItems]
-  );
+  const itemsTotal = useMemo(() => {
+    return orderItems.reduce(
+      (sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 0),
+      0
+    );
+  }, [orderItems]);
 
-  // keep this same as backend if you want matching totals
   const deliveryFee = 100;
   const total = Math.max(0, itemsTotal + (itemsCount > 0 ? deliveryFee : 0));
 
-  const provinceObj = useMemo(
-    () => NEPAL.provinces.find((p) => p.name === province) || null,
-    [province]
-  );
+  const provinceObj = useMemo(() => {
+    return NEPAL.provinces.find((p) => p.name === province) || null;
+  }, [province]);
 
   const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
-
   const cityObj = useMemo(
     () => cityOptions.find((c) => c.name === city) || null,
     [cityOptions, city]
   );
-
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
 
   function handleProvinceChange(value) {
@@ -333,38 +358,32 @@ export default function Checkout() {
   }
 
   function startEdit() {
-    if (savedAddress) {
-      setFullName(savedAddress.full_name || "");
+    setErrorMsg("");
 
-      const pn = String(savedAddress.phone_number || "");
-      if (pn.startsWith("+977")) {
-        setCountryCode("+977");
-        setPhone(pn.replace("+977", "").trim());
-      } else {
-        setPhone(pn);
-      }
-
-      setProvince(savedAddress.region || "");
-      setAddressLine(savedAddress.line1 || "");
-      setPostalCode(savedAddress.postal_code || "");
-
-      const parsed = parseLine2(savedAddress.line2);
-      setZone(parsed.zone);
-      setCity(parsed.city);
-      setLandmark(parsed.landmark);
-    } else {
-      setFullName("");
-      setCountryCode("+977");
-      setPhone("");
-      setProvince("");
-      setCity("");
-      setZone("");
-      setLandmark("");
-      setAddressLine("");
-      setPostalCode("");
+    if (!savedAddress) {
+      setIsEditingAddress(true);
+      return;
     }
 
-    setErrorMsg("");
+    setFullName(savedAddress.full_name || "");
+
+    const pn = String(savedAddress.phone_number || "");
+    if (pn.startsWith("+977")) {
+      setCountryCode("+977");
+      setPhone(pn.slice(4));
+    } else {
+      setPhone(pn);
+    }
+
+    setProvince(savedAddress.region || "");
+    setAddressLine(savedAddress.line1 || "");
+    setPostalCode(savedAddress.postal_code || "");
+
+    const parsed = parseLine2(savedAddress.line2);
+    setZone(parsed.zone);
+    setCity(parsed.city);
+    setLandmark(parsed.landmark);
+
     setIsEditingAddress(true);
   }
 
@@ -484,61 +503,25 @@ export default function Checkout() {
 
   return (
     <div className="checkout-page">
-      <header className="ck-header">
-        <div className="ck-wrap ck-headerRow">
-          <div className="ck-brand">
-            <span className="ck-brandName">James</span>
-          </div>
-
-          <nav className="ck-nav">
-            <a href="#">Categories</a>
-            <a href="#">Flash Sale</a>
-          </nav>
-
-          <div className="ck-search">
-            <span className="ck-searchIcon" aria-hidden="true">
-              🔎
-            </span>
-            <input placeholder="Search for products..." />
-          </div>
-
-          <div className="ck-actions">
-            <button className="ck-iconBtn" aria-label="Cart">
-              🛒
-            </button>
-            <button className="ck-iconBtn" aria-label="Notifications">
-              🔔
-            </button>
-            <button className="ck-avatar" aria-label="Account">
-              👤
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main className="ck-wrap ck-main">
-        <div className="ck-breadcrumb">
+        <div className="ck-breadcrumb" style={{ marginBottom: 16 }}>
           <Link to="/">Home</Link>
           <span className="ck-sep">›</span>
-          <a href="#">Cart</a>
-          <span className="ck-sep">›</span>
-          <span className="ck-current">Checkout</span>
-          {isBuyNowMode && <span style={{ marginLeft: 8, opacity: 0.7 }}>(Buy Now)</span>}
+          <span>Checkout</span>
+          {isBuyNowMode ? (
+            <span style={{ marginLeft: 8, opacity: 0.7 }}>(Buy Now)</span>
+          ) : null}
         </div>
 
         <div className="ck-grid">
           <section className="ck-card ck-left">
             <div className="ck-cardHeader">
-              <div className="ck-step">
-                <span className="ck-stepDot">1</span>
-                <h2 className="ck-h2">Delivery Information</h2>
-              </div>
-              <div className="ck-stepText">Step 1 of 2</div>
+              <h2 className="ck-h2">Delivery Information</h2>
             </div>
 
-            {loadingAddress && <div className="ck-hint">Loading saved addresses…</div>}
+            {loadingAddress ? <div className="ck-hint">Loading address…</div> : null}
 
-            {savedAddress && (
+            {savedAddress && !isEditingAddress ? (
               <div className="ship-card">
                 <div className="ship-head">
                   <div className="ship-title">Shipping Address</div>
@@ -563,57 +546,7 @@ export default function Checkout() {
                   </span>
                 </div>
               </div>
-            )}
-
-            <div className="ck-itemsUnderAddress">
-              <div className="ck-itemsHead">
-                <div className="ck-itemsTitle">Package 1 of 1</div>
-                <div className="ck-itemsSub">
-                  Fulfilled by <b>James</b>
-                </div>
-              </div>
-
-              <div className="ck-itemsBody">
-                {loadingOrder && <div className="ck-hint">Loading items…</div>}
-
-                {!loadingOrder && orderItems.length === 0 && (
-                  <div className="ck-hint">No items to show.</div>
-                )}
-
-                {!loadingOrder &&
-                  orderItems.map((it) => {
-                    const src = joinUrl(it.image_url || "") || "/shoes.jpg";
-
-                    return (
-                      <div className="ck-itemRow" key={`left_${it.id}`}>
-                        <img
-                          className="ck-itemImg"
-                          src={src}
-                          alt={it.product_name || "Product"}
-                          onError={(e) => {
-                            e.currentTarget.src = "/shoes.jpg";
-                          }}
-                        />
-
-                        <div className="ck-itemInfo">
-                          <div className="ck-itemName">
-                            {it.product_name || `Variant #${it.variant_id}`}
-                          </div>
-
-                          <div className="ck-itemMeta">
-                            {it.size ? <span>Size: {it.size}</span> : null}
-                            <span>Qty: {it.quantity}</span>
-                          </div>
-                        </div>
-
-                        <div className="ck-itemPrice">
-                          {money(Number(it.price) * Number(it.quantity))}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
+            ) : null}
 
             {(isEditingAddress || !savedAddress) && (
               <>
@@ -630,11 +563,7 @@ export default function Checkout() {
                   <div className="ck-field">
                     <label>Phone Number</label>
                     <div className="ck-phoneRow">
-                      <select
-                        value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value)}
-                        aria-label="Country code"
-                      >
+                      <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
                         <option value="+977">+977</option>
                       </select>
 
@@ -642,7 +571,6 @@ export default function Checkout() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="98XXXXXXXX"
-                        inputMode="numeric"
                       />
                     </div>
                   </div>
@@ -679,7 +607,11 @@ export default function Checkout() {
 
                   <div className="ck-field">
                     <label>Zone</label>
-                    <select value={zone} onChange={(e) => setZone(e.target.value)} disabled={!city}>
+                    <select
+                      value={zone}
+                      onChange={(e) => setZone(e.target.value)}
+                      disabled={!city}
+                    >
                       <option value="">Please choose your zone</option>
                       {zoneOptions.map((z) => (
                         <option key={z} value={z}>
@@ -717,63 +649,87 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {errorMsg && <div className="ck-error">{errorMsg}</div>}
+                {errorMsg ? <div className="ck-error">{errorMsg}</div> : null}
 
                 <div className="ck-footerRow" style={{ gap: 10 }}>
-                  {savedAddress && (
-                    <button
-                      className="ck-secondary"
-                      type="button"
-                      onClick={cancelEdit}
-                      disabled={saving}
-                    >
+                  {savedAddress ? (
+                    <button type="button" className="ck-secondary" onClick={cancelEdit} disabled={saving}>
                       CANCEL
                     </button>
-                  )}
+                  ) : null}
 
-                  <button
-                    className="ck-primary"
-                    type="button"
-                    onClick={saveAddress}
-                    disabled={saving}
-                  >
+                  <button type="button" className="ck-primary" onClick={saveAddress} disabled={saving}>
                     {saving ? "SAVING..." : "SAVE ADDRESS"}
                   </button>
                 </div>
               </>
             )}
 
-            {!isEditingAddress && savedAddress && errorMsg && <div className="ck-error">{errorMsg}</div>}
+            <div className="ck-itemsUnderAddress" style={{ marginTop: 24 }}>
+              <div className="ck-itemsHead">
+                <div className="ck-itemsTitle">Order Items</div>
+              </div>
+
+              <div className="ck-itemsBody">
+                {loadingOrder ? <div className="ck-hint">Loading items…</div> : null}
+
+                {!loadingOrder && orderItems.length === 0 ? (
+                  <div className="ck-hint">No items to show.</div>
+                ) : null}
+
+                {!loadingOrder &&
+                  orderItems.map((it) => {
+                    const src = joinUrl(it.image_url || "") || "/shoes.jpg";
+
+                    return (
+                      <div className="ck-itemRow" key={it.id}>
+                        <img
+                          className="ck-itemImg"
+                          src={src}
+                          alt={it.product_name || "Product"}
+                          onError={(e) => {
+                            e.currentTarget.src = "/shoes.jpg";
+                          }}
+                        />
+
+                        <div className="ck-itemInfo">
+                          <div className="ck-itemName">
+                            {it.product_name || `Variant #${it.variant_id}`}
+                          </div>
+                          <div className="ck-itemMeta">
+                            {it.size ? <span>Size: {it.size}</span> : null}
+                            {it.color ? <span>Color: {it.color}</span> : null}
+                            <span>Qty: {it.quantity}</span>
+                          </div>
+                        </div>
+
+                        <div className="ck-itemPrice">
+                          {money(Number(it.price) * Number(it.quantity))}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {!isEditingAddress && savedAddress && errorMsg ? (
+              <div className="ck-error">{errorMsg}</div>
+            ) : null}
           </section>
 
           <aside className="ck-card ck-right">
             <h3 className="ck-h3">Order Detail</h3>
 
             <div className="ck-lines">
-              {loadingOrder && (
-                <div className="ck-line">
-                  <span>Loading items…</span>
-                  <span />
+              {orderItems.map((it) => (
+                <div className="ck-line" key={`summary_${it.id}`}>
+                  <span>
+                    {it.product_name || `Variant #${it.variant_id}`}
+                    {it.size ? ` (${it.size})` : ""} × {it.quantity}
+                  </span>
+                  <span>{money(Number(it.price) * Number(it.quantity))}</span>
                 </div>
-              )}
-
-              {!loadingOrder && orderItems.length === 0 && (
-                <div className="ck-line">
-                  <span>No items in {isBuyNowMode ? "buy now" : "cart"}</span>
-                  <span />
-                </div>
-              )}
-
-              {!loadingOrder &&
-                orderItems.map((it) => (
-                  <div className="ck-line" key={it.id}>
-                    <span>
-                      {it.product_name || `Variant #${it.variant_id}`}
-                      {it.size ? ` (${it.size})` : ""} × {it.quantity}
-                    </span>
-                    <span>{money(Number(it.price) * Number(it.quantity))}</span>
-                  </div>
-                ))}
+              ))}
 
               <div className="ck-divider" />
 
@@ -795,8 +751,6 @@ export default function Checkout() {
                 <span className="ck-totalLabel">Total</span>
                 <span className="ck-totalValue">{money(itemsCount > 0 ? total : 0)}</span>
               </div>
-
-              <div className="ck-vat">VAT included where applicable</div>
             </div>
 
             <button
@@ -808,11 +762,11 @@ export default function Checkout() {
               PROCEED TO PAYMENT
             </button>
 
-            {!savedAddress && (
+            {!savedAddress ? (
               <div className="ck-terms" style={{ marginTop: 12 }}>
                 Please <b>save a shipping address</b> to proceed.
               </div>
-            )}
+            ) : null}
           </aside>
         </div>
       </main>

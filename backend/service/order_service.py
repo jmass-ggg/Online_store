@@ -168,7 +168,7 @@ def place_order_service(
         cart.status = "CHECKED_OUT"
         
 
-    return order, items_subtotal, len(seller_subtotals)
+    return order, grand_total, len(seller_subtotals)
 
 
 def buy_now_service(
