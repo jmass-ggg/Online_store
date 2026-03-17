@@ -5,6 +5,10 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 
 import Shoes from "./pages/Shoes.jsx";
+import Clothes from "./pages/Clothes.jsx";
+import Accessories from "./pages/Accessories.jsx";
+import Jewellery from "./pages/Jewellery.jsx";
+
 import Product from "./pages/Product.jsx";
 import AllProduct from "./pages/AllProduct.jsx";
 import Cart from "./pages/Cart.jsx";
@@ -35,6 +39,33 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shoes />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/clothes"
+        element={
+          <ProtectedRoute>
+            <Clothes />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/accessories"
+        element={
+          <ProtectedRoute>
+            <Accessories />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/jewellery"
+        element={
+          <ProtectedRoute>
+            <Jewellery />
           </ProtectedRoute>
         }
       />
@@ -75,7 +106,6 @@ export default function App() {
         }
       />
 
-      {/* IMPORTANT: keep this public */}
       <Route path="/payment/esewa/result" element={<EsewaResult />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

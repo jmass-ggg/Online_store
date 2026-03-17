@@ -15,48 +15,50 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // header shadow on scroll
   useEffect(() => {
     const topbar = document.getElementById("topbar");
+
     const onScroll = () => {
       if (!topbar) return;
       topbar.classList.toggle("scrolled", window.scrollY > 8);
     };
+
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // sync login state across tabs + after login
   useEffect(() => {
     const sync = () => setIsLoggedIn(isLoggedInNow());
     window.addEventListener("storage", sync);
     window.addEventListener("auth:changed", sync);
+
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("auth:changed", sync);
     };
   }, []);
 
-  // close dropdown on outside click / ESC
   useEffect(() => {
     const onDocDown = (e) => {
       if (!menuOpen) return;
       if (!menuRef.current) return;
       if (!menuRef.current.contains(e.target)) setMenuOpen(false);
     };
+
     const onEsc = (e) => {
       if (e.key === "Escape") setMenuOpen(false);
     };
+
     document.addEventListener("mousedown", onDocDown);
     document.addEventListener("keydown", onEsc);
+
     return () => {
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onEsc);
     };
   }, [menuOpen]);
 
-  // ✅ if later you store avatar_url
   const avatarUrl = useMemo(() => localStorage.getItem("avatar_url") || "", [isLoggedIn]);
 
   const initials = useMemo(() => {
@@ -80,7 +82,6 @@ export default function Home() {
 
   return (
     <div className="frame">
-      {/* HEADER */}
       <header className="topbar" id="topbar">
         <nav className="nav" aria-label="Primary">
           <button className="nav-btn" type="button">Catalog</button>
@@ -90,18 +91,26 @@ export default function Home() {
 
         <div className="logo-wrap">
           <Link className="logo" to="/products" aria-label="All Products">
-  JAMES
-</Link>
-
+            JAMES
+          </Link>
         </div>
 
         <div className="actions" role="group" aria-label="Quick actions">
           {!isLoggedIn ? (
             <>
-              <button className="auth-btn auth-login" type="button" onClick={() => nav("/login")}>
+              <button
+                className="auth-btn auth-login"
+                type="button"
+                onClick={() => nav("/login")}
+              >
                 LOGIN
               </button>
-              <button className="auth-btn auth-signup" type="button" onClick={() => nav("/register")}>
+
+              <button
+                className="auth-btn auth-signup"
+                type="button"
+                onClick={() => nav("/register")}
+              >
                 Sign up
               </button>
             </>
@@ -148,7 +157,12 @@ export default function Home() {
 
                   <div className="profileDivider" />
 
-                  <button className="profileItem danger" type="button" role="menuitem" onClick={logout}>
+                  <button
+                    className="profileItem danger"
+                    type="button"
+                    role="menuitem"
+                    onClick={logout}
+                  >
                     Logout
                   </button>
                 </div>
@@ -158,7 +172,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* HERO */}
       <main className="hero">
         <div className="shop-block">
           <div className="barcode" aria-hidden="true"></div>
@@ -174,18 +187,17 @@ export default function Home() {
             as it feels.
           </p>
 
-          
-            <div className="btn-row">
-  <button className="btn" type="button" onClick={() => nav("/products")}>
-  Shop now ///
-</button>
-  <button className="btn btn-outline">Learn more</button>
-</div>
-
+          <div className="btn-row">
+            <button className="btn" type="button" onClick={() => nav("/products")}>
+              Shop now ///
+            </button>
+            <button className="btn btn-outline" type="button">
+              Learn more
+            </button>
+          </div>
         </div>
       </main>
 
-      {/* SPOTLIGHT */}
       <section className="spotlight">
         <h2 className="spotlight-title">SPOTLIGHT</h2>
         <p className="spotlight-sub">
@@ -201,26 +213,26 @@ export default function Home() {
             <span className="spotlight-label">Shoes</span>
           </Link>
 
-          <div className="spotlight-item">
+          <Link to="/clothes" className="spotlight-item spotlight-link">
             <span className="spotlight-img">
               <img src="/clothes.jpg" alt="Clothes" />
             </span>
             <span className="spotlight-label">Clothes</span>
-          </div>
+          </Link>
 
-          <div className="spotlight-item">
+          <Link to="/jewellery" className="spotlight-item spotlight-link">
             <span className="spotlight-img">
               <img src="/jewellery.jpg" alt="Jewellery" />
             </span>
             <span className="spotlight-label">Jewellery</span>
-          </div>
+          </Link>
 
-          <div className="spotlight-item">
+          <Link to="/accessories" className="spotlight-item spotlight-link">
             <span className="spotlight-img">
               <img src="/accessories.jpg" alt="Accessories" />
             </span>
             <span className="spotlight-label">Accessories</span>
-          </div>
+          </Link>
         </div>
       </section>
     </div>
