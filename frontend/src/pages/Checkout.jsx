@@ -8,10 +8,10 @@ const BUY_NOW_KEY = "buy_now_item";
 const CHECKOUT_CTX_KEY = "checkout_context";
 
 function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-  });
+  return `Rs. ${Number(n || 0).toLocaleString("en-NP", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function formatApiError(err) {
@@ -92,8 +92,14 @@ const NEPAL = {
       lat: 26.67,
       lng: 87.27,
       cities: [
-        { name: "Biratnagar", zones: ["Main Road", "Traffic Chowk", "Bargachhi"] },
-        { name: "Dharan", zones: ["Bhanuchowk", "Putali Line", "Siddha Kali"] },
+        {
+          name: "Biratnagar",
+          zones: ["Main Road", "Traffic Chowk", "Bargachhi"],
+        },
+        {
+          name: "Dharan",
+          zones: ["Bhanuchowk", "Putali Line", "Siddha Kali"],
+        },
       ],
     },
     {
@@ -101,8 +107,14 @@ const NEPAL = {
       lat: 26.72,
       lng: 85.92,
       cities: [
-        { name: "Janakpur", zones: ["Ramanand Chowk", "Mills Area", "Kuwa"] },
-        { name: "Birgunj", zones: ["Ghantaghar", "Adarshanagar", "Dryport"] },
+        {
+          name: "Janakpur",
+          zones: ["Ramanand Chowk", "Mills Area", "Kuwa"],
+        },
+        {
+          name: "Birgunj",
+          zones: ["Ghantaghar", "Adarshanagar", "Dryport"],
+        },
       ],
     },
     {
@@ -110,9 +122,18 @@ const NEPAL = {
       lat: 27.72,
       lng: 85.32,
       cities: [
-        { name: "Kathmandu", zones: ["New Baneshwor", "Koteshwor", "Kalanki", "Boudha"] },
-        { name: "Lalitpur", zones: ["Jawalakhel", "Patan", "Satdobato"] },
-        { name: "Bhaktapur", zones: ["Suryabinayak", "Thimi", "Durbar Square"] },
+        {
+          name: "Kathmandu",
+          zones: ["New Baneshwor", "Koteshwor", "Kalanki", "Boudha"],
+        },
+        {
+          name: "Lalitpur",
+          zones: ["Jawalakhel", "Patan", "Satdobato"],
+        },
+        {
+          name: "Bhaktapur",
+          zones: ["Suryabinayak", "Thimi", "Durbar Square"],
+        },
       ],
     },
     {
@@ -120,8 +141,14 @@ const NEPAL = {
       lat: 28.21,
       lng: 83.99,
       cities: [
-        { name: "Pokhara", zones: ["Lakeside", "Chipledhunga", "Bagar"] },
-        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk"] },
+        {
+          name: "Pokhara",
+          zones: ["Lakeside", "Chipledhunga", "Bagar"],
+        },
+        {
+          name: "Beni",
+          zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk"],
+        },
       ],
     },
     {
@@ -129,8 +156,14 @@ const NEPAL = {
       lat: 27.53,
       lng: 83.45,
       cities: [
-        { name: "Butwal", zones: ["Traffic Chowk", "Golpark", "Kalikanagar"] },
-        { name: "Bhairahawa", zones: ["Siddharthnagar", "Buspark", "Airport Area"] },
+        {
+          name: "Butwal",
+          zones: ["Traffic Chowk", "Golpark", "Kalikanagar"],
+        },
+        {
+          name: "Bhairahawa",
+          zones: ["Siddharthnagar", "Buspark", "Airport Area"],
+        },
       ],
     },
     {
@@ -138,23 +171,89 @@ const NEPAL = {
       lat: 28.6,
       lng: 81.6,
       cities: [
-        { name: "Birendranagar", zones: ["Yarichowk", "Mangalgadhi", "Airport Area"] },
+        {
+          name: "Birendranagar",
+          zones: ["Yarichowk", "Mangalgadhi", "Airport Area"],
+        },
       ],
     },
     {
       name: "Sudurpashchim Province",
       lat: 28.95,
       lng: 80.18,
-      cities: [{ name: "Dhangadhi", zones: ["Campus Road", "Hasanpur", "Chatakpur"] }],
+      cities: [
+        {
+          name: "Dhangadhi",
+          zones: ["Campus Road", "Hasanpur", "Chatakpur"],
+        },
+      ],
     },
   ],
 };
+
+function CheckoutHeader() {
+  const navigate = useNavigate();
+
+  return (
+    <header className="ck-header">
+      <div className="ck-wrap">
+        <div className="ck-headerRow">
+          <Link to="/" className="ck-brand">
+            <span className="ck-brandName">JAMES</span>
+          </Link>
+
+          <nav className="ck-nav">
+            <Link to="/products">Categories</Link>
+            <Link to="/products">Flash Sale</Link>
+          </nav>
+
+          <div className="ck-search">
+            <span className="ck-searchIcon">🔎</span>
+            <input type="text" placeholder="Search for products..." />
+          </div>
+
+          <div className="ck-actions">
+            <button
+              type="button"
+              className="ck-iconBtn"
+              onClick={() => navigate("/cart")}
+              aria-label="Cart"
+              title="Cart"
+            >
+              🛒
+            </button>
+
+            <button
+              type="button"
+              className="ck-iconBtn"
+              aria-label="Notifications"
+              title="Notifications"
+            >
+              🔔
+            </button>
+
+            <button
+              type="button"
+              className="ck-avatar"
+              onClick={() => navigate("/login")}
+              aria-label="Profile"
+              title="Profile"
+            >
+              👤
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
 
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isBuyNowMode = new URLSearchParams(location.search).get("mode") === "buy_now";
+  const isBuyNowMode =
+    new URLSearchParams(location.search).get("mode") === "buy_now";
 
   const [fullName, setFullName] = useState("");
   const [countryCode, setCountryCode] = useState("+977");
@@ -210,6 +309,7 @@ export default function Checkout() {
 
         if (newest) {
           const pn = String(newest.phone_number || "");
+
           setFullName(newest.full_name || "");
           setProvince(newest.region || "");
           setAddressLine(newest.line1 || "");
@@ -228,9 +328,13 @@ export default function Checkout() {
           setLandmark(parsed.landmark);
         }
       } catch (e) {
-        if (!cancelled) setErrorMsg(formatApiError(e));
+        if (!cancelled) {
+          setErrorMsg(formatApiError(e));
+        }
       } finally {
-        if (!cancelled) setLoadingAddress(false);
+        if (!cancelled) {
+          setLoadingAddress(false);
+        }
       }
     }
 
@@ -287,6 +391,7 @@ export default function Checkout() {
         if (cancelled) return;
 
         const items = Array.isArray(cart?.items) ? cart.items : [];
+
         const enriched = items.map((it) => {
           const local = localMap.get(Number(it.variant_id));
 
@@ -310,7 +415,9 @@ export default function Checkout() {
           setErrorMsg(formatApiError(e));
         }
       } finally {
-        if (!cancelled) setLoadingOrder(false);
+        if (!cancelled) {
+          setLoadingOrder(false);
+        }
       }
     }
 
@@ -340,10 +447,11 @@ export default function Checkout() {
   }, [province]);
 
   const cityOptions = useMemo(() => provinceObj?.cities || [], [provinceObj]);
-  const cityObj = useMemo(
-    () => cityOptions.find((c) => c.name === city) || null,
-    [cityOptions, city]
-  );
+
+  const cityObj = useMemo(() => {
+    return cityOptions.find((c) => c.name === city) || null;
+  }, [cityOptions, city]);
+
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
 
   function handleProvinceChange(value) {
@@ -503,13 +611,15 @@ export default function Checkout() {
 
   return (
     <div className="checkout-page">
+      <CheckoutHeader />
+
       <main className="ck-wrap ck-main">
-        <div className="ck-breadcrumb" style={{ marginBottom: 16 }}>
+        <div className="ck-breadcrumb">
           <Link to="/">Home</Link>
           <span className="ck-sep">›</span>
           <span>Checkout</span>
           {isBuyNowMode ? (
-            <span style={{ marginLeft: 8, opacity: 0.7 }}>(Buy Now)</span>
+            <span className="ck-buyNowFlag">(Buy Now)</span>
           ) : null}
         </div>
 
@@ -519,13 +629,19 @@ export default function Checkout() {
               <h2 className="ck-h2">Delivery Information</h2>
             </div>
 
-            {loadingAddress ? <div className="ck-hint">Loading address…</div> : null}
+            {loadingAddress ? (
+              <div className="ck-hint">Loading address…</div>
+            ) : null}
 
             {savedAddress && !isEditingAddress ? (
               <div className="ship-card">
                 <div className="ship-head">
                   <div className="ship-title">Shipping Address</div>
-                  <button type="button" className="ship-edit" onClick={startEdit}>
+                  <button
+                    type="button"
+                    className="ship-edit"
+                    onClick={startEdit}
+                  >
                     EDIT
                   </button>
                 </div>
@@ -541,7 +657,9 @@ export default function Checkout() {
                     {savedAddress.line1}
                     {savedAddress.line2 ? `, ${savedAddress.line2}` : ""}
                     {savedAddress.region ? `, ${savedAddress.region}` : ""}
-                    {savedAddress.postal_code ? `, ${savedAddress.postal_code}` : ""}
+                    {savedAddress.postal_code
+                      ? `, ${savedAddress.postal_code}`
+                      : ""}
                     {savedAddress.country ? `, ${savedAddress.country}` : ""}
                   </span>
                 </div>
@@ -563,7 +681,10 @@ export default function Checkout() {
                   <div className="ck-field">
                     <label>Phone Number</label>
                     <div className="ck-phoneRow">
-                      <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
+                      <select
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                      >
                         <option value="+977">+977</option>
                       </select>
 
@@ -579,8 +700,13 @@ export default function Checkout() {
                 <div className="ck-formGrid" style={{ marginTop: 10 }}>
                   <div className="ck-field">
                     <label>Province / Region</label>
-                    <select value={province} onChange={(e) => handleProvinceChange(e.target.value)}>
-                      <option value="">Please choose your province / region</option>
+                    <select
+                      value={province}
+                      onChange={(e) => handleProvinceChange(e.target.value)}
+                    >
+                      <option value="">
+                        Please choose your province / region
+                      </option>
                       {NEPAL.provinces.map((p) => (
                         <option key={p.name} value={p.name}>
                           {p.name}
@@ -653,25 +779,37 @@ export default function Checkout() {
 
                 <div className="ck-footerRow" style={{ gap: 10 }}>
                   {savedAddress ? (
-                    <button type="button" className="ck-secondary" onClick={cancelEdit} disabled={saving}>
+                    <button
+                      type="button"
+                      className="ck-secondary"
+                      onClick={cancelEdit}
+                      disabled={saving}
+                    >
                       CANCEL
                     </button>
                   ) : null}
 
-                  <button type="button" className="ck-primary" onClick={saveAddress} disabled={saving}>
+                  <button
+                    type="button"
+                    className="ck-primary"
+                    onClick={saveAddress}
+                    disabled={saving}
+                  >
                     {saving ? "SAVING..." : "SAVE ADDRESS"}
                   </button>
                 </div>
               </>
             )}
 
-            <div className="ck-itemsUnderAddress" style={{ marginTop: 24 }}>
+            <div className="ck-itemsUnderAddress">
               <div className="ck-itemsHead">
                 <div className="ck-itemsTitle">Order Items</div>
               </div>
 
               <div className="ck-itemsBody">
-                {loadingOrder ? <div className="ck-hint">Loading items…</div> : null}
+                {loadingOrder ? (
+                  <div className="ck-hint">Loading items…</div>
+                ) : null}
 
                 {!loadingOrder && orderItems.length === 0 ? (
                   <div className="ck-hint">No items to show.</div>
@@ -696,6 +834,7 @@ export default function Checkout() {
                           <div className="ck-itemName">
                             {it.product_name || `Variant #${it.variant_id}`}
                           </div>
+
                           <div className="ck-itemMeta">
                             {it.size ? <span>Size: {it.size}</span> : null}
                             {it.color ? <span>Color: {it.color}</span> : null}
@@ -724,8 +863,8 @@ export default function Checkout() {
               {orderItems.map((it) => (
                 <div className="ck-line" key={`summary_${it.id}`}>
                   <span>
-                    {it.product_name || `Variant #${it.variant_id}`}
-                    {it.size ? ` (${it.size})` : ""} × {it.quantity}
+                    {it.product_name || `Variant #${it.variant_id}`}{" "}
+                    {it.size ? `(${it.size})` : ""} × {it.quantity}
                   </span>
                   <span>{money(Number(it.price) * Number(it.quantity))}</span>
                 </div>
@@ -749,7 +888,9 @@ export default function Checkout() {
 
               <div className="ck-totalRow">
                 <span className="ck-totalLabel">Total</span>
-                <span className="ck-totalValue">{money(itemsCount > 0 ? total : 0)}</span>
+                <span className="ck-totalValue">
+                  {money(itemsCount > 0 ? total : 0)}
+                </span>
               </div>
             </div>
 
@@ -763,7 +904,7 @@ export default function Checkout() {
             </button>
 
             {!savedAddress ? (
-              <div className="ck-terms" style={{ marginTop: 12 }}>
+              <div className="ck-terms">
                 Please <b>save a shipping address</b> to proceed.
               </div>
             ) : null}
