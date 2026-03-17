@@ -5,18 +5,18 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
-
+from backend.models.order import PaymentMethod
 
 class PlaceOrderRequest(BaseModel):
     address_id: int = Field(..., gt=0)
-    payment_method: str
+    payment_method: PaymentMethod
 
 class PlaceOrderResponse(BaseModel):
     order_id: int
     status: str
     total_price: Decimal
     seller_count: int
-    payment_method: str
+    payment_method: PaymentMethod
     payment_redirect_url: Optional[str] = None
 
 
@@ -59,12 +59,12 @@ class BuyNowRequest(BaseModel):
     address_id: int = Field(..., gt=0)
     variant_id: int = Field(..., gt=0)
     quantity: int = Field(1, ge=1)
-    payment_method: str
+    payment_method: PaymentMethod
     
 class BuyNowResponse(BaseModel):
     order_id: int
     status: str
     total_price: Decimal
     seller_count: int
-    payment_method: str
+    payment_method: PaymentMethod
     payment_redirect_url: Optional[str] = None

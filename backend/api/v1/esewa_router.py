@@ -31,7 +31,7 @@ from backend.core.settings_esewa import (
 
 router = APIRouter(prefix="/payments/esewa", tags=["eSewa"])
 
-# change this in production
+
 FRONTEND_BASE_URL = "http://localhost:5173"
 
 

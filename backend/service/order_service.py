@@ -272,7 +272,7 @@ def buy_now_service(
             )
             if res.rowcount != 1:
                 raise error_handler(400, "Insufficient stock")
-            
+            db.commit()
         return order, grand_total, 1
     except IntegrityError:
         db.rollback()

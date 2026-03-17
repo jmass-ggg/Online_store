@@ -28,22 +28,21 @@ def place_order_api(
         db,
         user_id=current_user.id,
         address_id=payload.address_id,
-        paymentmethod=str(payload.payment_method),
+        paymentmethod=payload.payment_method.value,
     )
 
     payment_redirect_url = None
-    if str(payload.payment_method) == str(PaymentMethod.ESEWA):
+    if payload.payment_method == PaymentMethod.ESEWA:
         payment_redirect_url = f"/payments/esewa/initiate?order_id={order.id}"
 
     return PlaceOrderResponse(
         order_id=order.id,
-        status=str(order.status),
+        status=order.status.value if hasattr(order.status, "value") else str(order.status),
         total_price=total_price,
         seller_count=seller_count,
-        payment_method=str(order.payment_Method),
+        payment_method=order.payment_Method.value if hasattr(order.payment_Method, "value") else str(order.payment_Method),
         payment_redirect_url=payment_redirect_url,
     )
-
 
 @router.post("/buy-now", response_model=BuyNowResponse, status_code=200)
 def buy_now_api(
@@ -57,18 +56,18 @@ def buy_now_api(
         address_id=payload.address_id,
         variant_id=payload.variant_id,
         quantity=payload.quantity,
-        paymentmethod=str(payload.payment_method),
+        paymentmethod=payload.payment_method.value,
     )
 
     payment_redirect_url = None
-    if str(payload.payment_method) == str(PaymentMethod.ESEWA):
+    if payload.payment_method == PaymentMethod.ESEWA:
         payment_redirect_url = f"/payments/esewa/initiate?order_id={order.id}"
 
     return BuyNowResponse(
         order_id=order.id,
-        status=str(order.status),
+        status=order.status.value if hasattr(order.status, "value") else str(order.status),
         total_price=total_price,
         seller_count=seller_count,
-        payment_method=str(order.payment_Method),
+        payment_method=order.payment_Method.value if hasattr(order.payment_Method, "value") else str(order.payment_Method),
         payment_redirect_url=payment_redirect_url,
     )
