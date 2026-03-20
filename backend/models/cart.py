@@ -5,6 +5,8 @@ from datetime import datetime
 from sqlalchemy.orm import relationship,Mapped,mapped_column
 from enum import Enum
 from decimal import Decimal
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 class CartStauts(str,Enum):
     ACTIVE = "ACTIVE"
@@ -14,7 +16,7 @@ class CartStauts(str,Enum):
 class Cart(Base):
     __tablename__ = "carts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[uuid.uuid4] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     buyer_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("customer.id", ondelete="CASCADE"), nullable=False
     )

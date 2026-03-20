@@ -19,10 +19,13 @@ from sqlalchemy import (
     text,
 )
 from decimal import Decimal
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
 class DeliveryCharge(Base):
     __tablename__="deliveryCharge"
     
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[uuid.uuid4] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     
     Delivery:Mapped[Decimal]=mapped_column(Numeric(5,2),default=0.00)
     seller_id:Mapped[int]=mapped_column(Integer,

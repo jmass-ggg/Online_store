@@ -1,7 +1,11 @@
 from __future__ import annotations
 from decimal import Decimal
-from sqlalchemy import Integer, ForeignKey, UniqueConstraint,Numeric
+import uuid
+
+from sqlalchemy import ForeignKey, UniqueConstraint, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+
 from backend.database import Base
 
 
@@ -11,19 +15,24 @@ class CartItem(Base):
         UniqueConstraint("cart_id", "variant_id", name="uq_cart_variant"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    cart_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("carts.id", ondelete="CASCADE"),
-        nullable=False, index=True
+    cart_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("carts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
-    variant_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("product_variants.id", ondelete="CASCADE"),
-        nullable=False, index=True
+    variant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("product_variants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
-    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    price:Mapped[Decimal]=mapped_column(Numeric(12,2),nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False, default=1)
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
     cart: Mapped["Cart"] = relationship("Cart", back_populates="items")
     variant: Mapped["ProductVariant"] = relationship("ProductVariant", back_populates="cart_items")

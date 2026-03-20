@@ -1,30 +1,19 @@
 from __future__ import annotations
-
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+import uuid
 
-from sqlalchemy import (
-    Integer,
-    String,
-    DateTime,
-    ForeignKey,
-    Numeric,
-    Float,
-    Enum as SAEnum,
-    UniqueConstraint,
-    Index,
-    CheckConstraint,
-    func,
-    and_,
-    text,
-)
+from sqlalchemy import String, DateTime, ForeignKey, Numeric, Enum as SAEnum, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
 
 from backend.database import Base
 
-class PaymentProvider(str,Enum):
+
+class PaymentProvider(str, Enum):
     ESEWA = "ESEWA"
+
 
 class PaymentStatus(str, Enum):
     UNPAID = "UNPAID"
@@ -37,23 +26,30 @@ class PaymentStatus(str, Enum):
     FULL_REFUND = "FULL_REFUND"
     PARTIAL_REFUND = "PARTIAL_REFUND"
 
-class Payment(Base):
-    __tablename__="payments"
-    __table_args__=(
 
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("orders.id", ondelete="CASCADE"),
+        nullable=False,
     )
-    id:Mapped[int]=mapped_column(Integer,primary_key=True,index=True)
-    order_id:Mapped[int]=mapped_column(Integer,ForeignKey("orders.id",ondelete="CASCADE"),nullable=False)
-    provider:Mapped[PaymentProvider]=mapped_column(
-        SAEnum(PaymentProvider,name="payment_provider"),
+
+    provider: Mapped[PaymentProvider] = mapped_column(
+        SAEnum(PaymentProvider, name="payment_provider"),
         default=PaymentProvider.ESEWA,
-        nullable=False
+        nullable=False,
     )
+
     status: Mapped[PaymentStatus] = mapped_column(
         SAEnum(PaymentStatus, name="payment_status"),
         default=PaymentStatus.UNPAID,
         nullable=False,
     )
+
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     ref_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     transaction_uuid: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)

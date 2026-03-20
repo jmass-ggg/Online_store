@@ -1,12 +1,12 @@
 from __future__ import annotations
-
 from decimal import Decimal
 from datetime import datetime
-from sqlalchemy import (
-    Integer, String, Numeric, ForeignKey, Boolean, DateTime,
-    UniqueConstraint, Index, CheckConstraint
-)
+import uuid
+
+from sqlalchemy import String, Numeric, ForeignKey, Boolean, DateTime, UniqueConstraint, Index, CheckConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+
 from backend.database import Base
 
 
@@ -20,16 +20,18 @@ class ProductVariant(Base):
         Index("ix_variant_product_active", "product_id", "is_active"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("products.id", ondelete="CASCADE"),
-        nullable=False, index=True
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     sku: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
-    color: Mapped[str | None] = mapped_column(String)
-    size: Mapped[str | None] = mapped_column(String)
+    color: Mapped[str | None] = mapped_column(String, nullable=True)
+    size: Mapped[str | None] = mapped_column(String, nullable=True)
 
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -39,9 +41,5 @@ class ProductVariant(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     product: Mapped["Product"] = relationship("Product", back_populates="variants")
-
     cart_items: Mapped[list["CartItem"]] = relationship("CartItem", back_populates="variant")
-    orderitems: Mapped[list["OrderItem"]] = relationship(
-        "OrderItem",
-        back_populates="variant",
-    )
+    orderitems: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="variant")

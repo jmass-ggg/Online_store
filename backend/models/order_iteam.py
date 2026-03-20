@@ -1,22 +1,20 @@
-
 from __future__ import annotations
-
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+import uuid
 
-from sqlalchemy import (
-    Integer, DateTime, ForeignKey, Numeric, Enum as SAEnum,
-    UniqueConstraint, Index, CheckConstraint, func
-)
+from sqlalchemy import DateTime, ForeignKey, Numeric, Enum as SAEnum, UniqueConstraint, Index, CheckConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+
 from backend.database import Base
 
 
 class OrderItemStatus(str, Enum):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
-    HAND_OVER="HAND_OVER"
+    HAND_OVER = "HAND_OVER"
     SHIPPED = "SHIPPED"
     CANCELLED = "CANCELLED"
 
@@ -35,25 +33,14 @@ class OrderItem(Base):
         CheckConstraint("line_total >= 0", name="ck_order_items_line_total_nonnegative"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    order_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
-    )
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    seller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("seller.id", ondelete="RESTRICT"), nullable=False)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
+    variant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False)
 
-    seller_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("seller.id", ondelete="RESTRICT"), nullable=False
-    )
-
-    product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False
-    )
-
-    variant_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("product_variants.id", ondelete="RESTRICT"), nullable=False
-    )
-
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    quantity: Mapped[int] = mapped_column(nullable=False, default=1)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     line_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 
