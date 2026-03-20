@@ -48,9 +48,10 @@ def create_seller_application(db: Session, data: SellerApplicationCreate) -> Sel
     )
 
     try:
-        with db.begin():
-            db.add(seller)
-        return SellerResponse.from_orm(seller)
+        db.add(seller)
+        db.commit()
+        db.refresh(seller)
+        return SellerResponse.model_validate(seller)
     except IntegrityError as exc:
         db.rollback()
         error_message=str(exc.orig).lower()
@@ -76,7 +77,7 @@ def admin_approve_account(
     db: Session,
     seller_id: int,
     seller_approved: SellerVerificationUpdate
-):
+)->SellerResponse:
     seller = db.query(Seller).filter(Seller.id == seller_id).one_or_none()
     if seller is None:
         raise error_handler(404, "Seller not found")
@@ -89,7 +90,7 @@ def admin_approve_account(
         db.rollback()
         raise error_handler(500,"Failed to update seller status")
     db.refresh(seller)
-    return SellerResponse.from_orm(seller)
+    return SellerResponse.model_validate(seller)
 
     
 def update_seller_profile(
@@ -120,7 +121,7 @@ def update_seller_profile(
     db.commit()
     db.refresh(seller)
 
-    return SellerResponse.from_orm(seller)
+    return SellerResponse.model_validate(seller)
 
 
 def delete_seller_account(db: Session, current_user) -> dict:
@@ -130,6 +131,14 @@ def delete_seller_account(db: Session, current_user) -> dict:
     
     if seller is None:
         raise error_handler(404, "Seller not found")
+    try:
+        db.delete(seller)
+        db.commit()
+        return {"message": f"Seller '{seller.username}' deleted successfully."}
+
+    except SQLAlchemyError:
+        db.rollback()
+        raise error_handler(500, "Account deletion failed")
     
 
 

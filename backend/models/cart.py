@@ -17,8 +17,8 @@ class Cart(Base):
     __tablename__ = "carts"
 
     id: Mapped[uuid.uuid4] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
-    buyer_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("customer.id", ondelete="CASCADE"), nullable=False
+    buyer_id: Mapped[UUID] = mapped_column(
+        ForeignKey("customer.id", ondelete="CASCADE"), nullable=False
     )
     status: Mapped[str] = mapped_column(String, default="ACTIVE", nullable=False)
 

@@ -24,79 +24,6 @@ export default function Register() {
     alert("Google login not connected yet. Add your OAuth URL here.");
   }
 
-  function saveAuthTokens(res) {
-    // Accept different token field names (backend variations)
-    const access =
-      res?.access_token || res?.accessToken || res?.token || res?.auth_token || res?.authToken;
-
-    const refresh = res?.refresh_token || res?.refreshToken;
-
-    if (access) localStorage.setItem("access_token", access);
-    if (res?.auth_token) localStorage.setItem("auth_token", res.auth_token);
-    if (refresh) localStorage.setItem("refresh_token", refresh);
-
-    // Save username for Home initials
-    localStorage.setItem("username", form.username.trim());
-
-    // notify app to refresh auth state
-    window.dispatchEvent(new Event("auth:changed"));
-  }
-
-  async function tryAutoLogin(email, password) {
-    // We try multiple common FastAPI styles:
-    // 1) JSON body {email, password}
-    // 2) JSON body {username, password} (some APIs use "username" field)
-    // 3) Form-encoded (OAuth2PasswordRequestForm) username=<email>&password=<pw>
-    const attempts = [
-      {
-        name: "JSON email+password",
-        url: "/user/login",
-        options: {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        },
-      },
-      {
-        name: "JSON username+password",
-        url: "/user/login",
-        options: {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: email, password }),
-        },
-      },
-      {
-        name: "FORM username+password",
-        url: "/user/login",
-        options: {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ username: email, password }).toString(),
-        },
-      },
-    ];
-
-    let lastErr = null;
-
-    for (const a of attempts) {
-      try {
-        const res = await apiFetch(a.url, a.options);
-
-        // must contain some token to be considered success
-        const hasToken =
-          res?.access_token || res?.accessToken || res?.token || res?.auth_token || res?.authToken;
-
-        if (!hasToken) throw new Error("Login response did not include a token.");
-        return res;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-
-    throw lastErr || new Error("Auto-login failed");
-  }
-
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
@@ -110,19 +37,14 @@ export default function Register() {
     };
 
     try {
-      // 1) Register
       await apiFetch("/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      // 2) Auto-login
-      const loginRes = await tryAutoLogin(payload.email, payload.password);
-
-      // 3) Save token + redirect Home
-      saveAuthTokens(loginRes);
-      nav("/", { replace: true });
+      // after register, go to login page only
+      nav("/login", { replace: true });
     } catch (err) {
       setError(err?.message || "Something went wrong");
     } finally {
