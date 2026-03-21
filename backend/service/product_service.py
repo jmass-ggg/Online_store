@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import os
 import shutil
+from sqlalchemy import select, and_
 from decimal import Decimal
 from sqlalchemy.exc import SQLAlchemyError
 from backend.database import get_db
@@ -294,7 +295,6 @@ def search_products(
 
     products = query.offset(skip).limit(limit).all()
     return [ProductRead.model_validate(p) for p in products]
-
 def view_all_product(
     db: Session,
     category: Optional[ProductCategory] = None,
@@ -302,18 +302,17 @@ def view_all_product(
     limit: int = 20,
     only_active: bool = True,
 ):
+    V = aliased(ProductVariant)
 
     first_variant_sq = (
         db.query(
             ProductVariant.product_id.label("pid"),
-            func.min(ProductVariant.id).label("vid"),
+            func.min(ProductVariant.created_at).label("first_created_at"),
         )
         .filter(ProductVariant.is_active == True)
         .group_by(ProductVariant.product_id)
         .subquery()
     )
-
-    V = aliased(ProductVariant)
 
     q = (
         db.query(
@@ -322,7 +321,14 @@ def view_all_product(
             V.price.label("default_price"),
         )
         .outerjoin(first_variant_sq, first_variant_sq.c.pid == Product.id)
-        .outerjoin(V, V.id == first_variant_sq.c.vid)
+        .outerjoin(
+            V,
+            and_(
+                V.product_id == first_variant_sq.c.pid,
+                V.created_at == first_variant_sq.c.first_created_at,
+                V.is_active == True,
+            ),
+        )
     )
 
     if only_active:
@@ -333,9 +339,9 @@ def view_all_product(
 
     rows = (
         q.order_by(Product.created_at.desc())
-         .offset(skip)
-         .limit(limit)
-         .all()
+        .offset(skip)
+        .limit(limit)
+        .all()
     )
 
     out = []
@@ -346,7 +352,6 @@ def view_all_product(
         out.append(base)
 
     return out
-
 from sqlalchemy import select
 
 def get_product_options(db: Session, product_id: UUID):

@@ -25,6 +25,10 @@ from backend.models.admin import Admin
 UPLOAD_FOLDER="backend/uploads/"
 router=APIRouter(prefix="/product",tags=["Product"])
 
+@router.get("/products/{product_id}/options")
+def product_options(product_id: UUID, db: Session = Depends(get_db)):
+    return get_product_options(db, product_id)
+
 @router.get("/", response_model=List[ProductListRead])
 def get_all_product(
     category: Optional[ProductCategory] = Query(None),
@@ -39,9 +43,6 @@ def get_all_product(
         limit=limit,
         only_active=True,
     )
-@router.get("/products/{product_id}/options")
-def product_options(product_id: UUID, db: Session = Depends(get_db)):
-    return get_product_options(db, product_id)
 
 @router.get("/slug/{slug}", response_model=AllProduct)
 def get_product_by_slug(

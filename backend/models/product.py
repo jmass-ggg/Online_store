@@ -29,7 +29,7 @@ class ProductStatus(str, Enum):
 class Product(Base):
     __tablename__ = "products"
 
-    id: Mapped[uuid.uuid4] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
 
     product_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     url_slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
