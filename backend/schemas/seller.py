@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, ConfigDict
-
+from pydantic import BaseModel, ConfigDict, EmailStr
+from backend.models.role import RoleChoices
 from backend.models.seller import SellerVerification
 
 
@@ -11,7 +12,7 @@ class SellerBase(BaseModel):
     email: EmailStr
     phone_number: str
     business_name: str
-    business_type: str = "Individual"
+    business_type:Optional[str] = "Individual"
     business_address: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -34,19 +35,19 @@ class SellerApplicationCreate(SellerBase):
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str
+    token_type: str = "bearer"
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class SellerReviewUpdate(BaseModel):
-    status: str
+    status: SellerVerification
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class SellerResponse(BaseModel):
-    id: int
+    id: UUID
     username: str
     email: EmailStr
     phone_number: str
@@ -58,17 +59,18 @@ class SellerResponse(BaseModel):
     status: SellerVerification
     is_verified: bool
 
-    kyc_document_type: str
-    kyc_document_number: str
+    kyc_document_type: Optional[str] = None
+    kyc_document_number: Optional[str] = None
 
-    bank_account_name: str
-    bank_account_number: str
-    bank_name: str
-    bank_branch: str
+    bank_account_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_branch: Optional[str] = None
 
     created_at: datetime
     updated_at: datetime
 
+    role_name:RoleChoices
     model_config = ConfigDict(from_attributes=True)
 
 

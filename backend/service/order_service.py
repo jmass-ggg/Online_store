@@ -17,6 +17,7 @@ from backend.models.order_address import OrderAddress
 from backend.models.order_iteam import OrderItem, OrderItemStatus
 from backend.models.order_fullments import OrderFulfillment, FulfillmentStatus
 
+from uuid import UUID
 DELIVERY_CHARGE = Decimal("100.00")
 
 
@@ -30,8 +31,8 @@ def _begin_tx(db:Session):
 def place_order_service(
     db: Session,
     *,
-    user_id: int,
-    address_id: int,
+    user_id: UUID,
+    address_id: UUID,
     paymentmethod: str,
 ) -> Tuple[Order, Decimal, int]:
   
@@ -174,9 +175,9 @@ def place_order_service(
 def buy_now_service(
     db: Session,
     *,
-    user_id: int,
-    address_id: int,
-    variant_id: int,
+    user_id: UUID,
+    address_id: UUID,
+    variant_id: UUID,
     quantity: int,
     paymentmethod: str,
 ) -> Tuple[Order, Decimal, int]:

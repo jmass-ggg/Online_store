@@ -17,7 +17,8 @@ rough.txt
 # Docker
 *.log
 docker-compose.override.yml
-
+alembic
+alembic.ini
 # Node / Frontend
 frontend/node_modules/
 frontend/build/

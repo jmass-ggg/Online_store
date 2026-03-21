@@ -1,9 +1,12 @@
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, String, Enum as SAEnum
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from backend.database import Base
-
-
+from enum import Enum
+class RoleChoices(str,Enum):
+    seller="Seller"
+    customer="Customer"
+    admin="Admin"
 class Roles(Base):
     __tablename__ = "roles"
 

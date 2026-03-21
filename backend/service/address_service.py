@@ -13,7 +13,7 @@ from backend.service.geocoding import (
     in_nepal_bounds,
     reverse_geocode,
 )
-
+from uuid import UUID
 def _dump(pydantic_obj) -> Dict[str, Any]:
     
     if hasattr(pydantic_obj, "model_dump"):
@@ -37,7 +37,7 @@ def _normalize_str(x: Optional[str]) -> Optional[str]:
     return x or None
 
 
-def create_address(db: Session, address_in: AddressCreate, customer_id: int) -> Address:
+def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) -> Address:
     data = _dump(address_in)
 
     lat = float(data["latitude"])
@@ -107,12 +107,12 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: int) -> 
         raise HTTPException(status_code=400, detail="Address save failed (invalid data)")
 
 
-def list_addresses(db: Session, customer_id: int) -> list[Address]:
+def list_addresses(db: Session, customer_id: UUID) -> list[Address]:
     stmt = select(Address).where(Address.customer_id == customer_id).order_by(Address.created_at.desc())
     return list(db.execute(stmt).scalars().all())
 
 
-def delete_address(db: Session, customer_id: int, address_id: int) -> None:
+def delete_address(db: Session, customer_id: UUID, address_id: UUID) -> None:
     addr = db.get(Address, address_id)
     if not addr or addr.customer_id != customer_id:
         raise HTTPException(status_code=404, detail="Address not found")
@@ -121,7 +121,7 @@ def delete_address(db: Session, customer_id: int, address_id: int) -> None:
         db.delete(addr)
 
 
-def update_address(db: Session, customer_id: int, address_id: int, patch: AddressUpdate) -> Address:
+def update_address(db: Session, customer_id: UUID, address_id: UUID, patch: AddressUpdate) -> Address:
     addr = db.get(Address, address_id)
     if not addr or addr.customer_id != customer_id:
         raise HTTPException(status_code=404, detail="Address not found")

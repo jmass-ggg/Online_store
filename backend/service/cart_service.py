@@ -8,8 +8,8 @@ from backend.models.cart_items import CartItem
 from backend.models.ProductVariant import ProductVariant
 from backend.core.error_handler import error_handler
 from decimal import Decimal
-
-def get_or_create_active_cart(db:Session,buyer_id:int)->Cart:
+from uuid import UUID
+def get_or_create_active_cart(db:Session,buyer_id:UUID)->Cart:
     cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
     if cart:
         return cart
@@ -20,7 +20,7 @@ def get_or_create_active_cart(db:Session,buyer_id:int)->Cart:
     cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
     return cart
 
-def add_to_cart_by_customer(db:Session,buyer_id:int,variant_id:int,quantity:int)->Cart:
+def add_to_cart_by_customer(db:Session,buyer_id:UUID,variant_id:UUID,quantity:int)->Cart:
     cart=get_or_create_active_cart(db,buyer_id)
     variant=db.query(ProductVariant).filter(ProductVariant.id == variant_id,ProductVariant.is_active == True).one_or_none()
     if not variant:
@@ -36,7 +36,7 @@ def add_to_cart_by_customer(db:Session,buyer_id:int,variant_id:int,quantity:int)
     db.commit()
     return get_or_create_active_cart(db,buyer_id)
 
-def get_item_by_variant_id(db: Session, buyer_id: int, variant_id: int) -> CartItem:
+def get_item_by_variant_id(db: Session, buyer_id: UUID, variant_id: UUID) -> CartItem:
     cart = get_or_create_active_cart(db, buyer_id)
 
     item = (
@@ -49,7 +49,7 @@ def get_item_by_variant_id(db: Session, buyer_id: int, variant_id: int) -> CartI
     return item
 
 
-def uncart_the_product(db: Session, buyer_id: int, item_id: int) -> Cart:
+def uncart_the_product(db: Session, buyer_id: UUID, item_id: UUID) -> Cart:
     cart=get_or_create_active_cart(db,buyer_id)
     item=db.query(CartItem).filter(CartItem.id == item_id,CartItem.cart_id == cart.id).one_or_none()
     if not item:
@@ -59,7 +59,7 @@ def uncart_the_product(db: Session, buyer_id: int, item_id: int) -> Cart:
 
     return get_or_create_active_cart(db, buyer_id=buyer_id)
 
-def decrease__item_quantity(item_id: int, payload: DecreaseQty, db: Session, buyer_id: int):
+def decrease__item_quantity(item_id: UUID, payload: DecreaseQty, db: Session, buyer_id: UUID):
     cart=get_or_create_active_cart(db,buyer_id)
     item=db.query(CartItem).filter(CartItem.id == item_id,
                                    CartItem.cart_id == cart.id).one_or_none()
@@ -84,7 +84,7 @@ def cart_subtotal(cart: Cart) -> Decimal:
         total += item.variant.price * item.quantity
     return total
 
-def clear_cart(db: Session, buyer_id: int) -> Cart:
+def clear_cart(db: Session, buyer_id: UUID) -> Cart:
     cart=get_or_create_active_cart(db,buyer_id)
     if not cart:
         raise error_handler(400,"cart not found")

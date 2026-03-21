@@ -24,6 +24,7 @@ from uuid import uuid4
 from backend.core.settings import UPLOAD_DIR
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import aliased
+from uuid import UUID
 
 UPLOAD_FOLDER="backend/uploads/"
 
@@ -64,10 +65,10 @@ def add_product_by_seller(
     db.commit()
     db.refresh(new_product)
 
-    return ProductRead.from_orm(new_product)
+    return ProductRead.model_validate(new_product)
 
 def upload_single_product_image(
-    product_id: int,
+    product_id: UUID,
     image: UploadFile,
     is_primary: bool,
     sort_order: int,
@@ -108,7 +109,7 @@ def upload_single_product_image(
             db.flush()
         db.commit()
         db.refresh(row)
-        return ProductImageRead.from_orm(row)
+        return ProductImageRead.model_validate(row)
 
     except IntegrityError:
         db.rollback()
@@ -119,7 +120,7 @@ def upload_single_product_image(
         raise HTTPException(status_code=500, detail="Failed to save product image")
 
 def upload_multiple_product_images(
-    product_id: int,
+    product_id: UUID,
     color:str,
     images: List[UploadFile],
     db: Session,
@@ -168,7 +169,7 @@ def upload_multiple_product_images(
         for r in saved_rows:
             db.refresh(r)
 
-        return [ProductImageRead.from_orm(r) for r in saved_rows]
+        return [ProductImageRead.model_validate(r) for r in saved_rows]
 
     except IntegrityError:
         db.rollback()
@@ -180,7 +181,7 @@ def upload_multiple_product_images(
     
 def add_product_variant(
     db: Session,
-    product_id: int,
+    product_id: UUID,
     variants: list[ProductVariantCreate],
     current_seller: Seller,
 ) -> list[ProductVariant]:
@@ -247,7 +248,7 @@ def add_product_variant(
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error while creating variants")
 
-def view_product(db: Session, product_id: int) -> AllProduct:
+def view_product(db: Session, product_id: UUID) -> AllProduct:
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
 
     if not product:
@@ -292,7 +293,7 @@ def search_products(
     ).order_by(Product.created_at.desc())
 
     products = query.offset(skip).limit(limit).all()
-    return [ProductRead.from_orm(p) for p in products]
+    return [ProductRead.model_validate(p) for p in products]
 
 def view_all_product(
     db: Session,
@@ -348,7 +349,7 @@ def view_all_product(
 
 from sqlalchemy import select
 
-def get_product_options(db: Session, product_id: int):
+def get_product_options(db: Session, product_id: UUID):
     variants = db.execute(
         select(ProductVariant).where(
             ProductVariant.product_id == product_id,
@@ -444,12 +445,12 @@ def edit_product_by_seller(
     db.commit()
     db.refresh(product)
 
-    return ProductRead.from_orm(product)
+    return ProductRead.model_validate(product)
 
 
 def delete_product_by_admin(
     db: Session,
-    product_id: int,
+    product_id: UUID,
     current_admin: Admin,
 ) -> dict:
 
@@ -468,7 +469,7 @@ def delete_product_by_admin(
 
 def delete_product_by_seller(
     db: Session,
-    product_id: int,
+    product_id: UUID,
     current_seller: Seller,
 ) -> dict:
 
@@ -485,11 +486,11 @@ def delete_product_by_seller(
 
     return {"message": "Product deleted successfully"}
 
-def view_all_product_seller(seller_id: int, db: Session) -> List[ProductRead]:
+def view_all_product_seller(seller_id: UUID, db: Session) -> List[ProductRead]:
     products = (
         db.query(Product)
         .filter(Product.seller_id == seller_id)
         .order_by(Product.created_at.desc())
         .all()
     )
-    return [ProductRead.from_orm(p) for p in products]
+    return [ProductRead.model_validate(p) for p in products]

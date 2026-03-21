@@ -8,9 +8,10 @@ from backend.models.review import Review
 from backend.schemas.review import Review_read, Review_create, Review_update
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
+from uuid import UUID
 
 def reveiw_the_product(
-    product_id: int,
+    product_id: UUID,
     add_review: Review_create,
     db: Session,
     current_user: Customer
@@ -36,7 +37,7 @@ def reveiw_the_product(
     return Review_read.from_orm(new_review)
 
 def update_product_review(
-    product_id: int,
+    product_id: UUID,
     update_review: Review_update,
     db: Session,
     current_user: Customer
@@ -60,7 +61,7 @@ def update_product_review(
     return Review_read.from_orm(review)
 
 def get_reviews(
-    product_id: int,
+    product_id: UUID,
     db: Session,
     current_user: Customer
 ) -> list[Review_read]:
@@ -74,7 +75,7 @@ def get_reviews(
     return [Review_read.from_orm(r) for r in reviews]
 
 def review_delete_by_customer(
-    review_id: int,
+    review_id: UUID,
     db: Session,
     current_user: Customer
 ) -> dict:

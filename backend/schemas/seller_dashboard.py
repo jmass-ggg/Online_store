@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
 from pydantic import BaseModel
-
+from uuid import UUID
 
 class CustomerOut(BaseModel):
     name: Optional[str] = None
@@ -23,7 +23,7 @@ class DashboardItemOut(BaseModel):
         omr_mode=True
 
 class SellerDashboardOut(BaseModel):
-    order_id: int
+    order_id: UUID
     fulfillment_status: str
     customer: CustomerOut
     shipping_address: ShippingAddressOut

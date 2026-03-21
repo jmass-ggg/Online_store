@@ -8,13 +8,13 @@ from backend.schemas.seller import (
     SellerVerificationUpdate,
 )
 from backend.service.seller_service import admin_approve_account
-
+from uuid import UUID
 router = APIRouter(prefix="/admin", tags=["Admin Authentication"])
 
 
 @router.put("/{seller_id}/approved", response_model=SellerResponse)
 def review_seller(
-    seller_id: int,
+    seller_id: UUID,
     seller_approved: SellerVerificationUpdate,
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),

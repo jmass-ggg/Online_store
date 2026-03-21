@@ -13,3 +13,7 @@ from .cart import Cart
 from .cart_items import CartItem
 from .address import Address
 from .deliveryCharge import DeliveryCharge
+from .order_fullments import OrderFulfillment
+from .order_address import OrderAddress
+from .order_iteam import OrderItem
+from .payment import Payment

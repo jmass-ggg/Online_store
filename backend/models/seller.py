@@ -31,10 +31,10 @@ class Seller(Base):
     business_address: Mapped[str] = mapped_column(String, nullable=False)
 
     kyc_document_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    kyc_document_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    kyc_document_number: Mapped[String | None] = mapped_column(String, nullable=True)
 
     bank_account_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    bank_account_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    bank_account_number: Mapped[str | None] = mapped_column(String, nullable=True)
     bank_name: Mapped[str | None] = mapped_column(String, nullable=True)
     bank_branch: Mapped[str | None] = mapped_column(String, nullable=True)
 

@@ -5,8 +5,8 @@ from backend.models.order_iteam import OrderItem,OrderItemStatus
 from sqlalchemy.orm import selectinload
 from backend.core.error_handler import error_handler
 from datetime import datetime
-
-def seller_accept_the_product(db: Session, seller_id: int):
+from uuid import UUID
+def seller_accept_the_product(db: Session, seller_id: UUID):
     return (
         db.query(OrderFulfillment)
         .filter(OrderFulfillment.seller_id == seller_id)
@@ -21,7 +21,7 @@ def seller_accept_the_product(db: Session, seller_id: int):
     )
 
 
-def seller_carts(db: Session, seller_id: int):
+def seller_carts(db: Session, seller_id: UUID):
     fulfillments = seller_accept_the_product(db, seller_id)
     result = []
 
@@ -67,7 +67,7 @@ def seller_carts(db: Session, seller_id: int):
 
     return result
 
-def accept_order(db:Session,customer_id:int,seller_id:int,order_id:int):
+def accept_order(db:Session,customer_id:UUID,seller_id:UUID,order_id:UUID):
     fulfillment=(
         db.query(OrderFulfillment)
         .filter(OrderFulfillment.seller_id == seller_id,OrderFulfillment.fulfillment_status == FulfillmentStatus.PENDING,
@@ -93,7 +93,7 @@ def accept_order(db:Session,customer_id:int,seller_id:int,order_id:int):
         "fulfillment_status": fulfillment.fulfillment_status.value,
     }
 
-def handover_the_product(db:Session,customer_id:int,seller_id:int,order_id:int):
+def handover_the_product(db:Session,customer_id:UUID,seller_id:UUID,order_id:UUID):
     fulfillment=(
         db.query(OrderFulfillment)
         .filter(OrderFulfillment.seller_id == seller_id,OrderFulfillment.fulfillment_status == FulfillmentStatus.ACCEPTED,

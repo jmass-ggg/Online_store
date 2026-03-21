@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional
-
+from pydantic import BaseModel, Field, constr,ConfigDict
+from uuid import UUID
 from pydantic import BaseModel, Field
 from backend.models.order import PaymentMethod
 
@@ -12,18 +13,19 @@ class PlaceOrderRequest(BaseModel):
     payment_method: PaymentMethod
 
 class PlaceOrderResponse(BaseModel):
-    order_id: int
+    order_id: UUID
     status: str
     total_price: Decimal
     seller_count: int
     payment_method: PaymentMethod
     payment_redirect_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SellerFulfillmentItem(BaseModel):
-    id: int
-    product_id: int
-    variant_id: int
+    id: UUID
+    product_id: UUID
+    variant_id: UUID
     quantity: int
     unit_price: Decimal
     line_total: Decimal
@@ -43,8 +45,8 @@ class SellerOrderAddressOut(BaseModel):
 
 
 class SellerFulfillmentOut(BaseModel):
-    fulfillment_id: int
-    order_id: int
+    fulfillment_id: UUID
+    order_id: UUID
     fulfillment_status: str
     seller_subtotal: Decimal
     order_placed: datetime
@@ -56,13 +58,13 @@ class UpdateFulfillmentStatusRequest(BaseModel):
     status: str
 
 class BuyNowRequest(BaseModel):
-    address_id: int = Field(..., gt=0)
-    variant_id: int = Field(..., gt=0)
+    address_id: UUID = Field(..., gt=0)
+    variant_id: UUID = Field(..., gt=0)
     quantity: int = Field(1, ge=1)
     payment_method: PaymentMethod
     
 class BuyNowResponse(BaseModel):
-    order_id: int
+    order_id: UUID
     status: str
     total_price: Decimal
     seller_count: int
