@@ -13,30 +13,30 @@ from backend.service.review_sevice import (
     review_delete_by_customer
 )
 
-
+from uuid import UUID
 router=APIRouter(prefix="/review",tags=["Product review"])
 
 @router.post("/{product_id}/review",response_model=Review_read)
-def give_product_review(product_id:int,
+def give_product_review(product_id:UUID,
                         add_review:Review_create,
                         db:Session=Depends(get_db),
                         current_user:Customer=Depends(get_current_customer)):
     return reveiw_the_product(product_id,add_review,db,current_user)
 
 @router.patch("/{product_id}/change_review",response_model=Review_read)
-def update_review(product_id:int,update_review:Review_update,
+def update_review(product_id:UUID,update_review:Review_update,
                         db:Session=Depends(get_db),
                         current_user:Customer=Depends(get_current_customer)):
     return update_product_review(product_id,update_review,db,current_user)
 
 @router.delete("/{review_id}/delete",status_code=status.HTTP_200_OK)
-def delete_review(review_id:int,
+def delete_review(review_id:UUID,
                   db:Session=Depends(get_db)
                   ,current_user:Customer=Depends(get_current_customer)):
     return review_delete_by_customer(review_id,db,current_user)
 
 @router.get("/{product_id}/change_review",response_model=Review_read)
-def get_review(product_id:int,
+def get_review(product_id:UUID,
                         db:Session=Depends(get_db),
                         current_user:Customer=Depends(get_current_customer)):
     return get_reviews(product_id,db,current_user)

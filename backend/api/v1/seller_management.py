@@ -30,7 +30,7 @@ from backend.models.seller import Seller
 from backend.utils.auth import oauth2_scheme
 from backend.schemas.seller_dashboard import SellerDashboardOut
 from backend.core.error_handler import error_handler 
-
+from uuid import UUID
 router=APIRouter(prefix="/seller_managements",tags=["seller"])
 
 @router.get("/Accept",response_model=list[SellerDashboardOut])
@@ -39,9 +39,9 @@ def all_user_cart_seen_by_seller(db:Session=Depends(get_db)
     return seller_carts(db,current_user.id)
 
 @router.post("/orders/{order_id}/accept",response_model=OrderActionResponse)
-def accept_seller_order(customer_id:int,order_id:int,db:Session=Depends(get_db),current_user:Seller=Depends(get_current_seller)):
+def accept_seller_order(customer_id:UUID,order_id:UUID,db:Session=Depends(get_db),current_user:Seller=Depends(get_current_seller)):
     return accept_order(db,customer_id,current_user.id,order_id)
 
 @router.post("/orders/{order_id}/handover",response_model=OrderActionResponse)
-def accept_seller_order(customer_id:int,order_id:int,db:Session=Depends(get_db),current_user:Seller=Depends(get_current_seller)):
+def accept_seller_order(customer_id:UUID,order_id:UUID,db:Session=Depends(get_db),current_user:Seller=Depends(get_current_seller)):
     return handover_the_product(db,customer_id,current_user.id,order_id)
