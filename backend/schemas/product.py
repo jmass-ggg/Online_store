@@ -20,10 +20,15 @@ class ProductUpdate(BaseModel):
     status: Optional[ProductStatus] = None
 
 
-class ProductRead(ProductCreate):
+class ProductRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    product_name: constr(min_length=5, max_length=50)
+    url_slug: str = Field(..., min_length=3, max_length=80)
+    target_audience: TargetAudience
+    product_category: ProductCategory
+    description: Optional[str] = None
     status: ProductStatus
     seller_id: UUID
     image_url: str | None = None

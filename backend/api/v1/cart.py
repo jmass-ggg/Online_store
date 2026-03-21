@@ -16,7 +16,7 @@ from backend.service.cart_service import (
     cart_subtotal,
     get_item_by_variant_id
 )
-
+from uuid import UUID
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
 
@@ -42,7 +42,7 @@ def get_my_cart(
 
 @router.get("/items/by-variant/{variant_id}", response_model=CartItemOut)
 def get_the_item(
-    variant_id: int,
+    variant_id: UUID,
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
 ):
@@ -68,7 +68,7 @@ def add_to_cart(
 
 @router.patch("/items/{item_id}/decrease", response_model=CartOut)
 def item_quantity_delete(
-    item_id: int,
+    item_id: UUID,
     payload: DecreaseQty,
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
@@ -80,7 +80,7 @@ def item_quantity_delete(
 
 @router.delete("/items/{item_id}", response_model=CartOut)
 def remove_cart_item(
-    item_id: int,
+    item_id: UUID,
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
 ):

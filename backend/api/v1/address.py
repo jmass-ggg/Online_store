@@ -14,7 +14,7 @@ from backend.utils.jwt import get_current_customer
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
 
-
+from uuid import UUID
 @router.post("/", response_model=AddressResponse, status_code=status.HTTP_201_CREATED)
 def create_address_api(
     address: AddressCreate,
@@ -33,7 +33,7 @@ def list_my_addresses(
 
 @router.patch("/{address_id}", response_model=AddressResponse)
 def patch_address(
-    address_id: int,
+    address_id: UUID,
     patch: AddressUpdate,
     db: Session = Depends(get_db),
     user: Customer = Depends(get_current_customer),
@@ -43,7 +43,7 @@ def patch_address(
 
 @router.delete("/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_address(
-    address_id: int,
+    address_id: UUID,
     db: Session = Depends(get_db),
     user: Customer = Depends(get_current_customer),
 ):

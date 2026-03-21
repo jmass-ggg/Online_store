@@ -28,7 +28,7 @@ from backend.core.settings_esewa import (
     ESEWA_SECRET_KEY,
     ESEWA_STATUS_URL,
 )
-
+from uuid import UUID
 router = APIRouter(prefix="/payments/esewa", tags=["eSewa"])
 
 
@@ -74,7 +74,7 @@ def _safe_eq(a: str, b: str) -> bool:
 
 def build_frontend_result_url(
     *,
-    order_id: int,
+    order_id: UUID,
     payment_status: str,
     esewa_status: str = "",
     ref_id: Optional[str] = None,
@@ -171,7 +171,7 @@ def _apply_esewa_status(payment: Payment, status: str, ref_id: Optional[str]) ->
     payment.order.status = OrderStatus.CANCELLED
 
 
-def _mark_latest_order_payment_failed(db: Session, order_id: int) -> None:
+def _mark_latest_order_payment_failed(db: Session, order_id: UUID) -> None:
     payment = (
         db.query(Payment)
         .filter(
@@ -190,7 +190,7 @@ def _mark_latest_order_payment_failed(db: Session, order_id: int) -> None:
 
 
 @router.get("/initiate", response_class=HTMLResponse)
-def initiate(order_id: int, request: Request, db: Session = Depends(get_db)):
+def initiate(order_id: UUID, request: Request, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise error_handler(404, "Order not found")
@@ -331,7 +331,7 @@ async def failure(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/poll/{order_id}")
-async def poll(order_id: int, db: Session = Depends(get_db)):
+async def poll(order_id: UUID, db: Session = Depends(get_db)):
     payment: Optional[Payment] = (
         db.query(Payment)
         .filter(

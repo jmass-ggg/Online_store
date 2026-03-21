@@ -17,6 +17,7 @@ from backend.service.product_service import (
     upload_single_product_image,upload_multiple_product_images,get_product_options
 
 )
+from uuid import UUID
 from backend.models.product import Product
 from typing import Optional
 from backend.models.admin import Admin
@@ -39,7 +40,7 @@ def get_all_product(
         only_active=True,
     )
 @router.get("/products/{product_id}/options")
-def product_options(product_id: int, db: Session = Depends(get_db)):
+def product_options(product_id: UUID, db: Session = Depends(get_db)):
     return get_product_options(db, product_id)
 
 @router.get("/slug/{slug}", response_model=AllProduct)
@@ -60,7 +61,7 @@ def product_search(
     return search_products(q=q, category=category, skip=skip, limit=limit, db=db)
 
 @router.get("/{product_id}",response_model=AllProduct)
-def get_product(product_id:int,db:Session=Depends(get_db),
+def get_product(product_id:UUID,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
     return view_product(db,product_id)
@@ -89,7 +90,7 @@ def create_product(
     )
 @router.post("/seller/products/{product_id}/image", response_model=ProductImageRead)
 def upload_single_image_of_product(
-    product_id: int,
+    product_id: UUID,
     image: UploadFile = File(...),
     is_primary: bool = False,
     sort_order: int = 0,
@@ -107,7 +108,7 @@ def upload_single_image_of_product(
 
 @router.post("/seller/products/{product_id}/images", response_model=List[ProductImageRead])
 def upload_multipile_image_of_product(
-    product_id: int,color:str,
+    product_id: UUID,color:str,
     images: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(get_current_seller),
@@ -119,7 +120,7 @@ def upload_multipile_image_of_product(
     status_code=status.HTTP_201_CREATED,
 )
 def create_product_variants(
-    product_id: int,
+    product_id: UUID,
     variants: list[ProductVariantCreate],   
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(verify_seller_or_not),
@@ -135,7 +136,7 @@ def create_product_variants(
 
 @router.patch("/{product_id}", response_model=ProductUpdate)
 def product_edit(
-    product_id: int,
+    product_id: UUID,
     product_update: ProductUpdate,
     db: Session = Depends(get_db),
     current_user: Seller = Depends(verify_seller_or_not)
@@ -150,13 +151,13 @@ def my_products(
     return view_all_product_seller(current_seller.id, db)
 
 @router.delete("/{product_id}/admin",status_code=status.HTTP_200_OK)
-def admin_delete_product(product_id:int,db:Session=Depends(get_db),
+def admin_delete_product(product_id:UUID,db:Session=Depends(get_db),
                 current_admin:Admin=Depends(get_current_admin)
 ):
     return delete_product_by_admin(db,product_id,current_admin)
 
 @router.delete("/{product_id}/seller",status_code=status.HTTP_200_OK)
-def seller_delete_product(product_id:int,db:Session=Depends(get_db),
+def seller_delete_product(product_id:UUID,db:Session=Depends(get_db),
                 current_user:Seller=Depends(verify_seller_or_not)
 ):
    return delete_product_by_seller(db, product_id, current_user)
