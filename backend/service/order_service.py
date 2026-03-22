@@ -120,7 +120,7 @@ def place_order_service(
             buyer_id=user_id,
             status="PLACED",  
             total_price=grand_total,
-            payment_Method=paymentmethod,
+            payment_method=paymentmethod,
         )
         db.add(order)
         db.flush()
@@ -167,7 +167,8 @@ def place_order_service(
 
         db.query(CartItem).filter(CartItem.cart_id == cart.id).delete(synchronize_session=False)
         cart.status = "CHECKED_OUT"
-        
+    
+    db.commit()
 
     return order, grand_total, len(seller_subtotals)
 
