@@ -431,7 +431,7 @@ def get_product_options(db: Session, product_id: UUID):
 
 def edit_product_by_seller(
     db: Session,
-    product_id: int,
+    product_id: UUID,
     product_update: ProductUpdate,
     current_seller: Seller,
 ) -> ProductRead:

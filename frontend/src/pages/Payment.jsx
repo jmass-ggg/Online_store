@@ -9,7 +9,7 @@ const CART_KEY = "cart_items";
 
 const PAYMENT_METHODS = {
   ESEWA: "ESEWA",
-  COD: "CASH ON DELIVERY",
+  COD: "CASH_ON_DELIVERY",
 };
 
 const TAB_KEYS = {
@@ -62,8 +62,17 @@ function safeParse(raw) {
   }
 }
 
+function toId(value) {
+  return String(value ?? "").trim();
+}
+
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function money(n) {
-  return `Rs. ${Number(n || 0).toLocaleString("en-NP", {
+  return `Rs. ${toNumber(n).toLocaleString("en-NP", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -72,13 +81,15 @@ function money(n) {
 function formatApiError(err) {
   const detail = err?.detail;
 
-  if (typeof detail === "string") return detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
 
-  if (Array.isArray(detail)) {
+  if (Array.isArray(detail) && detail.length) {
     return detail
       .map((d) => {
-        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "field";
-        return `${field}: ${d.msg}`;
+        const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : "field";
+        return `${field}: ${d?.msg || "Invalid value"}`;
       })
       .join(" | ");
   }
@@ -92,7 +103,6 @@ function buildBackendUrl(path) {
 
   const base = String(API_BASE_URL || "").replace(/\/+$/, "");
   const rel = String(path).startsWith("/") ? path : `/${path}`;
-
   return `${base}${rel}`;
 }
 
@@ -109,12 +119,58 @@ function cleanupAfterCod(mode) {
   window.dispatchEvent(new Event("cart:updated"));
 }
 
+function normalizeCheckoutContext(parsed) {
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+
+  const normalizedItems = items
+    .map((item, index) => ({
+      key: `${toId(item?.variant_id ?? item?.id)}_${index}`,
+      variant_id: toId(item?.variant_id ?? item?.variantId ?? item?.id),
+      quantity: Math.max(1, toNumber(item?.quantity, 1)),
+      price: toNumber(item?.price, 0),
+      product_name: String(item?.product_name || "").trim(),
+      size: String(item?.size || "").trim(),
+      color: String(item?.color || "").trim(),
+      image_url: String(item?.image_url || "").trim(),
+    }))
+    .filter((item) => item.variant_id);
+
+  const totals = {
+    itemsCount:
+      toNumber(parsed?.totals?.itemsCount) ||
+      normalizedItems.reduce((sum, item) => sum + item.quantity, 0),
+    itemsTotal:
+      toNumber(parsed?.totals?.itemsTotal) ||
+      normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    deliveryFee:
+      parsed?.totals?.deliveryFee != null
+        ? toNumber(parsed.totals.deliveryFee)
+        : normalizedItems.length > 0
+        ? 100
+        : 0,
+  };
+
+  totals.total =
+    parsed?.totals?.total != null
+      ? toNumber(parsed.totals.total)
+      : totals.itemsTotal + totals.deliveryFee;
+
+  return {
+    mode: String(parsed?.mode || "BUY_NOW").toUpperCase(),
+    address_id: toId(parsed?.address_id ?? parsed?.address?.id),
+    address: parsed?.address || null,
+    items: normalizedItems,
+    totals,
+  };
+}
+
 function getMethodDetails(activeTab) {
   if (activeTab === TAB_KEYS.ESEWA) {
     return {
       title: "Pay with eSewa",
       subtitle: "Fast and secure wallet payment",
       image: "/eswea.png",
+      emoji: null,
       intro:
         "Your order will be created first, then you will be redirected to eSewa to complete the payment securely.",
       points: [
@@ -122,7 +178,7 @@ function getMethodDetails(activeTab) {
         "Your order will be created with eSewa as the selected payment method.",
         "You will be redirected to eSewa to complete payment.",
       ],
-      cta: "Pay Now",
+      cta: "PROCEED TO ESEWA",
       enabled: true,
     };
   }
@@ -132,6 +188,7 @@ function getMethodDetails(activeTab) {
       title: "Cash on Delivery",
       subtitle: "Pay when your order arrives",
       image: "/cash_delivery.png",
+      emoji: null,
       intro:
         "Place your order now and pay in cash when the package is delivered to your address.",
       points: [
@@ -139,7 +196,7 @@ function getMethodDetails(activeTab) {
         "Your order will be confirmed with Cash on Delivery.",
         "Please keep the payment amount ready at delivery time.",
       ],
-      cta: "Place Order",
+      cta: "PLACE ORDER",
       enabled: true,
     };
   }
@@ -156,7 +213,7 @@ function getMethodDetails(activeTab) {
         "Use eSewa for instant online payment.",
         "Use Cash on Delivery if you want to pay at arrival.",
       ],
-      cta: "Not Connected Yet",
+      cta: "NOT CONNECTED YET",
       enabled: false,
     };
   }
@@ -165,13 +222,14 @@ function getMethodDetails(activeTab) {
     title: "Khalti by IME",
     subtitle: "This method is not connected yet",
     image: "/ime.png",
+    emoji: null,
     intro:
       "Khalti / IME support is visible in the interface, but backend integration is still pending.",
     points: [
       "Once the gateway is integrated, this method can be enabled.",
       "For now, use eSewa or Cash on Delivery.",
     ],
-    cta: "Not Connected Yet",
+    cta: "NOT CONNECTED YET",
     enabled: false,
   };
 }
@@ -190,15 +248,15 @@ function SuccessView({ successData }) {
       <div className="success-grid">
         <div className="success-row">
           <span>Order ID</span>
-          <strong>{successData?.order_id}</strong>
+          <strong>{successData?.order_id || successData?.id || "-"}</strong>
         </div>
         <div className="success-row">
           <span>Status</span>
-          <strong>{successData?.status}</strong>
+          <strong>{successData?.status || "-"}</strong>
         </div>
         <div className="success-row">
           <span>Total</span>
-          <strong>{money(successData?.total_price)}</strong>
+          <strong>{money(successData?.total_price || 0)}</strong>
         </div>
         <div className="success-row">
           <span>Payment Method</span>
@@ -237,17 +295,19 @@ export default function Payment() {
     const raw = sessionStorage.getItem(CHECKOUT_CTX_KEY);
     const parsed = safeParse(raw);
 
-    if (
-      !parsed ||
-      !parsed.address_id ||
-      !Array.isArray(parsed.items) ||
-      parsed.items.length === 0
-    ) {
+    if (!parsed) {
       setError("Checkout data is missing. Please go back to checkout.");
       return;
     }
 
-    setCheckoutCtx(parsed);
+    const normalized = normalizeCheckoutContext(parsed);
+
+    if (!normalized.address_id || normalized.items.length === 0) {
+      setError("Checkout data is incomplete. Please go back to checkout.");
+      return;
+    }
+
+    setCheckoutCtx(normalized);
   }, []);
 
   const totals = useMemo(() => checkoutCtx?.totals || {}, [checkoutCtx]);
@@ -259,16 +319,9 @@ export default function Payment() {
   const detail = useMemo(() => getMethodDetails(activeTab), [activeTab]);
 
   const primaryButtonLabel = useMemo(() => {
-    if (activeTab === TAB_KEYS.ESEWA) {
-      return placingOrder ? "PROCESSING..." : "PROCEED TO ESEWA";
-    }
-
-    if (activeTab === TAB_KEYS.COD) {
-      return placingOrder ? "PROCESSING..." : "PLACE ORDER";
-    }
-
-    return "UNAVAILABLE";
-  }, [activeTab, placingOrder]);
+    if (!detail.enabled) return detail.cta;
+    return placingOrder ? "PROCESSING..." : detail.cta;
+  }, [detail, placingOrder]);
 
   function handleSelectTab(tab) {
     setError("");
@@ -313,34 +366,45 @@ export default function Payment() {
           throw new Error("Buy now item is missing.");
         }
 
+        const payload = {
+          address_id: checkoutCtx.address_id,
+          variant_id: item.variant_id,
+          quantity: Number(item.quantity),
+          payment_method: paymentMethod,
+        };
+
+        console.log("BUY_NOW payload:", payload);
+
         res = await apiFetch("/orders/buy-now", {
           method: "POST",
-          body: JSON.stringify({
-            address_id: Number(checkoutCtx.address_id),
-            variant_id: Number(item.variant_id),
-            quantity: Number(item.quantity),
-            payment_method: paymentMethod,
-          }),
+          body: JSON.stringify(payload),
         });
       } else {
+        const payload = {
+          address_id: checkoutCtx.address_id,
+          payment_method: paymentMethod,
+        };
+
+        console.log("CART payload:", payload);
+
         res = await apiFetch("/orders/order", {
           method: "POST",
-          body: JSON.stringify({
-            address_id: Number(checkoutCtx.address_id),
-            payment_method: paymentMethod,
-          }),
+          body: JSON.stringify(payload),
         });
       }
 
       if (paymentMethod === PAYMENT_METHODS.ESEWA) {
-        const redirectUrl = res?.payment_redirect_url;
+        const redirectUrl =
+          res?.payment_redirect_url ||
+          res?.paymentUrl ||
+          res?.redirect_url ||
+          res?.redirectUrl;
 
         if (!redirectUrl) {
           throw new Error("Backend did not return eSewa redirect URL.");
         }
 
-        const finalUrl = buildBackendUrl(redirectUrl);
-        window.location.href = finalUrl;
+        window.location.assign(buildBackendUrl(redirectUrl));
         return;
       }
 
@@ -408,7 +472,11 @@ export default function Payment() {
           <button
             type="button"
             className="back-btn"
-            onClick={() => navigate("/checkout")}
+            onClick={() =>
+              navigate(
+                checkoutCtx.mode === "BUY_NOW" ? "/checkout?mode=buy_now" : "/checkout"
+              )
+            }
           >
             ← Back to Checkout
           </button>
@@ -447,9 +515,7 @@ export default function Payment() {
                       <p>{tab.subtitle}</p>
                     </div>
 
-                    {activeTab === tab.key ? (
-                      <span className="method-active-dot" />
-                    ) : null}
+                    {activeTab === tab.key ? <span className="method-active-dot" /> : null}
                   </button>
                 ))}
               </div>
@@ -492,11 +558,7 @@ export default function Payment() {
                     onClick={handlePlaceOrder}
                     disabled={placingOrder || !detail.enabled}
                   >
-                    {!detail.enabled
-                      ? detail.cta
-                      : placingOrder
-                      ? "PROCESSING..."
-                      : detail.cta}
+                    {primaryButtonLabel}
                   </button>
 
                   <div className="detail-trust">
@@ -566,10 +628,7 @@ export default function Payment() {
               type="button"
               className="summary-main-btn"
               onClick={handlePlaceOrder}
-              disabled={
-                placingOrder ||
-                (activeTab !== TAB_KEYS.ESEWA && activeTab !== TAB_KEYS.COD)
-              }
+              disabled={placingOrder || !detail.enabled}
             >
               {primaryButtonLabel}
             </button>

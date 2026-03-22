@@ -9,6 +9,7 @@ from backend.models.ProductVariant import ProductVariant
 from backend.core.error_handler import error_handler
 from decimal import Decimal
 from uuid import UUID
+
 def get_or_create_active_cart(db:Session,buyer_id:UUID)->Cart:
     cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
     if cart:

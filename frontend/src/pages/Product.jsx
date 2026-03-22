@@ -6,10 +6,16 @@ import { apiFetch, joinUrl } from "../api";
 
 const BUY_NOW_KEY = "buy_now_item";
 const CART_KEY = "cart_items";
+const FALLBACK_IMAGE = "/shoes.jpg";
+const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
-function toNumber(v) {
-  const n = Number(v);
+function toNumber(value) {
+  const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function toId(value) {
+  return String(value ?? "").trim();
 }
 
 function formatMoney(value) {
@@ -20,7 +26,29 @@ function formatMoney(value) {
   }).format(toNumber(value));
 }
 
-// ---------- local cart helpers ----------
+function getVariantId(variant) {
+  return toId(variant?.variant_id ?? variant?.variantId ?? variant?.id);
+}
+
+function getProductId(product) {
+  return toId(product?.product_id ?? product?.productId ?? product?.id);
+}
+
+function normalizeVariant(variant) {
+  if (!variant || typeof variant !== "object") return null;
+
+  return {
+    ...variant,
+    _variantId: getVariantId(variant),
+    _price: toNumber(variant?.price),
+    _stock: toNumber(
+      variant?.stock_quantity ?? variant?.stock ?? variant?.quantity ?? 0
+    ),
+    _color: String(variant?.color || "").trim(),
+    _size: String(variant?.size || "").trim(),
+  };
+}
+
 function readLocalCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
@@ -32,37 +60,40 @@ function readLocalCart() {
 
 function upsertLocalCartItem(nextItem) {
   const arr = readLocalCart();
-  const vid = Number(nextItem.variant_id);
-
-  const idx = arr.findIndex(
-    (x) => Number(x?.variant_id ?? x?.variantId ?? x?.id) === vid
+  const nextVariantId = toId(
+    nextItem?.variant_id ?? nextItem?.variantId ?? nextItem?.id
   );
+
+  const idx = arr.findIndex((item) => {
+    const itemVariantId = toId(item?.variant_id ?? item?.variantId ?? item?.id);
+    return itemVariantId === nextVariantId;
+  });
 
   if (idx >= 0) {
     const prevQty = toNumber(arr[idx]?.quantity);
     arr[idx] = {
       ...arr[idx],
       ...nextItem,
-      quantity: prevQty + toNumber(nextItem.quantity),
+      quantity: prevQty + toNumber(nextItem?.quantity),
       updated_at: Date.now(),
     };
   } else {
-    arr.push({ ...nextItem, updated_at: Date.now() });
+    arr.push({
+      ...nextItem,
+      updated_at: Date.now(),
+    });
   }
 
   localStorage.setItem(CART_KEY, JSON.stringify(arr));
 }
 
-// ---------- size sort ----------
-const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
-
 function sizeRank(size) {
-  const s = String(size || "").trim().toUpperCase();
-  const idx = SIZE_ORDER.indexOf(s);
-  if (idx >= 0) return idx;
+  const normalized = String(size || "").trim().toUpperCase();
+  const known = SIZE_ORDER.indexOf(normalized);
+  if (known >= 0) return known;
 
-  const num = Number(s);
-  if (Number.isFinite(num)) return 100 + num;
+  const numeric = Number(normalized);
+  if (Number.isFinite(numeric)) return 100 + numeric;
 
   return 1000;
 }
@@ -72,10 +103,10 @@ export default function Product() {
   const navigate = useNavigate();
 
   const [product, setProduct] = useState(null);
-  const [activeImg, setActiveImg] = useState("/shoes.jpg");
+  const [activeImg, setActiveImg] = useState(FALLBACK_IMAGE);
 
   const [selectedColor, setSelectedColor] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedVariantId, setSelectedVariantId] = useState("");
   const [qty, setQty] = useState(1);
 
   const [shipOpen, setShipOpen] = useState(false);
@@ -84,38 +115,45 @@ export default function Product() {
   const [error, setError] = useState("");
 
   const [toast, setToast] = useState("");
-  const showToast = (msg) => {
-    setToast(msg);
-    window.clearTimeout(showToast._t);
-    showToast._t = window.setTimeout(() => setToast(""), 2200);
-  };
 
-  // top bar state
   const [search, setSearch] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
+  const toastTimeoutRef = useRef(null);
 
-  // ---------- variants ----------
+  function showToast(message) {
+    setToast(message);
+    window.clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast("");
+    }, 2200);
+  }
+
   const variants = useMemo(() => {
     if (!product) return [];
-    const v = product.variants || product.ProductVariants || [];
-    return Array.isArray(v) ? v : [];
+    const raw = product?.variants || product?.ProductVariants || [];
+    if (!Array.isArray(raw)) return [];
+    return raw.map(normalizeVariant).filter(Boolean);
   }, [product]);
 
   const colorOptions = useMemo(() => {
     const map = new Map();
 
-    for (const v of variants) {
-      const color = String(v?.color || "").trim();
+    for (const variant of variants) {
+      const color = variant?._color;
       if (!color) continue;
 
       if (!map.has(color)) {
-        map.set(color, v);
-      } else {
-        const cur = map.get(color);
-        const vStock = toNumber(v.stock_quantity);
-        const cStock = toNumber(cur.stock_quantity);
-        if (vStock > 0 && cStock <= 0) map.set(color, v);
+        map.set(color, variant);
+        continue;
+      }
+
+      const current = map.get(color);
+      const nextInStock = variant._stock > 0;
+      const currentInStock = current._stock > 0;
+
+      if (nextInStock && !currentInStock) {
+        map.set(color, variant);
       }
     }
 
@@ -127,45 +165,50 @@ export default function Product() {
 
   const filteredVariants = useMemo(() => {
     if (!selectedColor) return variants;
-    const pick = String(selectedColor).trim().toLowerCase();
+
+    const targetColor = String(selectedColor).trim().toLowerCase();
 
     return variants.filter(
-      (v) => String(v?.color || "").trim().toLowerCase() === pick
+      (variant) => variant._color.toLowerCase() === targetColor
     );
   }, [variants, selectedColor]);
 
   const sizeOptions = useMemo(() => {
     const map = new Map();
 
-    for (const v of filteredVariants) {
-      const size = String(v?.size || "").trim();
+    for (const variant of filteredVariants) {
+      const size = variant?._size;
       if (!size) continue;
 
       if (!map.has(size)) {
-        map.set(size, v);
-      } else {
-        const cur = map.get(size);
-        const vStock = toNumber(v.stock_quantity);
-        const cStock = toNumber(cur.stock_quantity);
-        const vIn = vStock > 0;
-        const cIn = cStock > 0;
+        map.set(size, variant);
+        continue;
+      }
 
-        if (vIn && !cIn) map.set(size, v);
-        else if (vIn === cIn && toNumber(v.price) < toNumber(cur.price)) {
-          map.set(size, v);
-        }
+      const current = map.get(size);
+      const nextInStock = variant._stock > 0;
+      const currentInStock = current._stock > 0;
+
+      if (nextInStock && !currentInStock) {
+        map.set(size, variant);
+        continue;
+      }
+
+      if (nextInStock === currentInStock && variant._price < current._price) {
+        map.set(size, variant);
       }
     }
 
-    const arr = Array.from(map.entries()).map(([size, variant]) => ({
+    const result = Array.from(map.entries()).map(([size, variant]) => ({
       size,
       variant,
     }));
 
-    arr.sort((a, b) => {
-      const ra = sizeRank(a.size);
-      const rb = sizeRank(b.size);
-      if (ra !== rb) return ra - rb;
+    result.sort((a, b) => {
+      const rankA = sizeRank(a.size);
+      const rankB = sizeRank(b.size);
+
+      if (rankA !== rankB) return rankA - rankB;
 
       return a.size.localeCompare(b.size, undefined, {
         numeric: true,
@@ -173,40 +216,43 @@ export default function Product() {
       });
     });
 
-    return arr;
+    return result;
   }, [filteredVariants]);
 
   const defaultVariant = useMemo(() => {
     if (sizeOptions.length === 0) return null;
-    const inStock = sizeOptions.find(
-      (x) => toNumber(x.variant.stock_quantity) > 0
+    return (
+      sizeOptions.find((entry) => entry.variant._stock > 0)?.variant ||
+      sizeOptions[0]?.variant ||
+      null
     );
-    return (inStock || sizeOptions[0]).variant;
   }, [sizeOptions]);
 
-  const chosenVariant = selectedVariant || defaultVariant;
-  const displayPrice = useMemo(
-    () => toNumber(chosenVariant?.price ?? 0),
-    [chosenVariant]
-  );
+  const selectedVariant = useMemo(() => {
+    const wantedId = toId(selectedVariantId);
+    if (!wantedId) return null;
 
-  const stockMax = useMemo(() => {
-    const s = toNumber(chosenVariant?.stock_quantity);
-    return s > 0 ? s : 0;
-  }, [chosenVariant]);
+    return (
+      filteredVariants.find((variant) => variant._variantId === wantedId) ||
+      variants.find((variant) => variant._variantId === wantedId) ||
+      null
+    );
+  }, [filteredVariants, variants, selectedVariantId]);
 
+  const chosenVariant = selectedVariant || defaultVariant || null;
+  const displayPrice = chosenVariant?._price ?? 0;
+  const stockMax = chosenVariant?._stock ?? 0;
   const outOfStock = stockMax <= 0;
 
-  // ---------- load product ----------
   useEffect(() => {
     let alive = true;
 
-    async function load() {
+    async function loadProduct() {
       setLoading(true);
       setError("");
       setProduct(null);
-      setSelectedVariant(null);
       setSelectedColor("");
+      setSelectedVariantId("");
       setQty(1);
 
       try {
@@ -214,16 +260,16 @@ export default function Product() {
         if (!alive) return;
 
         setProduct(data);
-        setActiveImg(joinUrl(data.image_url || "") || "/shoes.jpg");
-      } catch (e) {
+        setActiveImg(joinUrl(data?.image_url || "") || FALLBACK_IMAGE);
+      } catch (err) {
         if (!alive) return;
-        setError(e?.message || "Failed to load product");
+        setError(err?.message || "Failed to load product");
       } finally {
         if (alive) setLoading(false);
       }
     }
 
-    load();
+    loadProduct();
 
     return () => {
       alive = false;
@@ -235,38 +281,35 @@ export default function Product() {
     if (selectedColor) return;
     if (colorOptions.length === 0) return;
 
-    const inStockColor = colorOptions.find(
-      (x) => toNumber(x.variant.stock_quantity) > 0
-    );
-
+    const inStockColor = colorOptions.find((entry) => entry.variant._stock > 0);
     setSelectedColor((inStockColor || colorOptions[0]).color);
   }, [product, colorOptions, selectedColor]);
 
   useEffect(() => {
-    if (!product) return;
-    setSelectedVariant(null);
-  }, [selectedColor, product]);
+    setSelectedVariantId("");
+    setQty(1);
+  }, [selectedColor]);
 
   useEffect(() => {
     if (!chosenVariant) return;
 
-    const max = toNumber(chosenVariant.stock_quantity);
-    setQty((q) => {
-      const next = Math.max(1, toNumber(q));
-      if (max > 0) return Math.min(next, max);
-      return 1;
+    const max = chosenVariant._stock;
+    setQty((currentQty) => {
+      const safeQty = Math.max(1, toNumber(currentQty));
+      return max > 0 ? Math.min(safeQty, max) : 1;
     });
-  }, [chosenVariant?.id]);
+  }, [chosenVariant?._variantId, chosenVariant?._stock]);
 
-  // close dropdown on outside click + ESC
   useEffect(() => {
-    function onDocMouseDown(e) {
+    function onDocMouseDown(event) {
       if (!profileRef.current) return;
-      if (!profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (!profileRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
     }
 
-    function onEsc(e) {
-      if (e.key === "Escape") setProfileOpen(false);
+    function onEsc(event) {
+      if (event.key === "Escape") setProfileOpen(false);
     }
 
     document.addEventListener("mousedown", onDocMouseDown);
@@ -275,6 +318,12 @@ export default function Product() {
     return () => {
       document.removeEventListener("mousedown", onDocMouseDown);
       window.removeEventListener("keydown", onEsc);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(toastTimeoutRef.current);
     };
   }, []);
 
@@ -294,40 +343,59 @@ export default function Product() {
   function getVariantOrToast() {
     if (!product) return null;
 
-    const v = chosenVariant;
-    if (!v) return (showToast("No sizes available."), null);
-
-    const variantId = Number(v.id);
-    if (!Number.isFinite(variantId)) {
-      return showToast("Invalid variant."), null;
+    const variant = chosenVariant;
+    if (!variant) {
+      showToast("No sizes available.");
+      return null;
     }
 
-    const stock = toNumber(v.stock_quantity);
-    if (stock <= 0) return showToast("This size is out of stock."), null;
+    const variantId = getVariantId(variant);
+    if (!variantId) {
+      console.log("Invalid variant object:", variant);
+      showToast("Invalid variant.");
+      return null;
+    }
+
+    const stock = toNumber(variant._stock);
+    if (stock <= 0) {
+      showToast("This size is out of stock.");
+      return null;
+    }
 
     const safeQty = Math.max(1, Math.min(toNumber(qty), stock));
-    if (safeQty !== qty) setQty(safeQty);
+    if (safeQty !== qty) {
+      setQty(safeQty);
+    }
 
-    return { v, variantId, stock, safeQty };
+    return {
+      variant,
+      variantId,
+      stock,
+      safeQty,
+    };
   }
 
-  const decQty = () => setQty((q) => Math.max(1, toNumber(q) - 1));
+  function decQty() {
+    setQty((currentQty) => Math.max(1, toNumber(currentQty) - 1));
+  }
 
-  const incQty = () =>
-    setQty((q) =>
-      stockMax > 0 ? Math.min(stockMax, toNumber(q) + 1) : toNumber(q) + 1
-    );
+  function incQty() {
+    setQty((currentQty) => {
+      const nextQty = toNumber(currentQty) + 1;
+      return stockMax > 0 ? Math.min(stockMax, nextQty) : nextQty;
+    });
+  }
 
-  const onQtyInput = (e) => {
-    const n = Math.max(1, toNumber(e.target.value));
-    setQty(stockMax > 0 ? Math.min(stockMax, n) : n);
-  };
+  function onQtyInput(event) {
+    const nextQty = Math.max(1, toNumber(event.target.value));
+    setQty(stockMax > 0 ? Math.min(stockMax, nextQty) : nextQty);
+  }
 
   async function handleAddToCart() {
     const info = getVariantOrToast();
     if (!info) return;
-
     if (busy) return;
+
     setBusy(true);
 
     try {
@@ -342,20 +410,20 @@ export default function Product() {
       upsertLocalCartItem({
         variant_id: info.variantId,
         quantity: info.safeQty,
-        price: toNumber(info.v.price),
-        product_id: product.id,
-        product_name: product.product_name,
-        product_category: product.product_category,
-        url_slug: product.url_slug,
+        price: toNumber(info.variant._price),
+        product_id: getProductId(product),
+        product_name: product?.product_name || "",
+        product_category: product?.product_category || "",
+        url_slug: product?.url_slug || slug,
         image_url: activeImg,
-        size: info.v.size,
-        color: info.v.color,
+        size: info.variant._size,
+        color: info.variant._color,
       });
 
       window.dispatchEvent(new Event("cart:updated"));
       showToast(`Added ${info.safeQty} to cart ✅`);
-    } catch (e) {
-      showToast(e?.message || "Failed to add to cart");
+    } catch (err) {
+      showToast(err?.message || "Failed to add to cart");
     } finally {
       setBusy(false);
     }
@@ -371,14 +439,14 @@ export default function Product() {
       item: {
         variant_id: info.variantId,
         quantity: info.safeQty,
-        product_id: product.id,
-        product_name: product.product_name,
-        product_category: product.product_category,
-        url_slug: product.url_slug,
+        product_id: getProductId(product),
+        product_name: product?.product_name || "",
+        product_category: product?.product_category || "",
+        url_slug: product?.url_slug || slug,
         image_url: activeImg,
-        size: info.v.size,
-        color: info.v.color,
-        price: toNumber(info.v.price),
+        size: info.variant._size,
+        color: info.variant._color,
+        price: toNumber(info.variant._price),
       },
     };
 
@@ -451,7 +519,7 @@ export default function Product() {
                 type="button"
                 aria-label="Account"
                 aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((v) => !v)}
+                onClick={() => setProfileOpen((open) => !open)}
                 title="Account"
               >
                 <span className="profile-avatar">👤</span>
@@ -533,23 +601,23 @@ export default function Product() {
         <div className="pgrid">
           <div className="pleft">
             <div className="pbreadcrumb">
-              Home / {product.product_category || "Products"} / {product.product_name}
+              Home / {product?.product_category || "Products"} / {product?.product_name}
             </div>
 
             <div className="pmain">
               <img
                 src={activeImg}
-                alt={product.product_name}
+                alt={product?.product_name || "Product image"}
                 onError={(e) => {
-                  e.currentTarget.src = "/shoes.jpg";
+                  e.currentTarget.src = FALLBACK_IMAGE;
                 }}
               />
             </div>
           </div>
 
           <aside className="pright">
-            <h1 className="ptitle">{product.product_name}</h1>
-            <p className="pcat">{product.product_category}</p>
+            <h1 className="ptitle">{product?.product_name}</h1>
+            <p className="pcat">{product?.product_category}</p>
             <p className="pprice">{formatMoney(displayPrice)}</p>
 
             {colorOptions.length > 0 && (
@@ -561,7 +629,7 @@ export default function Product() {
 
                 <div className="pcolors">
                   {colorOptions.map(({ color }) => {
-                    const chosen =
+                    const isChosen =
                       String(selectedColor).toLowerCase() ===
                       String(color).toLowerCase();
 
@@ -569,7 +637,7 @@ export default function Product() {
                       <button
                         key={color}
                         type="button"
-                        className={`pcolorBtn ${chosen ? "selected" : ""}`}
+                        className={`pcolorBtn ${isChosen ? "selected" : ""}`}
                         onClick={() => setSelectedColor(color)}
                         disabled={busy}
                         title={`Select color ${color}`}
@@ -584,17 +652,20 @@ export default function Product() {
 
             <div className="psizes">
               {sizeOptions.map(({ size, variant }) => {
-                const chosen = chosenVariant?.id === variant.id;
-                const out = toNumber(variant.stock_quantity) <= 0;
+                const isChosen =
+                  !!chosenVariant?._variantId &&
+                  chosenVariant._variantId === variant._variantId;
+
+                const isOut = variant._stock <= 0;
 
                 return (
                   <button
-                    key={variant.id}
+                    key={variant._variantId || `${variant._color}-${variant._size}`}
                     type="button"
-                    className={`psizeBtn ${chosen ? "selected" : ""}`}
-                    disabled={out || busy}
-                    onClick={() => setSelectedVariant(variant)}
-                    title={out ? "Out of stock" : `Select size ${size}`}
+                    className={`psizeBtn ${isChosen ? "selected" : ""}`}
+                    disabled={isOut || busy}
+                    onClick={() => setSelectedVariantId(variant._variantId)}
+                    title={isOut ? "Out of stock" : `Select size ${size}`}
                   >
                     {size}
                   </button>
@@ -675,7 +746,7 @@ export default function Product() {
               <button
                 type="button"
                 className="paccHead"
-                onClick={() => setShipOpen((v) => !v)}
+                onClick={() => setShipOpen((open) => !open)}
               >
                 <span>Shipping &amp; Returns</span>
                 <span className={`pchev ${shipOpen ? "open" : ""}`}>⌃</span>
@@ -693,7 +764,7 @@ export default function Product() {
         <div className="pdescBottom">
           <h2 className="pdescTitle">Description</h2>
           <p className="pdescTextBottom">
-            {product.description ? product.description : "No description provided."}
+            {product?.description || "No description provided."}
           </p>
         </div>
       </div>

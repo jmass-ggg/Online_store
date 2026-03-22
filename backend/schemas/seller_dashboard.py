@@ -36,8 +36,8 @@ class SellerDashboardOut(BaseModel):
 
 class OrderActionResponse(BaseModel):
     message:str
-    order_id:int
-    seller_id:int
+    order_id:UUID
+    seller_id:UUID
     fulfillment_status:str
     class Config:
         from_omr=True

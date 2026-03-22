@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from backend.models.order import PaymentMethod
 
 class PlaceOrderRequest(BaseModel):
-    address_id: int = Field(..., gt=0)
+    address_id: UUID 
     payment_method: PaymentMethod
 
 class PlaceOrderResponse(BaseModel):
@@ -58,9 +58,9 @@ class UpdateFulfillmentStatusRequest(BaseModel):
     status: str
 
 class BuyNowRequest(BaseModel):
-    address_id: UUID = Field(..., gt=0)
-    variant_id: UUID = Field(..., gt=0)
-    quantity: int = Field(1, ge=1)
+    address_id: UUID
+    variant_id: UUID
+    quantity: int = Field(..., gt=0)
     payment_method: PaymentMethod
     
 class BuyNowResponse(BaseModel):

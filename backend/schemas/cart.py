@@ -6,10 +6,10 @@ from typing import List
 
 from pydantic import BaseModel, Field, ConfigDict
 from backend.models.cart import CartStauts
-
+from uuid import UUID
 
 class CartItemAdd(BaseModel):
-    variant_id: int
+    variant_id: UUID
     quantity: int = Field(default=1, ge=1)
 
 
@@ -19,9 +19,9 @@ class DecreaseQty(BaseModel):
 
 class CartItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int
-    cart_id: int
-    variant_id: int
+    id: UUID
+    cart_id: UUID
+    variant_id: UUID
     quantity: int
     price: Decimal 
 
@@ -29,8 +29,8 @@ class CartItemOut(BaseModel):
 class CartOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    buyer_id: int
+    id: UUID
+    buyer_id: UUID
     status: str
     created_at: datetime
     updated_at: datetime

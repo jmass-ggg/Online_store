@@ -171,7 +171,7 @@ def place_order_service(
 
     return order, grand_total, len(seller_subtotals)
 
-
+from backend.models.order import PaymentMethod
 def buy_now_service(
     db: Session,
     *,
@@ -179,7 +179,7 @@ def buy_now_service(
     address_id: UUID,
     variant_id: UUID,
     quantity: int,
-    paymentmethod: str,
+    paymentmethod: PaymentMethod,
 ) -> Tuple[Order, Decimal, int]:
    
     try:
@@ -223,7 +223,7 @@ def buy_now_service(
                 buyer_id=user_id,
                 status="PLACED",
                 total_price=grand_total,
-                payment_Method=paymentmethod,
+                payment_method=paymentmethod,
             )
             db.add(order)
             db.flush()

@@ -7,6 +7,10 @@ const CART_KEY = "cart_items";
 const BUY_NOW_KEY = "buy_now_item";
 const CHECKOUT_CTX_KEY = "checkout_context";
 
+function toId(value) {
+  return String(value ?? "").trim();
+}
+
 function money(n) {
   return `Rs. ${Number(n || 0).toLocaleString("en-NP", {
     minimumFractionDigits: 2,
@@ -45,8 +49,8 @@ function readLocalMapByVariantId() {
   const map = new Map();
 
   for (const x of arr) {
-    const vid = Number(x?.variant_id ?? x?.variantId ?? x?.id);
-    if (Number.isFinite(vid)) {
+    const vid = toId(x?.variant_id ?? x?.variantId ?? x?.id);
+    if (vid) {
       map.set(vid, x);
     }
   }
@@ -57,7 +61,7 @@ function readLocalMapByVariantId() {
 function readBuyNow() {
   try {
     const raw = JSON.parse(localStorage.getItem(BUY_NOW_KEY) || "null");
-    if (!raw?.item?.variant_id) return null;
+    if (!toId(raw?.item?.variant_id)) return null;
     return raw;
   } catch {
     return null;
@@ -85,6 +89,12 @@ function jitterCoord(base, maxDelta = 0.03) {
   return Number((base + r).toFixed(6));
 }
 
+function sortByNewest(a, b) {
+  const ta = Date.parse(a?.updated_at || a?.created_at || "") || 0;
+  const tb = Date.parse(b?.updated_at || b?.created_at || "") || 0;
+  return tb - ta;
+}
+
 const NEPAL = {
   provinces: [
     {
@@ -92,14 +102,8 @@ const NEPAL = {
       lat: 26.67,
       lng: 87.27,
       cities: [
-        {
-          name: "Biratnagar",
-          zones: ["Main Road", "Traffic Chowk", "Bargachhi"],
-        },
-        {
-          name: "Dharan",
-          zones: ["Bhanuchowk", "Putali Line", "Siddha Kali"],
-        },
+        { name: "Biratnagar", zones: ["Main Road", "Traffic Chowk", "Bargachhi"] },
+        { name: "Dharan", zones: ["Bhanuchowk", "Putali Line", "Siddha Kali"] },
       ],
     },
     {
@@ -107,14 +111,8 @@ const NEPAL = {
       lat: 26.72,
       lng: 85.92,
       cities: [
-        {
-          name: "Janakpur",
-          zones: ["Ramanand Chowk", "Mills Area", "Kuwa"],
-        },
-        {
-          name: "Birgunj",
-          zones: ["Ghantaghar", "Adarshanagar", "Dryport"],
-        },
+        { name: "Janakpur", zones: ["Ramanand Chowk", "Mills Area", "Kuwa"] },
+        { name: "Birgunj", zones: ["Ghantaghar", "Adarshanagar", "Dryport"] },
       ],
     },
     {
@@ -122,18 +120,9 @@ const NEPAL = {
       lat: 27.72,
       lng: 85.32,
       cities: [
-        {
-          name: "Kathmandu",
-          zones: ["New Baneshwor", "Koteshwor", "Kalanki", "Boudha"],
-        },
-        {
-          name: "Lalitpur",
-          zones: ["Jawalakhel", "Patan", "Satdobato"],
-        },
-        {
-          name: "Bhaktapur",
-          zones: ["Suryabinayak", "Thimi", "Durbar Square"],
-        },
+        { name: "Kathmandu", zones: ["New Baneshwor", "Koteshwor", "Kalanki", "Boudha"] },
+        { name: "Lalitpur", zones: ["Jawalakhel", "Patan", "Satdobato"] },
+        { name: "Bhaktapur", zones: ["Suryabinayak", "Thimi", "Durbar Square"] },
       ],
     },
     {
@@ -141,14 +130,8 @@ const NEPAL = {
       lat: 28.21,
       lng: 83.99,
       cities: [
-        {
-          name: "Pokhara",
-          zones: ["Lakeside", "Chipledhunga", "Bagar"],
-        },
-        {
-          name: "Beni",
-          zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk"],
-        },
+        { name: "Pokhara", zones: ["Lakeside", "Chipledhunga", "Bagar"] },
+        { name: "Beni", zones: ["Birendra Chowk", "Campus Chowk", "Hospital Chowk"] },
       ],
     },
     {
@@ -156,14 +139,8 @@ const NEPAL = {
       lat: 27.53,
       lng: 83.45,
       cities: [
-        {
-          name: "Butwal",
-          zones: ["Traffic Chowk", "Golpark", "Kalikanagar"],
-        },
-        {
-          name: "Bhairahawa",
-          zones: ["Siddharthnagar", "Buspark", "Airport Area"],
-        },
+        { name: "Butwal", zones: ["Traffic Chowk", "Golpark", "Kalikanagar"] },
+        { name: "Bhairahawa", zones: ["Siddharthnagar", "Buspark", "Airport Area"] },
       ],
     },
     {
@@ -171,10 +148,7 @@ const NEPAL = {
       lat: 28.6,
       lng: 81.6,
       cities: [
-        {
-          name: "Birendranagar",
-          zones: ["Yarichowk", "Mangalgadhi", "Airport Area"],
-        },
+        { name: "Birendranagar", zones: ["Yarichowk", "Mangalgadhi", "Airport Area"] },
       ],
     },
     {
@@ -182,10 +156,7 @@ const NEPAL = {
       lat: 28.95,
       lng: 80.18,
       cities: [
-        {
-          name: "Dhangadhi",
-          zones: ["Campus Road", "Hasanpur", "Chatakpur"],
-        },
+        { name: "Dhangadhi", zones: ["Campus Road", "Hasanpur", "Chatakpur"] },
       ],
     },
   ],
@@ -301,7 +272,7 @@ export default function Checkout() {
         if (cancelled) return;
 
         const arr = Array.isArray(list) ? [...list] : [];
-        arr.sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
+        arr.sort(sortByNewest);
 
         const newest = arr[0] || null;
         setSavedAddress(newest);
@@ -368,14 +339,14 @@ export default function Checkout() {
         if (!cancelled) {
           setOrderItems([
             {
-              id: `buy_now_${it.variant_id}`,
-              variant_id: Number(it.variant_id),
+              id: `buy_now_${toId(it.variant_id)}`,
+              variant_id: toId(it.variant_id),
               quantity: Number(it.quantity ?? 1),
               price: Number(it.price ?? 0),
-              product_name: it.product_name,
-              image_url: it.image_url,
-              size: it.size,
-              color: it.color,
+              product_name: it.product_name || "",
+              image_url: it.image_url || "",
+              size: it.size || "",
+              color: it.color || "",
             },
           ]);
           setLoadingOrder(false);
@@ -393,18 +364,19 @@ export default function Checkout() {
         const items = Array.isArray(cart?.items) ? cart.items : [];
 
         const enriched = items.map((it) => {
-          const local = localMap.get(Number(it.variant_id));
+          const variantId = toId(it.variant_id);
+          const local = localMap.get(variantId);
 
           return {
             ...it,
-            id: it.id ?? `cart_${it.variant_id}`,
-            variant_id: Number(it.variant_id),
+            id: toId(it.id) || `cart_${variantId}`,
+            variant_id: variantId,
             quantity: Number(it.quantity ?? 1),
             price: Number(it.price ?? local?.price ?? 0),
-            product_name: local?.product_name || it.product_name,
-            image_url: local?.image_url || it.image_url,
-            size: local?.size || it.size,
-            color: local?.color || it.color,
+            product_name: local?.product_name || it.product_name || "",
+            image_url: local?.image_url || it.image_url || "",
+            size: local?.size || it.size || "",
+            color: local?.color || it.color || "",
           };
         });
 
@@ -572,7 +544,7 @@ export default function Checkout() {
   function proceedToPayment() {
     setErrorMsg("");
 
-    if (!savedAddress?.id) {
+    if (!toId(savedAddress?.id)) {
       setErrorMsg("Please save a shipping address to proceed.");
       return;
     }
@@ -584,10 +556,10 @@ export default function Checkout() {
 
     const checkoutContext = {
       mode: isBuyNowMode ? "BUY_NOW" : "CART",
-      address_id: Number(savedAddress.id),
+      address_id: toId(savedAddress.id),
       address: savedAddress,
       items: orderItems.map((x) => ({
-        variant_id: Number(x.variant_id),
+        variant_id: toId(x.variant_id),
         quantity: Number(x.quantity),
         price: Number(x.price),
         product_name: x.product_name,
@@ -618,9 +590,7 @@ export default function Checkout() {
           <Link to="/">Home</Link>
           <span className="ck-sep">›</span>
           <span>Checkout</span>
-          {isBuyNowMode ? (
-            <span className="ck-buyNowFlag">(Buy Now)</span>
-          ) : null}
+          {isBuyNowMode ? <span className="ck-buyNowFlag">(Buy Now)</span> : null}
         </div>
 
         <div className="ck-grid">
@@ -629,9 +599,7 @@ export default function Checkout() {
               <h2 className="ck-h2">Delivery Information</h2>
             </div>
 
-            {loadingAddress ? (
-              <div className="ck-hint">Loading address…</div>
-            ) : null}
+            {loadingAddress ? <div className="ck-hint">Loading address…</div> : null}
 
             {savedAddress && !isEditingAddress ? (
               <div className="ship-card">
@@ -657,9 +625,7 @@ export default function Checkout() {
                     {savedAddress.line1}
                     {savedAddress.line2 ? `, ${savedAddress.line2}` : ""}
                     {savedAddress.region ? `, ${savedAddress.region}` : ""}
-                    {savedAddress.postal_code
-                      ? `, ${savedAddress.postal_code}`
-                      : ""}
+                    {savedAddress.postal_code ? `, ${savedAddress.postal_code}` : ""}
                     {savedAddress.country ? `, ${savedAddress.country}` : ""}
                   </span>
                 </div>
@@ -704,9 +670,7 @@ export default function Checkout() {
                       value={province}
                       onChange={(e) => handleProvinceChange(e.target.value)}
                     >
-                      <option value="">
-                        Please choose your province / region
-                      </option>
+                      <option value="">Please choose your province / region</option>
                       {NEPAL.provinces.map((p) => (
                         <option key={p.name} value={p.name}>
                           {p.name}
@@ -807,9 +771,7 @@ export default function Checkout() {
               </div>
 
               <div className="ck-itemsBody">
-                {loadingOrder ? (
-                  <div className="ck-hint">Loading items…</div>
-                ) : null}
+                {loadingOrder ? <div className="ck-hint">Loading items…</div> : null}
 
                 {!loadingOrder && orderItems.length === 0 ? (
                   <div className="ck-hint">No items to show.</div>

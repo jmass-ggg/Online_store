@@ -11,7 +11,6 @@ from backend.database import Base
 
 
 class ProductVariant(Base):
-    
     __tablename__ = "product_variants"
     __table_args__ = (
         UniqueConstraint("sku", name="uq_product_variants_sku"),

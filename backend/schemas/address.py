@@ -1,7 +1,7 @@
 from pydantic import BaseModel,Field,ConfigDict
 from typing import Optional
 from datetime import datetime
-
+from uuid import UUID
 class AddressCreate(BaseModel):
     full_name: str=Field(max_length=100)
     phone_number: str = Field(..., max_length=20)
@@ -33,8 +33,8 @@ class AddressUpdate(BaseModel):
     is_default_billing: Optional[bool] = None
     
 class AddressResponse(AddressCreate):
-    id: int
-    customer_id: int
+    id: UUID
+    customer_id: UUID
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)

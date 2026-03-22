@@ -68,6 +68,6 @@ def buy_now_api(
         status=order.status.value if hasattr(order.status, "value") else str(order.status),
         total_price=total_price,
         seller_count=seller_count,
-        payment_method=order.payment_Method.value if hasattr(order.payment_Method, "value") else str(order.payment_Method),
+        payment_method=order.payment_method.value if hasattr(order.payment_method, "value") else str(order.payment_Method),
         payment_redirect_url=payment_redirect_url,
     )

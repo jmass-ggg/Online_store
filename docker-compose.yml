@@ -58,6 +58,8 @@ services:
       - DOCKER=true
       - VITE_API_URL=http://backend:8030
       - VITE_API_BASE_URL=/api
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
 
 
 
