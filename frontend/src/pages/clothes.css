@@ -1,0 +1,39 @@
+/* =========================================
+   CLOTHES FIX (does NOT affect shoes)
+========================================= */
+
+/* Fix product image cropping */
+.clothes-page .pmain img {
+  object-fit: contain !important;   /* 👈 IMPORTANT */
+  background: #f6f6f6;
+  padding: 20px;
+}
+
+/* Make image frame taller (better for outfits) */
+.clothes-page .pmain {
+  aspect-ratio: 3 / 4;   /* 👈 vertical instead of wide */
+}
+
+/* Adjust grid for better balance */
+.clothes-page .pgrid {
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+
+/* Improve spacing */
+.clothes-page .pright {
+  padding: 20px;
+}
+
+/* Make size buttons feel less "shoe-like" */
+.clothes-page .psizes {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Slightly softer UI */
+.clothes-page .pbtnDark {
+  border-radius: 12px;
+}
+
+.clothes-page .pbtnPrimary {
+  border-radius: 12px;
+}

@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.v1 import (
     customer, product, review, seller, admin, login, cart, address, order,
-    seller_management, esewa_router
+    seller_management, esewa_router,checkout
 )
 from backend.database import Base, engine
 from pathlib import Path
@@ -42,7 +42,7 @@ app.include_router(admin.router)
 app.include_router(cart.router)
 app.include_router(seller_management.router)
 app.include_router(esewa_router.router)
-
+app.include_router(checkout.router)
 @app.get("/")
 def hello_world():
     return {"message": "hello this is online store"}

@@ -27,7 +27,7 @@ class DeliveryCharge(Base):
     
     id: Mapped[uuid.uuid4] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     
-    Delivery:Mapped[Decimal]=mapped_column(Numeric(5,2),default=0.00)
+    delivery_charge:Mapped[Decimal]=mapped_column(Numeric(5,2),default=0.00)
     seller_id:Mapped[UUID]=mapped_column(
                                         ForeignKey("seller.id",
                                                    ondelete="CASCADE"),nullable=False

@@ -6,6 +6,7 @@ export default function Clothes() {
       category="Clothes"
       pageTitle="Clothes"
       cardMeta="Clothing"
+      className="clothes-page"   // ✅ ADD THIS
     />
   );
 }

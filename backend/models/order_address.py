@@ -31,7 +31,6 @@ class OrderAddress(Base):
     region: Mapped[str] = mapped_column(String(50), nullable=False)
     line1: Mapped[str] = mapped_column(String(255), nullable=False)
     line2: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     country: Mapped[str] = mapped_column(String(50), default="Nepal", nullable=False)
 
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)

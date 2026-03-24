@@ -57,6 +57,11 @@ class SellerFulfillmentOut(BaseModel):
 class UpdateFulfillmentStatusRequest(BaseModel):
     status: str
 
+class Checkout(BaseModel):
+    address_id:UUID
+    variant_id:UUID
+    quantity:int
+
 class BuyNowRequest(BaseModel):
     address_id: UUID
     variant_id: UUID
