@@ -7,19 +7,39 @@ const CHECKOUT_CTX_KEY = "checkout_context";
 const BUY_NOW_KEY = "buy_now_item";
 const CART_KEY = "cart_items";
 
+const CHECKOUT_PREVIEW_ENDPOINT = "/checkout/checkout";
+const BUY_NOW_ENDPOINT = "/orders/buy-now";
+const CART_ORDER_ENDPOINT = "/orders/order";
+
+const TAB_KEYS = {
+  ESEWA: "ESEWA",
+  COD: "COD",
+  CARD: "CARD",
+  KHALTI: "KHALTI",
+};
+
 const PAYMENT_METHODS = {
   ESEWA: "ESEWA",
   COD: "CASH_ON_DELIVERY",
 };
 
-const TAB_KEYS = {
-  CARD: "CARD",
-  ESEWA: "ESEWA",
-  KHALTI: "KHALTI",
-  COD: "COD",
-};
-
 const PAYMENT_TABS = [
+  {
+    key: TAB_KEYS.ESEWA,
+    title: "eSewa Wallet",
+    subtitle: "Fast online payment",
+    image: "/eswea.png",
+    emoji: "💚",
+    enabled: true,
+  },
+  {
+    key: TAB_KEYS.COD,
+    title: "Cash on Delivery",
+    subtitle: "Pay when order arrives",
+    image: "/cash_delivery.png",
+    emoji: "📦",
+    enabled: true,
+  },
   {
     key: TAB_KEYS.CARD,
     title: "Credit / Debit Card",
@@ -29,28 +49,12 @@ const PAYMENT_TABS = [
     enabled: false,
   },
   {
-    key: TAB_KEYS.ESEWA,
-    title: "eSewa Wallet",
-    subtitle: "Fast online payment",
-    image: "/eswea.png",
-    emoji: null,
-    enabled: true,
-  },
-  {
     key: TAB_KEYS.KHALTI,
     title: "Khalti by IME",
     subtitle: "Coming soon",
     image: "/ime.png",
-    emoji: null,
+    emoji: "💜",
     enabled: false,
-  },
-  {
-    key: TAB_KEYS.COD,
-    title: "Cash on Delivery",
-    subtitle: "Pay on arrival",
-    image: "/cash_delivery.png",
-    emoji: null,
-    enabled: true,
   },
 ];
 
@@ -71,8 +75,8 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function money(n) {
-  return `Rs. ${toNumber(n).toLocaleString("en-NP", {
+function money(value) {
+  return `Rs. ${toNumber(value).toLocaleString("en-NP", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -87,9 +91,9 @@ function formatApiError(err) {
 
   if (Array.isArray(detail) && detail.length) {
     return detail
-      .map((d) => {
-        const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : "field";
-        return `${field}: ${d?.msg || "Invalid value"}`;
+      .map((item) => {
+        const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : "field";
+        return `${field}: ${item?.msg || "Invalid value"}`;
       })
       .join(" | ");
   }
@@ -106,7 +110,7 @@ function buildBackendUrl(path) {
   return `${base}${rel}`;
 }
 
-function cleanupAfterCod(mode) {
+function cleanupAfterOrder(mode) {
   sessionStorage.removeItem(CHECKOUT_CTX_KEY);
 
   if (mode === "BUY_NOW") {
@@ -119,161 +123,240 @@ function cleanupAfterCod(mode) {
   window.dispatchEvent(new Event("cart:updated"));
 }
 
-function normalizeCheckoutContext(parsed) {
+function normalizeSeed(parsed) {
+  const mode = String(parsed?.mode || "BUY_NOW").toUpperCase();
+
+  if (mode === "BUY_NOW") {
+    return {
+      mode: "BUY_NOW",
+      address_id: toId(parsed?.address_id),
+      variant_id: toId(parsed?.variant_id),
+      quantity: Math.max(1, toNumber(parsed?.quantity, 1)),
+      checkout: parsed?.checkout || null,
+      items: [],
+    };
+  }
+
   const items = Array.isArray(parsed?.items) ? parsed.items : [];
 
-  const normalizedItems = items
-    .map((item, index) => ({
-      key: `${toId(item?.variant_id ?? item?.id)}_${index}`,
-      variant_id: toId(item?.variant_id ?? item?.variantId ?? item?.id),
-      quantity: Math.max(1, toNumber(item?.quantity, 1)),
-      price: toNumber(item?.price, 0),
-      product_name: String(item?.product_name || "").trim(),
-      size: String(item?.size || "").trim(),
-      color: String(item?.color || "").trim(),
-      image_url: String(item?.image_url || "").trim(),
-    }))
-    .filter((item) => item.variant_id);
-
-  const totals = {
-    itemsCount:
-      toNumber(parsed?.totals?.itemsCount) ||
-      normalizedItems.reduce((sum, item) => sum + item.quantity, 0),
-    itemsTotal:
-      toNumber(parsed?.totals?.itemsTotal) ||
-      normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    deliveryFee:
-      parsed?.totals?.deliveryFee != null
-        ? toNumber(parsed.totals.deliveryFee)
-        : normalizedItems.length > 0
-        ? 100
-        : 0,
-  };
-
-  totals.total =
-    parsed?.totals?.total != null
-      ? toNumber(parsed.totals.total)
-      : totals.itemsTotal + totals.deliveryFee;
-
   return {
-    mode: String(parsed?.mode || "BUY_NOW").toUpperCase(),
-    address_id: toId(parsed?.address_id ?? parsed?.address?.id),
-    address: parsed?.address || null,
-    items: normalizedItems,
-    totals,
+    mode: "CART",
+    address_id: toId(parsed?.address_id),
+    variant_id: "",
+    quantity: 0,
+    checkout: parsed?.checkout || null,
+    items: items
+      .map((item, index) => ({
+        key: `${toId(item?.variant_id ?? item?.id)}_${index}`,
+        variant_id: toId(item?.variant_id ?? item?.id),
+        quantity: Math.max(1, toNumber(item?.quantity, 1)),
+        price: toNumber(item?.price, 0),
+        product_name: String(item?.product_name || "").trim(),
+        product_category: String(item?.product_category || "").trim(),
+        size: String(item?.size || "").trim(),
+        color: String(item?.color || "").trim(),
+        image_url: String(item?.image_url || "").trim(),
+      }))
+      .filter((item) => item.variant_id),
   };
 }
 
-function getMethodDetails(activeTab) {
-  if (activeTab === TAB_KEYS.ESEWA) {
+function buildBuyNowPreview(seed, preview) {
+  const quantity = Math.max(1, toNumber(seed?.quantity, 1));
+
+  return {
+    mode: "BUY_NOW",
+    seller_id: preview?.seller_id || "",
+    items: [
+      {
+        key: `buy_now_${toId(preview?.variant?.id || seed?.variant_id)}`,
+        variant_id: toId(preview?.variant?.id || seed?.variant_id),
+        quantity,
+        price: toNumber(preview?.unit_price, preview?.variant?.price),
+        product_name: preview?.product?.product_name || "Selected Product",
+        product_category: preview?.product?.product_category || "",
+        size: preview?.variant?.size || "",
+        color: preview?.variant?.color || "",
+        image_url: preview?.product?.image_url || "",
+      },
+    ],
+    totals: {
+      itemsCount: quantity,
+      itemsTotal: toNumber(preview?.items_subtotal, 0),
+      deliveryFee: toNumber(preview?.delivery_charge, 0),
+      total: toNumber(preview?.grand_total, 0),
+    },
+  };
+}
+
+function buildCartPreview(seed) {
+  const items = Array.isArray(seed?.items) ? seed.items : [];
+  const itemsCount = items.reduce((sum, item) => sum + Math.max(1, toNumber(item.quantity, 1)), 0);
+  const itemsTotal = items.reduce(
+    (sum, item) => sum + toNumber(item.price, 0) * Math.max(1, toNumber(item.quantity, 1)),
+    0
+  );
+
+  return {
+    mode: "CART",
+    items,
+    totals: {
+      itemsCount,
+      itemsTotal,
+      deliveryFee: 0,
+      total: itemsTotal,
+    },
+  };
+}
+
+function getMethodMeta(tabKey) {
+  if (tabKey === TAB_KEYS.ESEWA) {
     return {
       title: "Pay with eSewa",
       subtitle: "Fast and secure wallet payment",
-      image: "/eswea.png",
-      emoji: null,
       intro:
-        "Your order will be created first, then you will be redirected to eSewa to complete the payment securely.",
+        "Your order will be created first, then you will be redirected to eSewa to complete payment securely.",
       points: [
         "Click the payment button below.",
-        "Your order will be created with eSewa as the selected payment method.",
-        "You will be redirected to eSewa to complete payment.",
+        "Order will be created with eSewa as selected payment method.",
+        "You will be redirected to eSewa to complete the payment.",
       ],
-      cta: "PROCEED TO ESEWA",
+      cta: "Proceed to eSewa",
       enabled: true,
+      paymentMethod: PAYMENT_METHODS.ESEWA,
+      image: "/eswea.png",
+      emoji: "💚",
     };
   }
 
-  if (activeTab === TAB_KEYS.COD) {
+  if (tabKey === TAB_KEYS.COD) {
     return {
       title: "Cash on Delivery",
       subtitle: "Pay when your order arrives",
-      image: "/cash_delivery.png",
-      emoji: null,
-      intro:
-        "Place your order now and pay in cash when the package is delivered to your address.",
+      intro: "Place your order now and pay in cash at the time of delivery.",
       points: [
         "Click the place order button below.",
         "Your order will be confirmed with Cash on Delivery.",
-        "Please keep the payment amount ready at delivery time.",
+        "Please keep the payable amount ready on delivery.",
       ],
-      cta: "PLACE ORDER",
+      cta: "Place Order",
       enabled: true,
+      paymentMethod: PAYMENT_METHODS.COD,
+      image: "/cash_delivery.png",
+      emoji: "📦",
     };
   }
 
-  if (activeTab === TAB_KEYS.CARD) {
+  if (tabKey === TAB_KEYS.CARD) {
     return {
       title: "Credit / Debit Card",
-      subtitle: "This method is not connected yet",
+      subtitle: "This payment method is not connected yet",
+      intro: "Card payment is visible in the UI, but backend integration is not completed yet.",
+      points: [
+        "Use eSewa for online payment.",
+        "Use Cash on Delivery if you want to pay later.",
+      ],
+      cta: "Coming Soon",
+      enabled: false,
+      paymentMethod: null,
       image: null,
       emoji: "💳",
-      intro:
-        "Card payments are shown in the interface, but the gateway integration has not been completed yet.",
-      points: [
-        "Use eSewa for instant online payment.",
-        "Use Cash on Delivery if you want to pay at arrival.",
-      ],
-      cta: "NOT CONNECTED YET",
-      enabled: false,
     };
   }
 
   return {
     title: "Khalti by IME",
-    subtitle: "This method is not connected yet",
-    image: "/ime.png",
-    emoji: null,
-    intro:
-      "Khalti / IME support is visible in the interface, but backend integration is still pending.",
+    subtitle: "This payment method is not connected yet",
+    intro: "Khalti / IME is shown in the UI, but backend integration is still pending.",
     points: [
-      "Once the gateway is integrated, this method can be enabled.",
-      "For now, use eSewa or Cash on Delivery.",
+      "Use eSewa for instant online payment.",
+      "Use Cash on Delivery as an alternative.",
     ],
-    cta: "NOT CONNECTED YET",
+    cta: "Coming Soon",
     enabled: false,
+    paymentMethod: null,
+    image: "/ime.png",
+    emoji: "💜",
   };
+}
+
+function SummaryItemCard({ item }) {
+  const imageUrl = item?.image_url
+    ? /^https?:\/\//i.test(item.image_url)
+      ? item.image_url
+      : buildBackendUrl(item.image_url)
+    : "";
+
+  return (
+    <div className="payment-summary-item">
+      <div className="payment-summary-thumbWrap">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={item.product_name || "Product"}
+            className="payment-summary-thumb"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="payment-summary-thumbFallback">
+            {(item.product_name || "P").slice(0, 1).toUpperCase()}
+          </div>
+        )}
+      </div>
+
+      <div className="payment-summary-itemBody">
+        <div className="payment-summary-itemTop">
+          <h4>{item.product_name || `Variant ${item.variant_id}`}</h4>
+          <strong>{money(toNumber(item.price, 0) * toNumber(item.quantity, 1))}</strong>
+        </div>
+
+        <div className="payment-summary-itemMeta">
+          {item.product_category ? <span>{item.product_category}</span> : null}
+          {item.size ? <span>Size: {item.size}</span> : null}
+          {item.color ? <span>Color: {item.color}</span> : null}
+          <span>Qty: {item.quantity}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SuccessView({ successData }) {
   const navigate = useNavigate();
 
   return (
-    <div className="payment-state-card success">
-      <div className="payment-state-badge success">Success</div>
-      <h2 className="payment-state-title">Order placed successfully</h2>
-      <p className="payment-state-text">
-        Your order has been created and is now waiting for fulfillment.
-      </p>
+    <div className="payment-stateCard payment-stateCard--success">
+      <div className="payment-stateIcon">✓</div>
+      <div className="payment-stateBadge">Success</div>
+      <h2>Order placed successfully</h2>
+      <p>Your order has been created and is now waiting for fulfillment.</p>
 
-      <div className="success-grid">
-        <div className="success-row">
+      <div className="payment-successGrid">
+        <div className="payment-successRow">
           <span>Order ID</span>
           <strong>{successData?.order_id || successData?.id || "-"}</strong>
         </div>
-        <div className="success-row">
+        <div className="payment-successRow">
           <span>Status</span>
           <strong>{successData?.status || "-"}</strong>
         </div>
-        <div className="success-row">
+        <div className="payment-successRow">
           <span>Total</span>
           <strong>{money(successData?.total_price || 0)}</strong>
         </div>
-        <div className="success-row">
+        <div className="payment-successRow">
           <span>Payment Method</span>
-          <strong>Cash on Delivery</strong>
+          <strong>{successData?.payment_method || PAYMENT_METHODS.COD}</strong>
         </div>
       </div>
 
-      <div className="payment-state-actions">
-        <button
-          type="button"
-          className="primary-btn"
-          onClick={() => navigate("/products")}
-        >
+      <div className="payment-stateActions">
+        <button type="button" className="payment-primaryBtn" onClick={() => navigate("/products")}>
           Continue Shopping
         </button>
-
-        <Link className="ghost-link" to="/">
+        <Link to="/" className="payment-ghostBtn">
           Back to Home
         </Link>
       </div>
@@ -284,121 +367,128 @@ function SuccessView({ successData }) {
 export default function Payment() {
   const navigate = useNavigate();
 
-  const [checkoutCtx, setCheckoutCtx] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS.ESEWA);
+  const [checkoutSeed, setCheckoutSeed] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(true);
   const [activeTab, setActiveTab] = useState(TAB_KEYS.ESEWA);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
 
   useEffect(() => {
-    const raw = sessionStorage.getItem(CHECKOUT_CTX_KEY);
-    const parsed = safeParse(raw);
+    const parsed = safeParse(sessionStorage.getItem(CHECKOUT_CTX_KEY));
 
     if (!parsed) {
       setError("Checkout data is missing. Please go back to checkout.");
+      setLoadingPreview(false);
       return;
     }
 
-    const normalized = normalizeCheckoutContext(parsed);
+    const normalized = normalizeSeed(parsed);
+    setCheckoutSeed(normalized);
 
-    if (!normalized.address_id || normalized.items.length === 0) {
-      setError("Checkout data is incomplete. Please go back to checkout.");
-      return;
+    async function loadPreview() {
+      setError("");
+      setLoadingPreview(true);
+
+      try {
+        if (normalized.mode === "BUY_NOW") {
+          if (!normalized.address_id || !normalized.variant_id) {
+            throw new Error("Checkout data is incomplete. Please go back to checkout.");
+          }
+
+          const preview = await apiFetch(CHECKOUT_PREVIEW_ENDPOINT, {
+            method: "POST",
+            body: JSON.stringify({
+              address_id: normalized.address_id,
+              variant_id: normalized.variant_id,
+              quantity: normalized.quantity,
+            }),
+          });
+
+          setPreviewData(buildBuyNowPreview(normalized, preview));
+        } else {
+          if (!normalized.address_id || normalized.items.length === 0) {
+            throw new Error("Checkout data is incomplete. Please go back to checkout.");
+          }
+
+          setPreviewData(buildCartPreview(normalized));
+        }
+      } catch (e) {
+        setError(formatApiError(e));
+      } finally {
+        setLoadingPreview(false);
+      }
     }
 
-    setCheckoutCtx(normalized);
+    loadPreview();
   }, []);
 
-  const totals = useMemo(() => checkoutCtx?.totals || {}, [checkoutCtx]);
-
-  const activeTabMeta = useMemo(() => {
-    return PAYMENT_TABS.find((tab) => tab.key === activeTab) || PAYMENT_TABS[1];
-  }, [activeTab]);
-
-  const detail = useMemo(() => getMethodDetails(activeTab), [activeTab]);
+  const methodMeta = useMemo(() => getMethodMeta(activeTab), [activeTab]);
+  const totals = useMemo(
+    () => previewData?.totals || { itemsCount: 0, itemsTotal: 0, deliveryFee: 0, total: 0 },
+    [previewData]
+  );
 
   const primaryButtonLabel = useMemo(() => {
-    if (!detail.enabled) return detail.cta;
-    return placingOrder ? "PROCESSING..." : detail.cta;
-  }, [detail, placingOrder]);
+    if (!methodMeta.enabled) return methodMeta.cta;
+    return placingOrder ? "Processing..." : methodMeta.cta;
+  }, [methodMeta, placingOrder]);
 
   function handleSelectTab(tab) {
     setError("");
     setActiveTab(tab.key);
-
-    if (!tab.enabled) return;
-
-    if (tab.key === TAB_KEYS.ESEWA) {
-      setPaymentMethod(PAYMENT_METHODS.ESEWA);
-    } else if (tab.key === TAB_KEYS.COD) {
-      setPaymentMethod(PAYMENT_METHODS.COD);
-    }
   }
 
   async function handlePlaceOrder() {
     setError("");
 
-    if (!checkoutCtx) {
-      setError("Checkout data is missing.");
+    if (!checkoutSeed || !previewData) {
+      setError("Checkout preview is missing.");
       return;
     }
 
-    if (!checkoutCtx.address_id) {
+    if (!checkoutSeed.address_id) {
       setError("Address is missing.");
       return;
     }
 
-    if (activeTab !== TAB_KEYS.ESEWA && activeTab !== TAB_KEYS.COD) {
-      setError(`${activeTabMeta.title} is not connected yet.`);
+    if (!methodMeta.enabled || !methodMeta.paymentMethod) {
+      setError(`${methodMeta.title} is not connected yet.`);
       return;
     }
 
     setPlacingOrder(true);
 
     try {
-      let res;
+      let response;
 
-      if (checkoutCtx.mode === "BUY_NOW") {
-        const item = checkoutCtx.items?.[0];
-
-        if (!item?.variant_id || !item?.quantity) {
-          throw new Error("Buy now item is missing.");
-        }
-
-        const payload = {
-          address_id: checkoutCtx.address_id,
-          variant_id: item.variant_id,
-          quantity: Number(item.quantity),
-          payment_method: paymentMethod,
-        };
-
-        console.log("BUY_NOW payload:", payload);
-
-        res = await apiFetch("/orders/buy-now", {
+      if (checkoutSeed.mode === "BUY_NOW") {
+        response = await apiFetch(BUY_NOW_ENDPOINT, {
           method: "POST",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            address_id: checkoutSeed.address_id,
+            variant_id: checkoutSeed.variant_id,
+            quantity: checkoutSeed.quantity,
+            payment_method: methodMeta.paymentMethod,
+          }),
         });
       } else {
-        const payload = {
-          address_id: checkoutCtx.address_id,
-          payment_method: paymentMethod,
-        };
-
-        console.log("CART payload:", payload);
-
-        res = await apiFetch("/orders/order", {
+        response = await apiFetch(CART_ORDER_ENDPOINT, {
           method: "POST",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            address_id: checkoutSeed.address_id,
+            payment_method: methodMeta.paymentMethod,
+          }),
         });
       }
 
-      if (paymentMethod === PAYMENT_METHODS.ESEWA) {
+      if (methodMeta.paymentMethod === PAYMENT_METHODS.ESEWA) {
         const redirectUrl =
-          res?.payment_redirect_url ||
-          res?.paymentUrl ||
-          res?.redirect_url ||
-          res?.redirectUrl;
+          response?.payment_redirect_url ||
+          response?.paymentUrl ||
+          response?.redirect_url ||
+          response?.redirectUrl;
 
         if (!redirectUrl) {
           throw new Error("Backend did not return eSewa redirect URL.");
@@ -408,8 +498,8 @@ export default function Payment() {
         return;
       }
 
-      cleanupAfterCod(checkoutCtx.mode);
-      setSuccessData(res);
+      cleanupAfterOrder(checkoutSeed.mode);
+      setSuccessData(response);
     } catch (e) {
       setError(formatApiError(e));
     } finally {
@@ -420,34 +510,46 @@ export default function Payment() {
   if (successData) {
     return (
       <div className="payment-shell">
-        <main className="payment-container">
+        <main className="payment-container payment-container--single">
           <SuccessView successData={successData} />
         </main>
       </div>
     );
   }
 
-  if (!checkoutCtx) {
+  if (loadingPreview) {
     return (
       <div className="payment-shell">
-        <main className="payment-container">
-          <div className="payment-state-card">
-            <div className="payment-state-badge">Payment</div>
-            <h2 className="payment-state-title">Checkout data missing</h2>
-            <p className="payment-state-text">
-              {error || "Please return to checkout and try again."}
-            </p>
+        <main className="payment-container payment-container--single">
+          <div className="payment-stateCard">
+            <div className="payment-stateBadge">Payment</div>
+            <h2>Loading checkout details</h2>
+            <p>Fetching your items, subtotal, delivery fee, and grand total.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-            <div className="payment-state-actions">
+  if (!checkoutSeed || !previewData) {
+    return (
+      <div className="payment-shell">
+        <main className="payment-container payment-container--single">
+          <div className="payment-stateCard">
+            <div className="payment-stateBadge">Payment</div>
+            <h2>Checkout data missing</h2>
+            <p>{error || "Please return to checkout and try again."}</p>
+
+            <div className="payment-stateActions">
               <button
                 type="button"
-                className="primary-btn"
+                className="payment-primaryBtn"
                 onClick={() => navigate("/checkout")}
               >
                 Back to Checkout
               </button>
 
-              <Link className="ghost-link" to="/">
+              <Link to="/" className="payment-ghostBtn">
                 Home
               </Link>
             </div>
@@ -461,21 +563,19 @@ export default function Payment() {
     <div className="payment-shell">
       <main className="payment-container">
         <section className="payment-hero">
-          <div>
+          <div className="payment-heroText">
             <div className="payment-kicker">Checkout</div>
             <h1 className="payment-title">Select Payment Method</h1>
             <p className="payment-subtitle">
-              Choose how you want to complete your order.
+              Review your order summary and choose how you want to complete payment.
             </p>
           </div>
 
           <button
             type="button"
-            className="back-btn"
+            className="payment-backBtn"
             onClick={() =>
-              navigate(
-                checkoutCtx.mode === "BUY_NOW" ? "/checkout?mode=buy_now" : "/checkout"
-              )
+              navigate(checkoutSeed.mode === "BUY_NOW" ? "/checkout?mode=buy_now" : "/checkout")
             }
           >
             ← Back to Checkout
@@ -483,159 +583,141 @@ export default function Payment() {
         </section>
 
         <section className="payment-layout">
-          <div className="payment-left-col">
-            <div className="payment-panel">
-              <div className="payment-method-tabs">
+          <div className="payment-left">
+            <div className="payment-card">
+              <div className="payment-tabGrid">
                 {PAYMENT_TABS.map((tab) => (
                   <button
                     key={tab.key}
                     type="button"
-                    className={`payment-method-tab ${
-                      activeTab === tab.key ? "active" : ""
-                    } ${!tab.enabled ? "is-disabled" : ""}`}
+                    className={[
+                      "payment-tab",
+                      activeTab === tab.key ? "is-active" : "",
+                      !tab.enabled ? "is-disabled" : "",
+                    ].join(" ")}
                     onClick={() => handleSelectTab(tab)}
                   >
-                    <div className="payment-method-iconWrap">
+                    <div className="payment-tabIcon">
                       {tab.image ? (
                         <img
                           src={tab.image}
                           alt={tab.title}
-                          className="method-icon"
+                          className="payment-tabIconImage"
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
                           }}
                         />
                       ) : (
-                        <div className="method-icon-emoji">{tab.emoji}</div>
+                        <span>{tab.emoji}</span>
                       )}
                     </div>
 
-                    <div className="method-text">
-                      <h4>{tab.title}</h4>
-                      <p>{tab.subtitle}</p>
+                    <div className="payment-tabText">
+                      <strong>{tab.title}</strong>
+                      <span>{tab.subtitle}</span>
                     </div>
 
-                    {activeTab === tab.key ? <span className="method-active-dot" /> : null}
+                    {activeTab === tab.key ? <span className="payment-tabDot" /> : null}
                   </button>
                 ))}
               </div>
 
-              <div className="payment-detail-panel">
-                <div className="detail-head">
-                  {detail.image ? (
-                    <img
-                      src={detail.image}
-                      alt={detail.title}
-                      className="detail-brand-logo"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <div className="detail-icon-box">{detail.emoji}</div>
-                  )}
+              <div className="payment-methodPanel">
+                <div className="payment-methodHead">
+                  <div className="payment-methodBrand">
+                    {methodMeta.image ? (
+                      <img
+                        src={methodMeta.image}
+                        alt={methodMeta.title}
+                        className="payment-methodBrandImage"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="payment-methodBrandFallback">{methodMeta.emoji}</div>
+                    )}
+                  </div>
 
                   <div>
-                    <h3>{detail.title}</h3>
-                    <p>{detail.subtitle}</p>
+                    <h3>{methodMeta.title}</h3>
+                    <p>{methodMeta.subtitle}</p>
                   </div>
                 </div>
 
-                <p className="detail-intro">{detail.intro}</p>
+                <p className="payment-methodIntro">{methodMeta.intro}</p>
 
-                <ol className="detail-list ordered">
-                  {detail.points.map((point) => (
+                <ol className="payment-steps">
+                  {methodMeta.points.map((point) => (
                     <li key={point}>{point}</li>
                   ))}
                 </ol>
 
-                <div className="detail-footer">
+                {error ? <div className="payment-errorBox">{error}</div> : null}
+
+                <div className="payment-methodFooter">
                   <button
                     type="button"
-                    className={`primary-btn detail-btn ${
-                      !detail.enabled ? "disabled" : ""
-                    }`}
+                    className={`payment-primaryBtn ${!methodMeta.enabled ? "is-disabled" : ""}`}
                     onClick={handlePlaceOrder}
-                    disabled={placingOrder || !detail.enabled}
+                    disabled={placingOrder || !methodMeta.enabled}
                   >
                     {primaryButtonLabel}
                   </button>
 
-                  <div className="detail-trust">
-                    <span className="detail-trust-dot" />
+                  <div className="payment-trustText">
+                    <span className="payment-trustDot" />
                     Secure checkout experience
                   </div>
                 </div>
-
-                {error ? <div className="payment-inline-error">{error}</div> : null}
               </div>
             </div>
           </div>
 
-          <aside className="payment-summary-card">
-            <div className="summary-top">
-              <h3>Order Summary</h3>
-              <span className="summary-chip">{checkoutCtx.mode}</span>
-            </div>
+          <aside className="payment-right">
+            <div className="payment-summaryCard">
+              <div className="payment-summaryTop">
+                <h3>Order Summary</h3>
+              </div>
 
-            <div className="summary-items">
-              {checkoutCtx.items.map((item, index) => (
-                <div
-                  key={`${item.variant_id}_${index}`}
-                  className="summary-item-row"
-                >
-                  <div className="summary-item-info">
-                    <div className="summary-item-name">{item.product_name}</div>
-                    <div className="summary-item-meta">
-                      {item.size ? `Size: ${item.size} · ` : ""}
-                      {item.color ? `Color: ${item.color} · ` : ""}
-                      Qty: {item.quantity}
-                    </div>
-                  </div>
+              <div className="payment-summaryItems">
+                {previewData.items.map((item) => (
+                  <SummaryItemCard key={item.key} item={item} />
+                ))}
+              </div>
 
-                  <div className="summary-item-price">
-                    {money(Number(item.price) * Number(item.quantity))}
-                  </div>
+              <div className="payment-summaryBreakdown">
+                <div className="payment-summaryLine">
+                  <span>Items</span>
+                  <strong>{totals.itemsCount}</strong>
                 </div>
-              ))}
-            </div>
 
-            <div className="summary-divider" />
+                <div className="payment-summaryLine">
+                  <span>Items Total</span>
+                  <strong>{money(totals.itemsTotal)}</strong>
+                </div>
 
-            <div className="summary-line">
-              <span>Items</span>
-              <span>{totals.itemsCount || 0}</span>
-            </div>
+                <div className="payment-summaryLine">
+                  <span>Delivery Fee</span>
+                  <strong>{money(totals.deliveryFee)}</strong>
+                </div>
 
-            <div className="summary-line">
-              <span>Items Total</span>
-              <span>{money(totals.itemsTotal || 0)}</span>
-            </div>
+                <div className="payment-summaryDivider" />
 
-            <div className="summary-line">
-              <span>Delivery Fee</span>
-              <span>{money(totals.deliveryFee || 0)}</span>
-            </div>
+                <div className="payment-summaryLine is-total">
+                  <span>Total</span>
+                  <strong>{money(totals.total)}</strong>
+                </div>
+              </div>
 
-            <div className="summary-divider" />
-
-            <div className="summary-line total">
-              <span>Total</span>
-              <span>{money(totals.total || 0)}</span>
-            </div>
-
-            <button
-              type="button"
-              className="summary-main-btn"
-              onClick={handlePlaceOrder}
-              disabled={placingOrder || !detail.enabled}
-            >
-              {primaryButtonLabel}
-            </button>
-
-            <div className="summary-note">
-              By proceeding, you confirm that your shipping and payment details
-              are correct.
+              <button
+                type="button"
+                className="payment-summaryBtn"
+                onClick={handlePlaceOrder}
+                disabled={placingOrder || !methodMeta.enabled}
+              >
+                {primaryButtonLabel}
+              </button>
             </div>
           </aside>
         </section>

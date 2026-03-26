@@ -28,6 +28,7 @@ class Address(Base):
     line1: Mapped[str] = mapped_column(String(255), nullable=False)
     line2: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     line2: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     country: Mapped[str] = mapped_column(String(50), default="Nepal", nullable=False)
 
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

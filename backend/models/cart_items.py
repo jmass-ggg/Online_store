@@ -2,7 +2,7 @@ from __future__ import annotations
 from decimal import Decimal
 import uuid
 
-from sqlalchemy import ForeignKey, UniqueConstraint, Numeric
+from sqlalchemy import ForeignKey, UniqueConstraint, Numeric,Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -33,6 +33,6 @@ class CartItem(Base):
 
     quantity: Mapped[int] = mapped_column(nullable=False, default=1)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-
+    selected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     cart: Mapped["Cart"] = relationship("Cart", back_populates="items")
     variant: Mapped["ProductVariant"] = relationship("ProductVariant", back_populates="cart_items")

@@ -13,7 +13,9 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://unsight-unartificially-mozelle.ngrok-free.dev", 
+    "http://0.0.0.0:5173",
+    "http://frontend:5173",
+    "https://unsight-unartificially-mozelle.ngrok-free.dev",
 ]
 
 app.add_middleware(

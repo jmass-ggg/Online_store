@@ -9,6 +9,10 @@ from backend.models.ProductVariant import ProductVariant
 from backend.core.error_handler import error_handler
 from decimal import Decimal
 from uuid import UUID
+from backend.models.product import Product
+from backend.models.seller import Seller
+from backend.models.deliveryCharge import DeliveryCharge
+
 
 def get_or_create_active_cart(db:Session,buyer_id:UUID)->Cart:
     cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
@@ -21,34 +25,217 @@ def get_or_create_active_cart(db:Session,buyer_id:UUID)->Cart:
     cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
     return cart
 
-def add_to_cart_by_customer(db:Session,buyer_id:UUID,variant_id:UUID,quantity:int)->Cart:
-    cart=get_or_create_active_cart(db,buyer_id)
-    variant=db.query(ProductVariant).filter(ProductVariant.id == variant_id,ProductVariant.is_active == True).one_or_none()
-    if not variant:
-        raise HTTPException(404, "Variant not found or inactive")
-    if variant.stock_quantity < quantity:
-        raise HTTPException(400, "Not enough stock")
-    item=db.query(CartItem).filter(CartItem.cart_id == cart.id,
-                                   CartItem.variant_id == variant_id).one_or_none()
-    if item:
-        item.quantity+=quantity
-    else:
-        db.add(CartItem(cart_id=cart.id,variant_id=variant_id,quantity=quantity,price=variant.price))
-    db.commit()
-    return get_or_create_active_cart(db,buyer_id)
-
-def get_item_by_variant_id(db: Session, buyer_id: UUID, variant_id: UUID) -> CartItem:
+def add_to_cart_by_customer(
+    db: Session,
+    buyer_id: UUID,
+    variant_id: UUID,
+    quantity: int,
+) -> Cart:
     cart = get_or_create_active_cart(db, buyer_id)
+
+    variant = (
+        db.query(ProductVariant)
+        .filter(
+            ProductVariant.id == variant_id,
+            ProductVariant.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if not variant:
+        raise HTTPException(status_code=404, detail="Variant not found or inactive")
 
     item = (
         db.query(CartItem)
-        .filter(CartItem.cart_id == cart.id, CartItem.variant_id == variant_id)
+        .filter(
+            CartItem.cart_id == cart.id,
+            CartItem.variant_id == variant_id,
+        )
+        .one_or_none()
+    )
+
+    new_quantity = quantity if item is None else item.quantity + quantity
+    if variant.stock_quantity < new_quantity:
+        raise HTTPException(status_code=400, detail="Not enough stock")
+
+    if item:
+        item.quantity = new_quantity
+        item.price = variant.price
+    else:
+        db.add(
+            CartItem(
+                cart_id=cart.id,
+                variant_id=variant_id,
+                quantity=quantity,
+                price=variant.price,
+                selected=False,
+            )
+        )
+
+    db.commit()
+
+    return (
+        db.query(Cart)
+        .options(selectinload(Cart.items))
+        .filter(Cart.id == cart.id)
         .first()
     )
-    if not item:
-        raise error_handler(404, "Cart item not found")
-    return item
 
+def select_cart_item(
+    db: Session,
+    buyer_id,
+    cart_item_id,
+    selected: bool,
+) -> dict:
+    cart_item = (
+        db.query(CartItem)
+        .join(Cart, Cart.id == CartItem.cart_id)
+        .filter(
+            CartItem.id == cart_item_id,
+            Cart.buyer_id == buyer_id,
+            Cart.status == "ACTIVE",
+        )
+        .options(
+            selectinload(CartItem.variant)
+            .selectinload(ProductVariant.product)
+            .selectinload(Product.seller)
+            
+        )
+        .with_for_update()
+        .first()
+    )
+
+    if not cart_item:
+        
+        raise error_handler(404, "Cart item not found")
+
+    cart_item.selected = selected
+    db.commit()
+
+    cart = (
+        db.query(Cart)
+        .filter(
+            Cart.id == cart_item.cart_id,
+            Cart.buyer_id == buyer_id,
+            Cart.status == "ACTIVE",
+        )
+        .options(
+            selectinload(Cart.items)
+            .selectinload(CartItem.variant)
+            .selectinload(ProductVariant.product)
+            .selectinload(Product.seller)
+            .selectinload(Seller.delivery)
+        )
+        .first()
+    )
+
+    if not cart:
+        raise error_handler(404, "Cart not found")
+
+    selected_items = [item for item in cart.items if item.selected]
+
+    subtotal = sum((item.price * item.quantity for item in selected_items), Decimal("0.00"))
+
+    
+
+    total = subtotal 
+
+    return {
+        "selected_count": len(selected_items),
+        "subtotal": subtotal,
+        
+        "total": total,
+        "items": [
+            {
+                "cart_item_id": item.id,
+                "quantity": item.quantity,
+                "unit_price": item.price,
+                "line_total": item.price * item.quantity,
+                "selected": item.selected,
+                "product": {
+                    "id": item.variant.product.id,
+                    "product_name": item.variant.product.product_name,
+                    "image_url": item.variant.product.image_url,
+                },
+                "product_variant": {
+                    "id": item.variant.id,
+                    "sku": item.variant.sku,
+                    "color": item.variant.color,
+                    "size": item.variant.size,
+                    "price": item.variant.price,
+                    "stock_quantity": item.variant.stock_quantity,
+                },
+            }
+            for item in selected_items
+            if item.variant and item.variant.product
+        ],
+    }
+# def get_item_by_variant_id(db: Session, buyer_id: UUID, variant_id: UUID) :
+#     cart = get_or_create_active_cart(db, buyer_id)
+
+#     item = (
+#         db.query(CartItem)
+#         .filter(CartItem.cart_id == cart.id, CartItem.variant_id == variant_id)
+#         .options(
+#             selectinload(CartItem.variant)
+#             .selectinload(ProductVariant.product)
+            
+#         ).first()
+#     )
+#     if not item:
+#         raise error_handler(404, "Cart item not found")
+#     return item
+
+def get_item_by_variant_id(db:Session,cart: Cart) :
+
+    loaded_cart=(
+        db.query(Cart).filter(Cart.id == cart.id)
+        .with_for_update()
+        .options(
+            selectinload(Cart.items)
+            .selectinload(CartItem.variant)
+            .selectinload(ProductVariant.product)
+            
+        ).first()
+    )
+    if not loaded_cart:
+        raise error_handler(400, "Cart is empty")
+    
+    
+    
+    return {
+        "cart_id": str(loaded_cart.id),
+        "buyer_id": str(loaded_cart.buyer_id),
+        "status": loaded_cart.status,
+        "items": [
+            {
+                "cart_item_id": str(item.id),
+                "quantity": item.quantity,
+                "price": float(item.price),
+
+                "product_variant": {
+                    "variant_id": str(item.variant.id),
+                    "sku": item.variant.sku,
+                    "color": item.variant.color,
+                    "size": item.variant.size,
+                    "price": float(item.variant.price),
+                    "stock_quantity": item.variant.stock_quantity,
+                    "is_active": item.variant.is_active,
+                } if item.variant else None,
+
+                "product": {
+                    "product_id": str(item.variant.product.id),
+                    "product_name": item.variant.product.product_name,
+                    "url_slug": item.variant.product.url_slug,
+                    "product_category": item.variant.product.product_category.value if item.variant.product.product_category else None,
+                    "target_audience": item.variant.product.target_audience.value if item.variant.product.target_audience else None,
+                    "description": item.variant.product.description,
+                    "image_url": item.variant.product.image_url,
+                    "status": item.variant.product.status.value if item.variant.product.status else None,
+                } if item.variant and item.variant.product else None,
+            }
+            for item in loaded_cart.items
+        ]
+    }
 
 def uncart_the_product(db: Session, buyer_id: UUID, item_id: UUID) -> Cart:
     cart=get_or_create_active_cart(db,buyer_id)

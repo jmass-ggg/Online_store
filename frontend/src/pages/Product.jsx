@@ -70,16 +70,31 @@ function upsertLocalCartItem(nextItem) {
   });
 
   if (idx >= 0) {
-    const prevQty = toNumber(arr[idx]?.quantity);
+    const prevQty = toNumber(arr[idx]?.quantity, 1);
+    const nextQty = prevQty + toNumber(nextItem?.quantity, 1);
+    const stock = toNumber(nextItem?.stock ?? arr[idx]?.stock, 0);
+
     arr[idx] = {
       ...arr[idx],
       ...nextItem,
-      quantity: prevQty + toNumber(nextItem?.quantity),
+      id: nextVariantId,
+      variant_id: nextVariantId,
+      inStock: stock > 0,
+      stock,
+      quantity: stock > 0 ? Math.min(nextQty, stock) : nextQty,
+      selected: true,
       updated_at: Date.now(),
     };
   } else {
+    const stock = toNumber(nextItem?.stock, 0);
+
     arr.push({
       ...nextItem,
+      id: nextVariantId,
+      variant_id: nextVariantId,
+      inStock: stock > 0,
+      stock,
+      selected: true,
       updated_at: Date.now(),
     });
   }
@@ -351,7 +366,6 @@ export default function Product() {
 
     const variantId = getVariantId(variant);
     if (!variantId) {
-      console.log("Invalid variant object:", variant);
       showToast("Invalid variant.");
       return null;
     }
@@ -408,7 +422,10 @@ export default function Product() {
       });
 
       upsertLocalCartItem({
+        id: info.variantId,
         variant_id: info.variantId,
+        inStock: info.stock > 0,
+        stock: info.stock,
         quantity: info.safeQty,
         price: toNumber(info.variant._price),
         product_id: getProductId(product),
@@ -416,8 +433,8 @@ export default function Product() {
         product_category: product?.product_category || "",
         url_slug: product?.url_slug || slug,
         image_url: activeImg,
-        size: info.variant._size,
-        color: info.variant._color,
+        size: info.variant._size || "",
+        color: info.variant._color || "",
       });
 
       window.dispatchEvent(new Event("cart:updated"));
@@ -507,8 +524,8 @@ export default function Product() {
               className="icon-btn"
               type="button"
               aria-label="Bag"
-              onClick={() => navigate("/checkout")}
-              title="Cart / Checkout"
+              onClick={() => navigate("/cart")}
+              title="Cart"
             >
               👜
             </button>

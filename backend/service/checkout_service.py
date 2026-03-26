@@ -24,6 +24,7 @@ from uuid import UUID
 
 def _begin_tx(db:Session):
     return db.begin_nested() if db.in_transaction() else db.begin()
+
 def prepare_buy_now_checkout(
     db: Session,
     *,
@@ -92,6 +93,7 @@ def prepare_buy_now_checkout(
         "delivery_charge": delivery_charge,
         "grand_total": grand_total,
     }
+    
 def checkout(
     db: Session,
     user_id: UUID,
