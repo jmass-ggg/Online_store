@@ -12,7 +12,7 @@ from backend.service.cart_service import (
     get_or_create_active_cart,
     uncart_the_product,
     decrease__item_quantity,
-    clear_cart,
+    clear_cart,select_cart_item
     
 )
 from backend.schemas.cart import (CartItemAdd,
@@ -166,15 +166,14 @@ def add_to_cart(
     return serialize_cart(cart)
 
 
-@router.patch("/items/{item_id}/decrease", response_model=CartProductsOut)
-def item_quantity_delete(
-    item_id: UUID,
-    payload: DecreaseQty,
+@router.patch("/items/{cart_item_id}")
+def items_selected(
+    cart_item_id: UUID,
+    select: bool,
     db: Session = Depends(get_db),
     current_customer: Customer = Depends(get_current_customer),
 ):
-    cart = decrease__item_quantity(item_id, payload, db, current_customer.id)
-    return to_cart_out(db, cart)
+    return select_cart_item(db, current_customer.id, cart_item_id, select)
 
 
 @router.delete("/items/{item_id}", response_model=CartProductsOut)

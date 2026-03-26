@@ -4,18 +4,44 @@ import "./Cart.css";
 import StoreTopBar from "./components/cart/StoreTopBar";
 
 const CHECKOUT_CTX_KEY = "checkout_context";
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-const money = (n) => `Rs. ${Number(n || 0).toLocaleString("en-NP")}`;
+const RAW_API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8000";
+
+const API_BASE_URL = String(RAW_API_BASE).replace(/\/+$/, "");
+
+const EMPTY_CART = {
+  cartId: "",
+  buyerId: "",
+  status: "ACTIVE",
+  selectedCount: 0,
+  subtotal: 0,
+  deliveryCharge: 0,
+  total: 0,
+  deliveryBreakdown: [],
+  items: [],
+};
+
+const money = (value) => `Rs. ${Number(value || 0).toLocaleString("en-NP")}`;
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
+function getToken() {
+  return (
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    ""
+  );
+}
+
 function getAuthHeaders() {
-  const token = localStorage.getItem("access_token");
+  const token = getToken();
 
   return {
     "Content-Type": "application/json",
@@ -23,58 +49,75 @@ function getAuthHeaders() {
   };
 }
 
+function buildApiUrl(path) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
 function resolveImageUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  return buildApiUrl(path);
+}
+
+async function readErrorMessage(res, fallbackMessage) {
+  try {
+    const data = await res.json();
+    if (typeof data?.detail === "string") return data.detail;
+    if (Array.isArray(data?.detail)) {
+      return data.detail.map((x) => x?.msg || JSON.stringify(x)).join(", ");
+    }
+    if (typeof data?.message === "string") return data.message;
+    return fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
 }
 
 function normalizeBackendCart(cart) {
   const backendItems = Array.isArray(cart?.items) ? cart.items : [];
-  const deliveryBreakdown = Array.isArray(cart?.delivery_breakdown)
-    ? cart.delivery_breakdown
-    : [];
-
-  const deliveryMap = deliveryBreakdown.reduce((acc, row) => {
-    const sellerId = String(row?.seller_id || "");
-    if (sellerId) acc[sellerId] = toNumber(row?.delivery_charge, 0);
-    return acc;
-  }, {});
 
   return {
     cartId: String(cart?.cart_id || ""),
     buyerId: String(cart?.buyer_id || ""),
     status: cart?.status || "ACTIVE",
-    deliveryMap,
+    selectedCount: toNumber(cart?.selected_count, 0),
+    subtotal: toNumber(cart?.subtotal, 0),
+    deliveryCharge: toNumber(cart?.delivery_charge, 0),
+    total: toNumber(cart?.total, 0),
+    deliveryBreakdown: Array.isArray(cart?.delivery_breakdown)
+      ? cart.delivery_breakdown
+      : [],
     items: backendItems.map((item, index) => {
       const variant = item?.product_variant || {};
       const product = item?.product || {};
-      const sellerId = String(product?.seller_id || "");
+      const quantity = Math.max(1, toNumber(item?.quantity, 1));
+      const price = toNumber(item?.price ?? variant?.price, 0);
 
       return {
         id: String(item?.cart_item_id || `cart_item_${index}`),
-        cart_id: String(cart?.cart_id || ""),
-        quantity: Math.max(1, toNumber(item?.quantity, 1)),
-        price: toNumber(item?.price ?? variant?.price, 0),
+        quantity,
+        price,
+        lineTotal: toNumber(item?.line_total, quantity * price),
         selected: Boolean(item?.selected),
-        line_total: toNumber(item?.line_total, 0),
 
-        sellerId,
-        deliveryCharge: toNumber(deliveryMap[sellerId], 0),
-
+        variantId: String(variant?.variant_id || ""),
+        sku: variant?.sku || "",
+        color: variant?.color || "",
+        size: variant?.size || "",
+        stock: Math.max(0, toNumber(variant?.stock_quantity, 0)),
         inStock:
           Boolean(variant?.is_active) && toNumber(variant?.stock_quantity, 0) > 0,
-        stock: Math.max(0, toNumber(variant?.stock_quantity, 0)),
 
+        productId: String(product?.product_id || ""),
         name: product?.product_name || "Untitled product",
-        image: resolveImageUrl(product?.image_url),
-        size: variant?.size || "",
-        color: variant?.color || "",
-        sku: variant?.sku || "",
+        slug: product?.url_slug || "",
         category: product?.product_category || "",
         audience: product?.target_audience || "",
-        slug: product?.url_slug || "",
+        description: product?.description || "",
+        image: resolveImageUrl(product?.image_url),
         productStatus: product?.status || "",
+        sellerId: String(product?.seller_id || ""),
       };
     }),
   };
@@ -83,53 +126,21 @@ function normalizeBackendCart(cart) {
 export default function Cart() {
   const navigate = useNavigate();
 
-  const [cartId, setCartId] = useState("");
-  const [deliveryMap, setDeliveryMap] = useState({});
-  const [items, setItems] = useState([]);
+  const [cartState, setCartState] = useState(EMPTY_CART);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
   const [search, setSearch] = useState("");
 
-  function handleSearchSubmit(query) {
-    navigate(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
-  }
-
-  useEffect(() => {
-    const fetchMyCart = async () => {
-      try {
-        setLoading(true);
-        setFetchError("");
-
-        const res = await fetch(`${API_BASE_URL}/cart/me`, {
-          method: "GET",
-          headers: getAuthHeaders(),
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          throw new Error(`Failed to fetch cart (${res.status})`);
-        }
-
-        const cart = await res.json();
-        const normalized = normalizeBackendCart(cart);
-
-        setCartId(normalized.cartId);
-        setDeliveryMap(normalized.deliveryMap);
-        setItems(normalized.items);
-      } catch (error) {
-        console.error("Failed to load cart:", error);
-        setFetchError(error.message || "Failed to load cart");
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMyCart();
-  }, []);
+  const items = cartState.items;
 
   const selectableItems = useMemo(
     () => items.filter((item) => item.inStock),
+    [items]
+  );
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => item.selected),
     [items]
   );
 
@@ -138,80 +149,184 @@ export default function Cart() {
     return selectableItems.every((item) => item.selected);
   }, [selectableItems]);
 
-  const selectedItems = useMemo(
-    () => items.filter((item) => item.inStock && item.selected),
-    [items]
-  );
+  const selectedItemCount = cartState.selectedCount;
+  const subtotal = cartState.subtotal;
+  const shipping = cartState.deliveryCharge;
+  const total = cartState.total;
 
-  const selectedItemCount = selectedItems.length;
+  function handleSearchSubmit(query) {
+    navigate(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
+  }
 
-  const subtotal = useMemo(() => {
-    return selectedItems.reduce(
-      (sum, item) => sum + toNumber(item.price) * toNumber(item.quantity, 1),
-      0
+  async function fetchCart(showLoader = false) {
+    if (showLoader) setLoading(true);
+
+    try {
+      const res = await fetch(buildApiUrl("/cart/me"), {
+        method: "GET",
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error(await readErrorMessage(res, `Failed to fetch cart (${res.status})`));
+      }
+
+      const cart = await res.json();
+      setCartState(normalizeBackendCart(cart));
+      setFetchError("");
+      return cart;
+    } catch (error) {
+      console.error("Failed to load cart:", error);
+      setFetchError(error.message || "Failed to load cart");
+
+      if (showLoader) {
+        setCartState(EMPTY_CART);
+      }
+
+      return null;
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  }
+
+  async function patchItemSelected(itemId, nextSelected) {
+    const res = await fetch(
+      buildApiUrl(`/cart/items/${itemId}?select=${nextSelected}`),
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        credentials: "include",
+      }
     );
-  }, [selectedItems]);
 
-  const shipping = useMemo(() => {
-    const uniqueSellerIds = [...new Set(selectedItems.map((i) => i.sellerId))].filter(
-      Boolean
-    );
+    if (!res.ok) {
+      throw new Error(
+        await readErrorMessage(res, `Failed to update item selection (${res.status})`)
+      );
+    }
 
-    return uniqueSellerIds.reduce(
-      (sum, sellerId) => sum + toNumber(deliveryMap[sellerId], 0),
-      0
-    );
-  }, [selectedItems, deliveryMap]);
+    return await res.json();
+  }
 
-  const total = useMemo(() => subtotal + shipping, [subtotal, shipping]);
+  async function deleteItemRequest(itemId) {
+    const res = await fetch(buildApiUrl(`/cart/items/${itemId}`), {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
 
-  const toggleSelectAll = () => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.inStock ? { ...item, selected: !allSelected } : item
-      )
-    );
-  };
+    if (!res.ok) {
+      throw new Error(
+        await readErrorMessage(res, `Failed to remove item (${res.status})`)
+      );
+    }
 
-  const toggleSelectOne = (id) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id && item.inStock
-          ? { ...item, selected: !item.selected }
-          : item
-      )
-    );
-  };
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
 
-  const changeQty = (id, delta) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id || !item.inStock) return item;
+  useEffect(() => {
+    fetchCart(true);
+  }, []);
 
-        const next = Math.max(1, toNumber(item.quantity, 1) + delta);
-        const capped = item.stock > 0 ? Math.min(next, item.stock) : next;
+  async function toggleSelectOne(item) {
+    if (actionBusy || !item.inStock) return;
 
-        return { ...item, quantity: capped };
-      })
-    );
-  };
+    setActionBusy(true);
+    setFetchError("");
 
-  const removeItem = (id) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
-  };
+    try {
+      const updatedCart = await patchItemSelected(item.id, !item.selected);
+      setCartState(normalizeBackendCart(updatedCart));
+    } catch (error) {
+      setFetchError(error.message || "Failed to update item selection");
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
-  const deleteSelected = () => {
-    setItems((prev) => prev.filter((item) => !(item.inStock && item.selected)));
-  };
+  async function toggleSelectAll() {
+    if (actionBusy || selectableItems.length === 0) return;
 
-  const proceedToCheckout = () => {
+    const nextSelected = !allSelected;
+
+    setActionBusy(true);
+    setFetchError("");
+
+    try {
+      let latestCart = null;
+
+      for (const item of selectableItems) {
+        if (item.selected !== nextSelected) {
+          latestCart = await patchItemSelected(item.id, nextSelected);
+        }
+      }
+
+      if (latestCart) {
+        setCartState(normalizeBackendCart(latestCart));
+      } else {
+        await fetchCart(false);
+      }
+    } catch (error) {
+      setFetchError(error.message || "Failed to update all items");
+      await fetchCart(false);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function removeItem(itemId) {
+    if (actionBusy) return;
+
+    setActionBusy(true);
+    setFetchError("");
+
+    try {
+      const updatedCart = await deleteItemRequest(itemId);
+
+      if (updatedCart?.items) {
+        setCartState(normalizeBackendCart(updatedCart));
+      } else {
+        await fetchCart(false);
+      }
+    } catch (error) {
+      setFetchError(error.message || "Failed to remove item");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function deleteSelected() {
+    if (actionBusy || selectedItems.length === 0) return;
+
+    setActionBusy(true);
+    setFetchError("");
+
+    try {
+      for (const item of selectedItems) {
+        await deleteItemRequest(item.id);
+      }
+      await fetchCart(false);
+    } catch (error) {
+      setFetchError(error.message || "Failed to delete selected items");
+      await fetchCart(false);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  function proceedToCheckout() {
     if (selectedItemCount === 0) return;
 
     sessionStorage.setItem(
       CHECKOUT_CTX_KEY,
       JSON.stringify({
         mode: "CART",
-        cart_id: cartId,
+        cart_id: cartState.cartId,
         summary: {
           selected_count: selectedItemCount,
           subtotal,
@@ -223,9 +338,11 @@ export default function Cart() {
     );
 
     navigate("/checkout");
-  };
+  }
 
-  const continueShopping = () => navigate("/");
+  function continueShopping() {
+    navigate("/products");
+  }
 
   if (loading) {
     return (
@@ -236,9 +353,10 @@ export default function Cart() {
           onSearchSubmit={handleSearchSubmit}
           searchPlaceholder="Search footwear..."
           bagPath="/cart"
-          wishlistPath="/products"
-          profilePath="/login"
+          wishlistPath="/wishlist"
+          profilePath="/profile"
         />
+
         <main className="cartPage">
           <div className="cartContainer">
             <div className="emptyState">
@@ -252,7 +370,7 @@ export default function Cart() {
     );
   }
 
-  if (fetchError) {
+  if (fetchError && items.length === 0) {
     return (
       <>
         <StoreTopBar
@@ -261,20 +379,17 @@ export default function Cart() {
           onSearchSubmit={handleSearchSubmit}
           searchPlaceholder="Search footwear..."
           bagPath="/cart"
-          wishlistPath="/products"
-          profilePath="/login"
+          wishlistPath="/wishlist"
+          profilePath="/profile"
         />
+
         <main className="cartPage">
           <div className="cartContainer">
             <div className="emptyState">
               <div className="emptyIcon">⚠️</div>
               <h3>Failed to load cart</h3>
               <p>{fetchError}</p>
-              <button
-                className="primaryBtn"
-                onClick={() => window.location.reload()}
-                type="button"
-              >
+              <button className="primaryBtn" type="button" onClick={() => fetchCart(true)}>
                 Retry
               </button>
             </div>
@@ -292,17 +407,33 @@ export default function Cart() {
         onSearchSubmit={handleSearchSubmit}
         searchPlaceholder="Search footwear..."
         bagPath="/cart"
-        wishlistPath="/products"
-        profilePath="/login"
+        wishlistPath="/wishlist"
+        profilePath="/profile"
       />
+
       <main className="cartPage">
         <div className="cartContainer">
           <div className="cartHeader">
             <h1 className="cartTitle">Cart</h1>
             <p className="cartSubtitle">
-              Review your selected products and proceed to checkout.
+              Tick items you want to buy. Subtotal and delivery fee will appear automatically.
             </p>
           </div>
+
+          {fetchError ? (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: "12px 14px",
+                border: "1px solid #f1c0c0",
+                background: "#fff2f2",
+                color: "#b42318",
+                borderRadius: 8,
+              }}
+            >
+              {fetchError}
+            </div>
+          ) : null}
 
           <div className="cartLayout">
             <section className="cartLeft">
@@ -314,10 +445,13 @@ export default function Cart() {
                         type="button"
                         className={`tickBox ${allSelected ? "checked" : ""}`}
                         onClick={toggleSelectAll}
-                        disabled={selectableItems.length === 0}
-                        aria-label={allSelected ? "Unselect all" : "Select all"}
+                        disabled={selectableItems.length === 0 || actionBusy}
+                        aria-label={allSelected ? "Untick all" : "Tick all"}
                         aria-pressed={allSelected}
-                      />
+                      >
+                        {allSelected ? "✓" : ""}
+                      </button>
+
                       <span className="bulkLabel">
                         SELECT ALL ({items.length} {items.length === 1 ? "ITEM" : "ITEMS"})
                       </span>
@@ -326,10 +460,10 @@ export default function Cart() {
                     <button
                       className="deleteSelectedBtn"
                       onClick={deleteSelected}
-                      disabled={selectedItemCount === 0}
+                      disabled={selectedItems.length === 0 || actionBusy}
                       type="button"
                     >
-                      DELETE
+                      {actionBusy ? "PLEASE WAIT..." : "DELETE"}
                     </button>
                   </div>
 
@@ -343,13 +477,13 @@ export default function Cart() {
                           <button
                             type="button"
                             className={`tickBox ${item.selected ? "checked" : ""}`}
-                            onClick={() => toggleSelectOne(item.id)}
-                            disabled={!item.inStock}
-                            aria-label={
-                              item.selected ? "Unselect item" : "Select item"
-                            }
+                            onClick={() => toggleSelectOne(item)}
+                            disabled={!item.inStock || actionBusy}
+                            aria-label={item.selected ? "Untick item" : "Tick item"}
                             aria-pressed={item.selected}
-                          />
+                          >
+                            {item.selected ? "✓" : ""}
+                          </button>
                         </div>
 
                         <div className="thumb">
@@ -363,42 +497,32 @@ export default function Cart() {
                         <div className="itemBody">
                           <div className="itemNameRow">
                             <h3 className="itemName">{item.name}</h3>
-                            {!item.inStock && (
+                            {!item.inStock ? (
                               <span className="stockPill">Out of stock</span>
-                            )}
+                            ) : null}
                           </div>
 
                           <div className="itemMeta">
-                            {item.color && <p>Color: {item.color}</p>}
-                            {item.size && <p>Size: {item.size}</p>}
-                            {item.sku && <p>SKU: {item.sku}</p>}
+                            {item.color ? <p>Color: {item.color}</p> : null}
+                            {item.size ? <p>Size: {item.size}</p> : null}
+                            {item.sku ? <p>SKU: {item.sku}</p> : null}
                           </div>
 
                           <div className="mobileRow">
                             <div className="priceBox mobilePrice">
                               <div className="price">{money(item.price)}</div>
                               <div className="lineTotal">
-                                Line total: {money(item.price * item.quantity)}
+                                Line total: {money(item.lineTotal)}
                               </div>
                             </div>
 
                             <div className="actionBox">
                               <div className="qtyControl">
-                                <button
-                                  type="button"
-                                  onClick={() => changeQty(item.id, -1)}
-                                  disabled={!item.inStock || item.quantity <= 1}
-                                >
+                                <button type="button" disabled>
                                   −
                                 </button>
                                 <span>{item.quantity}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => changeQty(item.id, +1)}
-                                  disabled={
-                                    !item.inStock || item.quantity >= item.stock
-                                  }
-                                >
+                                <button type="button" disabled>
                                   +
                                 </button>
                               </div>
@@ -407,6 +531,7 @@ export default function Cart() {
                                 type="button"
                                 className="removeBtn"
                                 onClick={() => removeItem(item.id)}
+                                disabled={actionBusy}
                               >
                                 Delete
                               </button>
@@ -417,25 +542,17 @@ export default function Cart() {
                         <div className="priceBox desktopPrice">
                           <div className="price">{money(item.price)}</div>
                           <div className="lineTotal">
-                            Line total: {money(item.price * item.quantity)}
+                            Line total: {money(item.lineTotal)}
                           </div>
                         </div>
 
                         <div className="actionBox desktopAction">
                           <div className="qtyControl">
-                            <button
-                              type="button"
-                              onClick={() => changeQty(item.id, -1)}
-                              disabled={!item.inStock || item.quantity <= 1}
-                            >
+                            <button type="button" disabled>
                               −
                             </button>
                             <span>{item.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => changeQty(item.id, +1)}
-                              disabled={!item.inStock || item.quantity >= item.stock}
-                            >
+                            <button type="button" disabled>
                               +
                             </button>
                           </div>
@@ -444,6 +561,7 @@ export default function Cart() {
                             type="button"
                             className="removeBtn"
                             onClick={() => removeItem(item.id)}
+                            disabled={actionBusy}
                           >
                             Delete
                           </button>
@@ -457,11 +575,7 @@ export default function Cart() {
                   <div className="emptyIcon">🛒</div>
                   <h3>Your cart is empty</h3>
                   <p>Looks like you haven’t added anything yet.</p>
-                  <button
-                    className="primaryBtn"
-                    onClick={continueShopping}
-                    type="button"
-                  >
+                  <button className="primaryBtn" onClick={continueShopping} type="button">
                     Continue Shopping
                   </button>
                 </div>
@@ -472,35 +586,50 @@ export default function Cart() {
               <div className="summaryCard">
                 <h2 className="summaryTitle">Order Summary</h2>
 
-                <div className="summaryLines">
-                  <div className="summaryLine">
-                    <span>
-                      Subtotal ({selectedItemCount}{" "}
-                      {selectedItemCount === 1 ? "item" : "items"})
-                    </span>
-                    <strong>{money(subtotal)}</strong>
+                {selectedItemCount > 0 ? (
+                  <>
+                    <div className="summaryLines">
+                      <div className="summaryLine">
+                        <span>
+                          Subtotal ({selectedItemCount}{" "}
+                          {selectedItemCount === 1 ? "item" : "items"})
+                        </span>
+                        <strong>{money(subtotal)}</strong>
+                      </div>
+
+                      <div className="summaryLine">
+                        <span>Shipping Fee</span>
+                        <strong>{money(shipping)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="summaryDivider" />
+
+                    <div className="summaryTotal">
+                      <span>Total</span>
+                      <strong>{money(total)}</strong>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    style={{
+                      padding: "12px 0",
+                      color: "#667085",
+                      fontSize: "14px",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Select at least one cart item to see subtotal, delivery fee, and total.
                   </div>
-
-                  <div className="summaryLine">
-                    <span>Shipping Fee</span>
-                    <strong>{money(shipping)}</strong>
-                  </div>
-                </div>
-
-                <div className="summaryDivider" />
-
-                <div className="summaryTotal">
-                  <span>Total</span>
-                  <strong>{money(total)}</strong>
-                </div>
+                )}
 
                 <button
                   className="proceedBtn"
                   onClick={proceedToCheckout}
-                  disabled={selectedItemCount === 0}
+                  disabled={selectedItemCount === 0 || actionBusy}
                   type="button"
                 >
-                  PROCEED TO CHECKOUT({selectedItemCount})
+                  PROCEED TO CHECKOUT ({selectedItemCount})
                 </button>
               </div>
 
