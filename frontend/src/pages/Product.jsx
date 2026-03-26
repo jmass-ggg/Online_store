@@ -644,20 +644,7 @@ export default function Product() {
               </button>
             </div>
 
-            <div className="pinfo">
-              <div className="pinfoRow">
-                <span>SKU</span>
-                <span>{chosenVariant?._variantId || "—"}</span>
-              </div>
-              <div className="pinfoRow">
-                <span>Color</span>
-                <span>{chosenVariant?._color || "—"}</span>
-              </div>
-              <div className="pinfoRow">
-                <span>Size</span>
-                <span>{chosenVariant?._size || "—"}</span>
-              </div>
-            </div>
+            
 
             <div className="psection paccordion">
               <button
