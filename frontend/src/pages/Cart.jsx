@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Cart.css";
+import StoreTopBar from "./components/cart/StoreTopBar";
 
 const CHECKOUT_CTX_KEY = "checkout_context";
 const API_BASE_URL =
@@ -87,6 +88,11 @@ export default function Cart() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
+  const [search, setSearch] = useState("");
+
+  function handleSearchSubmit(query) {
+    navigate(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
+  }
 
   useEffect(() => {
     const fetchMyCart = async () => {
@@ -223,255 +229,288 @@ export default function Cart() {
 
   if (loading) {
     return (
-      <main className="cartPage">
-        <div className="cartContainer">
-          <div className="emptyState">
-            <div className="emptyIcon">🛒</div>
-            <h3>Loading cart...</h3>
-            <p>Please wait while we fetch your cart.</p>
+      <>
+        <StoreTopBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearchSubmit}
+          searchPlaceholder="Search footwear..."
+          bagPath="/cart"
+          wishlistPath="/products"
+          profilePath="/login"
+        />
+        <main className="cartPage">
+          <div className="cartContainer">
+            <div className="emptyState">
+              <div className="emptyIcon">🛒</div>
+              <h3>Loading cart...</h3>
+              <p>Please wait while we fetch your cart.</p>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </>
     );
   }
 
   if (fetchError) {
     return (
-      <main className="cartPage">
-        <div className="cartContainer">
-          <div className="emptyState">
-            <div className="emptyIcon">⚠️</div>
-            <h3>Failed to load cart</h3>
-            <p>{fetchError}</p>
-            <button
-              className="primaryBtn"
-              onClick={() => window.location.reload()}
-              type="button"
-            >
-              Retry
-            </button>
+      <>
+        <StoreTopBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearchSubmit}
+          searchPlaceholder="Search footwear..."
+          bagPath="/cart"
+          wishlistPath="/products"
+          profilePath="/login"
+        />
+        <main className="cartPage">
+          <div className="cartContainer">
+            <div className="emptyState">
+              <div className="emptyIcon">⚠️</div>
+              <h3>Failed to load cart</h3>
+              <p>{fetchError}</p>
+              <button
+                className="primaryBtn"
+                onClick={() => window.location.reload()}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="cartPage">
-      <div className="cartContainer">
-        <div className="cartHeader">
-          <h1 className="cartTitle">Cart</h1>
-          <p className="cartSubtitle">
-            Review your selected products and proceed to checkout.
-          </p>
-        </div>
+    <>
+      <StoreTopBar
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={handleSearchSubmit}
+        searchPlaceholder="Search footwear..."
+        bagPath="/cart"
+        wishlistPath="/products"
+        profilePath="/login"
+      />
+      <main className="cartPage">
+        <div className="cartContainer">
+          <div className="cartHeader">
+            <h1 className="cartTitle">Cart</h1>
+            <p className="cartSubtitle">
+              Review your selected products and proceed to checkout.
+            </p>
+          </div>
 
-        <div className="cartLayout">
-          <section className="cartLeft">
-            {items.length > 0 ? (
-              <>
-                <div className="bulkBar">
-                  <div className="bulkLeft">
+          <div className="cartLayout">
+            <section className="cartLeft">
+              {items.length > 0 ? (
+                <>
+                  <div className="bulkBar">
+                    <div className="bulkLeft">
+                      <button
+                        type="button"
+                        className={`tickBox ${allSelected ? "checked" : ""}`}
+                        onClick={toggleSelectAll}
+                        disabled={selectableItems.length === 0}
+                        aria-label={allSelected ? "Unselect all" : "Select all"}
+                        aria-pressed={allSelected}
+                      />
+                      <span className="bulkLabel">
+                        SELECT ALL ({items.length} {items.length === 1 ? "ITEM" : "ITEMS"})
+                      </span>
+                    </div>
+
                     <button
+                      className="deleteSelectedBtn"
+                      onClick={deleteSelected}
+                      disabled={selectedItemCount === 0}
                       type="button"
-                      className={`tickBox ${allSelected ? "checked" : ""}`}
-                      onClick={toggleSelectAll}
-                      disabled={selectableItems.length === 0}
-                      aria-label={allSelected ? "Unselect all" : "Select all"}
-                      aria-pressed={allSelected}
-                    />
-                    <span className="bulkLabel">
-                      SELECT ALL ({items.length} {items.length === 1 ? "ITEM" : "ITEMS"})
-                    </span>
+                    >
+                      DELETE
+                    </button>
                   </div>
 
-                  <button
-                    className="deleteSelectedBtn"
-                    onClick={deleteSelected}
-                    disabled={selectedItemCount === 0}
-                    type="button"
-                  >
-                    DELETE
-                  </button>
-                </div>
+                  <div className="itemsList">
+                    {items.map((item) => (
+                      <article
+                        className={`cartItem ${!item.inStock ? "disabled" : ""}`}
+                        key={item.id}
+                      >
+                        <div className="checkCol">
+                          <button
+                            type="button"
+                            className={`tickBox ${item.selected ? "checked" : ""}`}
+                            onClick={() => toggleSelectOne(item.id)}
+                            disabled={!item.inStock}
+                            aria-label={
+                              item.selected ? "Unselect item" : "Select item"
+                            }
+                            aria-pressed={item.selected}
+                          />
+                        </div>
 
-                <div className="itemsList">
-                  {items.map((item) => (
-                    <article
-                      className={`cartItem ${!item.inStock ? "disabled" : ""}`}
-                      key={item.id}
-                    >
-                      <div className="checkCol">
-                        <button
-                          type="button"
-                          className={`tickBox ${item.selected ? "checked" : ""}`}
-                          onClick={() => toggleSelectOne(item.id)}
-                          disabled={!item.inStock}
-                          aria-label={
-                            item.selected ? "Unselect item" : "Select item"
-                          }
-                          aria-pressed={item.selected}
-                        />
-                      </div>
-
-                      <div className="thumb">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} />
-                        ) : (
-                          <div className="thumbFallback">No Image</div>
-                        )}
-                      </div>
-
-                      <div className="itemBody">
-                        <div className="itemNameRow">
-                          <h3 className="itemName">{item.name}</h3>
-                          {!item.inStock && (
-                            <span className="stockPill">Out of stock</span>
+                        <div className="thumb">
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} />
+                          ) : (
+                            <div className="thumbFallback">No Image</div>
                           )}
                         </div>
 
-                        <div className="itemMeta">
-                          {item.color && <p>Color: {item.color}</p>}
-                          {item.size && <p>Size: {item.size}</p>}
-                          {item.sku && <p>SKU: {item.sku}</p>}
-                        </div>
-
-                        <div className="mobileRow">
-                          <div className="priceBox mobilePrice">
-                            <div className="price">{money(item.price)}</div>
-                            <div className="lineTotal">
-                              Line total: {money(item.price * item.quantity)}
-                            </div>
+                        <div className="itemBody">
+                          <div className="itemNameRow">
+                            <h3 className="itemName">{item.name}</h3>
+                            {!item.inStock && (
+                              <span className="stockPill">Out of stock</span>
+                            )}
                           </div>
 
-                          <div className="actionBox">
-                            <div className="qtyControl">
-                              <button
-                                type="button"
-                                onClick={() => changeQty(item.id, -1)}
-                                disabled={!item.inStock || item.quantity <= 1}
-                              >
-                                −
-                              </button>
-                              <span>{item.quantity}</span>
-                              <button
-                                type="button"
-                                onClick={() => changeQty(item.id, +1)}
-                                disabled={
-                                  !item.inStock || item.quantity >= item.stock
-                                }
-                              >
-                                +
-                              </button>
+                          <div className="itemMeta">
+                            {item.color && <p>Color: {item.color}</p>}
+                            {item.size && <p>Size: {item.size}</p>}
+                            {item.sku && <p>SKU: {item.sku}</p>}
+                          </div>
+
+                          <div className="mobileRow">
+                            <div className="priceBox mobilePrice">
+                              <div className="price">{money(item.price)}</div>
+                              <div className="lineTotal">
+                                Line total: {money(item.price * item.quantity)}
+                              </div>
                             </div>
 
+                            <div className="actionBox">
+                              <div className="qtyControl">
+                                <button
+                                  type="button"
+                                  onClick={() => changeQty(item.id, -1)}
+                                  disabled={!item.inStock || item.quantity <= 1}
+                                >
+                                  −
+                                </button>
+                                <span>{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => changeQty(item.id, +1)}
+                                  disabled={
+                                    !item.inStock || item.quantity >= item.stock
+                                  }
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                className="removeBtn"
+                                onClick={() => removeItem(item.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="priceBox desktopPrice">
+                          <div className="price">{money(item.price)}</div>
+                          <div className="lineTotal">
+                            Line total: {money(item.price * item.quantity)}
+                          </div>
+                        </div>
+
+                        <div className="actionBox desktopAction">
+                          <div className="qtyControl">
                             <button
                               type="button"
-                              className="removeBtn"
-                              onClick={() => removeItem(item.id)}
+                              onClick={() => changeQty(item.id, -1)}
+                              disabled={!item.inStock || item.quantity <= 1}
                             >
-                              Delete
+                              −
+                            </button>
+                            <span>{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => changeQty(item.id, +1)}
+                              disabled={!item.inStock || item.quantity >= item.stock}
+                            >
+                              +
                             </button>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="priceBox desktopPrice">
-                        <div className="price">{money(item.price)}</div>
-                        <div className="lineTotal">
-                          Line total: {money(item.price * item.quantity)}
-                        </div>
-                      </div>
-
-                      <div className="actionBox desktopAction">
-                        <div className="qtyControl">
                           <button
                             type="button"
-                            onClick={() => changeQty(item.id, -1)}
-                            disabled={!item.inStock || item.quantity <= 1}
+                            className="removeBtn"
+                            onClick={() => removeItem(item.id)}
                           >
-                            −
-                          </button>
-                          <span>{item.quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => changeQty(item.id, +1)}
-                            disabled={!item.inStock || item.quantity >= item.stock}
-                          >
-                            +
+                            Delete
                           </button>
                         </div>
-
-                        <button
-                          type="button"
-                          className="removeBtn"
-                          onClick={() => removeItem(item.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="emptyState">
+                  <div className="emptyIcon">🛒</div>
+                  <h3>Your cart is empty</h3>
+                  <p>Looks like you haven’t added anything yet.</p>
+                  <button
+                    className="primaryBtn"
+                    onClick={continueShopping}
+                    type="button"
+                  >
+                    Continue Shopping
+                  </button>
                 </div>
-              </>
-            ) : (
-              <div className="emptyState">
-                <div className="emptyIcon">🛒</div>
-                <h3>Your cart is empty</h3>
-                <p>Looks like you haven’t added anything yet.</p>
+              )}
+            </section>
+
+            <aside className="cartRight">
+              <div className="summaryCard">
+                <h2 className="summaryTitle">Order Summary</h2>
+
+                <div className="summaryLines">
+                  <div className="summaryLine">
+                    <span>
+                      Subtotal ({selectedItemCount}{" "}
+                      {selectedItemCount === 1 ? "item" : "items"})
+                    </span>
+                    <strong>{money(subtotal)}</strong>
+                  </div>
+
+                  <div className="summaryLine">
+                    <span>Shipping Fee</span>
+                    <strong>{money(shipping)}</strong>
+                  </div>
+                </div>
+
+                <div className="summaryDivider" />
+
+                <div className="summaryTotal">
+                  <span>Total</span>
+                  <strong>{money(total)}</strong>
+                </div>
+
                 <button
-                  className="primaryBtn"
-                  onClick={continueShopping}
+                  className="proceedBtn"
+                  onClick={proceedToCheckout}
+                  disabled={selectedItemCount === 0}
                   type="button"
                 >
-                  Continue Shopping
+                  PROCEED TO CHECKOUT({selectedItemCount})
                 </button>
               </div>
-            )}
-          </section>
 
-          <aside className="cartRight">
-            <div className="summaryCard">
-              <h2 className="summaryTitle">Order Summary</h2>
-
-              <div className="summaryLines">
-                <div className="summaryLine">
-                  <span>
-                    Subtotal ({selectedItemCount}{" "}
-                    {selectedItemCount === 1 ? "item" : "items"})
-                  </span>
-                  <strong>{money(subtotal)}</strong>
-                </div>
-
-                <div className="summaryLine">
-                  <span>Shipping Fee</span>
-                  <strong>{money(shipping)}</strong>
-                </div>
-              </div>
-
-              <div className="summaryDivider" />
-
-              <div className="summaryTotal">
-                <span>Total</span>
-                <strong>{money(total)}</strong>
-              </div>
-
-              <button
-                className="proceedBtn"
-                onClick={proceedToCheckout}
-                disabled={selectedItemCount === 0}
-                type="button"
-              >
-                PROCEED TO CHECKOUT({selectedItemCount})
+              <button className="linkBtn" onClick={continueShopping} type="button">
+                ← Continue Shopping
               </button>
-            </div>
-
-            <button className="linkBtn" onClick={continueShopping} type="button">
-              ← Continue Shopping
-            </button>
-          </aside>
+            </aside>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

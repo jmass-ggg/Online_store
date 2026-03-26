@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Checkout.css";
+import StoreTopBar from "./components/cart/StoreTopBar";
 import { apiFetch, joinUrl } from "../api";
 
 const BUY_NOW_KEY = "buy_now_item";
@@ -164,58 +165,6 @@ function addressText(address) {
     .join(", ");
 }
 
-function CheckoutHeader() {
-  const navigate = useNavigate();
-
-  return (
-    <header className="ck-header">
-      <div className="ck-wrap">
-        <div className="ck-headerRow">
-          <Link to="/" className="ck-brand">
-            <span className="ck-brandName">JAMES</span>
-          </Link>
-
-          <nav className="ck-nav">
-            <Link to="/products">Categories</Link>
-            <Link to="/products">Flash Sale</Link>
-          </nav>
-
-          <div className="ck-search">
-            <span className="ck-searchIcon">🔎</span>
-            <input type="text" placeholder="Search for products..." />
-          </div>
-
-          <div className="ck-actions">
-            <button
-              type="button"
-              className="ck-iconBtn"
-              onClick={() => navigate("/cart")}
-              aria-label="Cart"
-              title="Cart"
-            >
-              🛒
-            </button>
-
-            <button type="button" className="ck-iconBtn" aria-label="Notifications" title="Notifications">
-              🔔
-            </button>
-
-            <button
-              type="button"
-              className="ck-avatar"
-              onClick={() => navigate("/login")}
-              aria-label="Profile"
-              title="Profile"
-            >
-              👤
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -242,6 +191,11 @@ export default function Checkout() {
   const [savedAddress, setSavedAddress] = useState(null);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [checkoutData, setCheckoutData] = useState(null);
+  const [search, setSearch] = useState("");
+
+  function handleSearchSubmit(query) {
+    navigate(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
+  }
 
   useEffect(() => {
     const sync = () => setBuyNowData(readBuyNow());
@@ -492,7 +446,15 @@ export default function Checkout() {
   if (!isBuyNowMode) {
     return (
       <div className="checkout-page">
-        <CheckoutHeader />
+        <StoreTopBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearchSubmit}
+          searchPlaceholder="Search footwear..."
+          bagPath="/cart"
+          wishlistPath="/products"
+          profilePath="/login"
+        />
         <main className="ck-wrap ck-main">
           <div className="ck-card">
             <h2 className="ck-h2">Checkout</h2>
@@ -506,7 +468,15 @@ export default function Checkout() {
   if (!buyNowData?.item?.variant_id) {
     return (
       <div className="checkout-page">
-        <CheckoutHeader />
+        <StoreTopBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearchSubmit}
+          searchPlaceholder="Search footwear..."
+          bagPath="/cart"
+          wishlistPath="/products"
+          profilePath="/login"
+        />
         <main className="ck-wrap ck-main">
           <div className="ck-card">
             <h2 className="ck-h2">No item selected</h2>
@@ -519,7 +489,15 @@ export default function Checkout() {
 
   return (
     <div className="checkout-page">
-      <CheckoutHeader />
+      <StoreTopBar
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={handleSearchSubmit}
+        searchPlaceholder="Search footwear..."
+        bagPath="/cart"
+        wishlistPath="/products"
+        profilePath="/login"
+      />
 
       <main className="ck-wrap ck-main">
         <div className="ck-breadcrumb">

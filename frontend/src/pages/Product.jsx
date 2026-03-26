@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "./Product.css";
 import "./Shoes.css";
+import StoreTopBar from "./components/cart/StoreTopBar";
 import { apiFetch, joinUrl } from "../api";
 
 const BUY_NOW_KEY = "buy_now_item";
@@ -128,13 +129,14 @@ export default function Product() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
   const [toast, setToast] = useState("");
-
   const [search, setSearch] = useState("");
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef(null);
+
   const toastTimeoutRef = useRef(null);
+
+  function handleSearchSubmit(query) {
+    navigate(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
+  }
 
   function showToast(message) {
     setToast(message);
@@ -316,44 +318,10 @@ export default function Product() {
   }, [chosenVariant?._variantId, chosenVariant?._stock]);
 
   useEffect(() => {
-    function onDocMouseDown(event) {
-      if (!profileRef.current) return;
-      if (!profileRef.current.contains(event.target)) {
-        setProfileOpen(false);
-      }
-    }
-
-    function onEsc(event) {
-      if (event.key === "Escape") setProfileOpen(false);
-    }
-
-    document.addEventListener("mousedown", onDocMouseDown);
-    window.addEventListener("keydown", onEsc);
-
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      window.removeEventListener("keydown", onEsc);
-    };
-  }, []);
-
-  useEffect(() => {
     return () => {
       window.clearTimeout(toastTimeoutRef.current);
     };
   }, []);
-
-  function go(path) {
-    setProfileOpen(false);
-    navigate(path);
-  }
-
-  function logout() {
-    setProfileOpen(false);
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-    navigate("/login");
-  }
 
   function getVariantOrToast() {
     if (!product) return null;
@@ -407,8 +375,7 @@ export default function Product() {
 
   async function handleAddToCart() {
     const info = getVariantOrToast();
-    if (!info) return;
-    if (busy) return;
+    if (!info || busy) return;
 
     setBusy(true);
 
@@ -461,8 +428,8 @@ export default function Product() {
         product_category: product?.product_category || "",
         url_slug: product?.url_slug || slug,
         image_url: activeImg,
-        size: info.variant._size,
-        color: info.variant._color,
+        size: info.variant._size || "",
+        color: info.variant._color || "",
         price: toNumber(info.variant._price),
       },
     };
@@ -472,153 +439,66 @@ export default function Product() {
     navigate("/checkout?mode=buy_now");
   }
 
-  if (loading) return <div className="pwrap">Loading...</div>;
-  if (error) return <div className="pwrap error">{error}</div>;
+  if (loading) {
+    return (
+      <div className="productPage">
+        <StoreTopBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearchSubmit}
+          searchPlaceholder="Search footwear..."
+          bagPath="/cart"
+          wishlistPath="/products"
+          profilePath="/login"
+        />
+        <main className="pwrap">
+          <div className="pstate">Loading...</div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="productPage">
+        <StoreTopBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          onSearchSubmit={handleSearchSubmit}
+          searchPlaceholder="Search footwear..."
+          bagPath="/cart"
+          wishlistPath="/products"
+          profilePath="/login"
+        />
+        <main className="pwrap">
+          <div className="pstate perror">{error}</div>
+        </main>
+      </div>
+    );
+  }
+
   if (!product) return null;
 
   return (
-    <div className="shoes-page">
-      <header className="top-header">
-        <div className="wrap header-row">
-          <div className="brand">
-            <Link to="/" className="brand-logo">
-              JAMES
-            </Link>
-          </div>
+    <div className="productPage">
+      <StoreTopBar
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSearchSubmit={handleSearchSubmit}
+        searchPlaceholder="Search footwear..."
+        bagPath="/cart"
+        wishlistPath="/products"
+        profilePath="/login"
+      />
 
-          <nav className="top-nav">
-            <a href="#">Men</a>
-            <a href="#">Women</a>
-            <a href="#">Kids</a>
-            <a href="#">Jordan</a>
-            <a href="#">Collections</a>
-            <a href="#" className="sale">
-              Sale
-            </a>
-          </nav>
-
-          <div className="header-actions">
-            <div className="search">
-              <span className="search-icon" aria-hidden="true">
-                🔍
-              </span>
-              <input
-                type="text"
-                placeholder="Search footwear..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            <button
-              className="icon-btn"
-              type="button"
-              aria-label="Favorites"
-              onClick={() => navigate("/wishlist")}
-              title="Wishlist"
-            >
-              ♡
-            </button>
-
-            <button
-              className="icon-btn"
-              type="button"
-              aria-label="Bag"
-              onClick={() => navigate("/cart")}
-              title="Cart"
-            >
-              👜
-            </button>
-
-            <div className="profile-wrap" ref={profileRef}>
-              <button
-                className="profile-btn"
-                type="button"
-                aria-label="Account"
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((open) => !open)}
-                title="Account"
-              >
-                <span className="profile-avatar">👤</span>
-              </button>
-
-              {profileOpen && (
-                <div className="profile-menu" role="menu" aria-label="Account menu">
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/account")}
-                  >
-                    <span className="pi-ico">🙂</span>
-                    <span>Manage My Account</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/orders")}
-                  >
-                    <span className="pi-ico">🧾</span>
-                    <span>My Orders</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/wishlist")}
-                  >
-                    <span className="pi-ico">♡</span>
-                    <span>My Wishlist &amp; Followed Stores</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/reviews")}
-                  >
-                    <span className="pi-ico">⭐</span>
-                    <span>My Reviews</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/returns")}
-                  >
-                    <span className="pi-ico">↩</span>
-                    <span>My Returns &amp; Cancellations</span>
-                  </button>
-
-                  <div className="profile-divider" />
-
-                  <button
-                    className="profile-item danger"
-                    type="button"
-                    role="menuitem"
-                    onClick={logout}
-                  >
-                    <span className="pi-ico">⎋</span>
-                    <span>Log out</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="pwrap">
+      <main className="pwrap">
         {toast && <div className="ptoast">{toast}</div>}
 
         <div className="pgrid">
-          <div className="pleft">
+          <section className="pleft">
             <div className="pbreadcrumb">
-              Home / {product?.product_category || "Products"} / {product?.product_name}
+              Home / {product?.product_category || "Products"} /{" "}
+              {product?.product_name}
             </div>
 
             <div className="pmain">
@@ -630,7 +510,7 @@ export default function Product() {
                 }}
               />
             </div>
-          </div>
+          </section>
 
           <aside className="pright">
             <h1 className="ptitle">{product?.product_name}</h1>
@@ -639,9 +519,9 @@ export default function Product() {
 
             {colorOptions.length > 0 && (
               <div className="pcolorBlock">
-                <div className="pcolorRowTop">
-                  <span className="pcolorLabel">Color</span>
-                  <span className="pcolorChosen">{selectedColor || "—"}</span>
+                <div className="poptionTop">
+                  <span className="poptionLabel">Color</span>
+                  <span className="poptionChosen">{selectedColor || "—"}</span>
                 </div>
 
                 <div className="pcolors">
@@ -654,10 +534,9 @@ export default function Product() {
                       <button
                         key={color}
                         type="button"
-                        className={`pcolorBtn ${isChosen ? "selected" : ""}`}
+                        className={`pchipBtn ${isChosen ? "selected" : ""}`}
                         onClick={() => setSelectedColor(color)}
                         disabled={busy}
-                        title={`Select color ${color}`}
                       >
                         {color}
                       </button>
@@ -667,39 +546,46 @@ export default function Product() {
               </div>
             )}
 
-            <div className="psizes">
-              {sizeOptions.map(({ size, variant }) => {
-                const isChosen =
-                  !!chosenVariant?._variantId &&
-                  chosenVariant._variantId === variant._variantId;
+            <div className="psizeBlock">
+              <div className="poptionTop">
+                <span className="poptionLabel">Size</span>
+                <span className="poptionChosen">
+                  {chosenVariant?._size || "Select size"}
+                </span>
+              </div>
 
-                const isOut = variant._stock <= 0;
+              <div className="psizes">
+                {sizeOptions.map(({ size, variant }) => {
+                  const isChosen =
+                    !!chosenVariant?._variantId &&
+                    chosenVariant._variantId === variant._variantId;
 
-                return (
-                  <button
-                    key={variant._variantId || `${variant._color}-${variant._size}`}
-                    type="button"
-                    className={`psizeBtn ${isChosen ? "selected" : ""}`}
-                    disabled={isOut || busy}
-                    onClick={() => setSelectedVariantId(variant._variantId)}
-                    title={isOut ? "Out of stock" : `Select size ${size}`}
-                  >
-                    {size}
-                  </button>
-                );
-              })}
+                  const isOut = variant._stock <= 0;
+
+                  return (
+                    <button
+                      key={variant._variantId || `${variant._color}-${variant._size}`}
+                      type="button"
+                      className={`pchipBtn ${isChosen ? "selected" : ""}`}
+                      disabled={isOut || busy}
+                      onClick={() => setSelectedVariantId(variant._variantId)}
+                      title={isOut ? "Out of stock" : `Select size ${size}`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {sizeOptions.length === 0 && (
+                <p className="pnote">No sizes available for this color.</p>
+              )}
             </div>
 
-            <div
-              className="pqtyRow"
-              style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}
-            >
-              <span style={{ fontWeight: 600 }}>Quantity</span>
+            <div className="pqtyRow">
+              <span className="pqtyLabel">Quantity</span>
 
-              <div
-                className="pqtyControls"
-                style={{ display: "flex", alignItems: "center", gap: 10 }}
-              >
+              <div className="pqtyControls">
                 <button
                   type="button"
                   onClick={decQty}
@@ -718,7 +604,6 @@ export default function Product() {
                   onChange={onQtyInput}
                   disabled={busy || outOfStock}
                   className="pqtyInput"
-                  style={{ width: 60, textAlign: "center" }}
                 />
 
                 <button
@@ -732,14 +617,14 @@ export default function Product() {
                 </button>
               </div>
 
-              {stockMax > 0 && (
-                <span style={{ opacity: 0.7, fontSize: 13 }}>
-                  ({stockMax} available)
-                </span>
+              {stockMax > 0 ? (
+                <span className="pstockNote">{stockMax} available</span>
+              ) : (
+                <span className="pstockNote out">Out of stock</span>
               )}
             </div>
 
-            <div className="pactions" style={{ marginTop: 14 }}>
+            <div className="pactions">
               <button
                 className="pbtn pbtnPrimary"
                 type="button"
@@ -759,6 +644,21 @@ export default function Product() {
               </button>
             </div>
 
+            <div className="pinfo">
+              <div className="pinfoRow">
+                <span>SKU</span>
+                <span>{chosenVariant?._variantId || "—"}</span>
+              </div>
+              <div className="pinfoRow">
+                <span>Color</span>
+                <span>{chosenVariant?._color || "—"}</span>
+              </div>
+              <div className="pinfoRow">
+                <span>Size</span>
+                <span>{chosenVariant?._size || "—"}</span>
+              </div>
+            </div>
+
             <div className="psection paccordion">
               <button
                 type="button"
@@ -772,6 +672,7 @@ export default function Product() {
               {shipOpen && (
                 <div className="paccBody">
                   <p>14 Days Free Returns</p>
+                  <p>Orders are usually processed within 1-2 business days.</p>
                 </div>
               )}
             </div>
@@ -784,7 +685,7 @@ export default function Product() {
             {product?.description || "No description provided."}
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
