@@ -14,10 +14,10 @@ from backend.schemas.order import (
 )
 from backend.service.order_service import place_order_service, buy_now_service
 from backend.utils.jwt import get_current_customer
-from backend.service.checkout_service import checkout,prepare_buy_now_checkout
+from backend.service.checkout_service import prepare_buy_now_checkout,cart_to_check_out
 router = APIRouter(prefix="/checkout", tags=["Checkout for customer"])
+from uuid import UUID
 
-from backend.service.checkout_service import checkout as checkout_service
 
 @router.post("/checkout")
 def customer_checkout(
@@ -34,3 +34,11 @@ def customer_checkout(
     )
     return checkout_result
  
+ 
+@router.post("/checkout/{cart_id}")
+def customer_cart_checkout(
+    cart_id:UUID,
+    db: Session = Depends(get_db),
+    current_user: Customer = Depends(get_current_customer),
+):
+    return cart_to_check_out(db, cart_id, user_id=current_user.id)

@@ -63,11 +63,15 @@ function resolveImageUrl(path) {
 async function readErrorMessage(res, fallbackMessage) {
   try {
     const data = await res.json();
+
     if (typeof data?.detail === "string") return data.detail;
+
     if (Array.isArray(data?.detail)) {
       return data.detail.map((x) => x?.msg || JSON.stringify(x)).join(", ");
     }
+
     if (typeof data?.message === "string") return data.message;
+
     return fallbackMessage;
   } catch {
     return fallbackMessage;
@@ -209,6 +213,25 @@ export default function Cart() {
     return await res.json();
   }
 
+  async function updateItemQuantity(itemId, quantity) {
+    const res = await fetch(
+      buildApiUrl(`/cart/increase_decrease_stock/${itemId}?quantity=${quantity}`),
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        credentials: "include",
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(
+        await readErrorMessage(res, `Failed to update quantity (${res.status})`)
+      );
+    }
+
+    return await res.json();
+  }
+
   async function deleteItemRequest(itemId) {
     const res = await fetch(buildApiUrl(`/cart/items/${itemId}`), {
       method: "DELETE",
@@ -274,6 +297,51 @@ export default function Cart() {
     } catch (error) {
       setFetchError(error.message || "Failed to update all items");
       await fetchCart(false);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function increaseQuantity(item) {
+    if (actionBusy || !item.inStock) return;
+
+    const nextQuantity = item.quantity + 1;
+
+    if (item.stock > 0 && nextQuantity > item.stock) {
+      setFetchError("Insufficient stock");
+      return;
+    }
+
+    setActionBusy(true);
+    setFetchError("");
+
+    try {
+      const updatedCart = await updateItemQuantity(item.id, nextQuantity);
+      setCartState(normalizeBackendCart(updatedCart));
+    } catch (error) {
+      setFetchError(error.message || "Failed to increase quantity");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function decreaseQuantity(item) {
+    if (actionBusy || !item.inStock) return;
+
+    const nextQuantity = item.quantity - 1;
+
+    if (nextQuantity < 1) {
+      return;
+    }
+
+    setActionBusy(true);
+    setFetchError("");
+
+    try {
+      const updatedCart = await updateItemQuantity(item.id, nextQuantity);
+      setCartState(normalizeBackendCart(updatedCart));
+    } catch (error) {
+      setFetchError(error.message || "Failed to decrease quantity");
     } finally {
       setActionBusy(false);
     }
@@ -518,11 +586,25 @@ export default function Cart() {
 
                             <div className="actionBox">
                               <div className="qtyControl">
-                                <button type="button" disabled>
+                                <button
+                                  type="button"
+                                  onClick={() => decreaseQuantity(item)}
+                                  disabled={
+                                    actionBusy || !item.inStock || item.quantity <= 1
+                                  }
+                                >
                                   −
                                 </button>
                                 <span>{item.quantity}</span>
-                                <button type="button" disabled>
+                                <button
+                                  type="button"
+                                  onClick={() => increaseQuantity(item)}
+                                  disabled={
+                                    actionBusy ||
+                                    !item.inStock ||
+                                    item.quantity >= item.stock
+                                  }
+                                >
                                   +
                                 </button>
                               </div>
@@ -548,11 +630,25 @@ export default function Cart() {
 
                         <div className="actionBox desktopAction">
                           <div className="qtyControl">
-                            <button type="button" disabled>
+                            <button
+                              type="button"
+                              onClick={() => decreaseQuantity(item)}
+                              disabled={
+                                actionBusy || !item.inStock || item.quantity <= 1
+                              }
+                            >
                               −
                             </button>
                             <span>{item.quantity}</span>
-                            <button type="button" disabled>
+                            <button
+                              type="button"
+                              onClick={() => increaseQuantity(item)}
+                              disabled={
+                                actionBusy ||
+                                !item.inStock ||
+                                item.quantity >= item.stock
+                              }
+                            >
                               +
                             </button>
                           </div>

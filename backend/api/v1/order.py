@@ -10,9 +10,9 @@ from backend.schemas.order import (
     PlaceOrderRequest,
     PlaceOrderResponse,
     BuyNowRequest,
-    BuyNowResponse,
+    BuyNowResponse,BuyCartRequest                                                                                                       
 )
-from backend.service.order_service import place_order_service, buy_now_service
+from backend.service.order_service import place_order_service, buy_now_service,buy_from_cart_service
 from backend.utils.jwt import get_current_customer
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -69,5 +69,32 @@ def buy_now_api(
         total_price=total_price,
         seller_count=seller_count,
         payment_method=order.payment_method.value if hasattr(order.payment_method, "value") else str(order.payment_method),
+        payment_redirect_url=payment_redirect_url,
+    )
+    
+    
+@router.post("/buy_product", response_model=BuyNowResponse, status_code=200)
+def buy_product_from_cart_to_payment(
+    payload: BuyCartRequest,
+    db: Session = Depends(get_db),
+    current_user: Customer = Depends(get_current_customer),
+):
+    order, total_price, seller_count = buy_from_cart_service(
+        db=db,
+        user_id=current_user.id,
+        cart_id=payload.cart_id,
+        paymentmethod=payload.payment_method,
+    )
+
+    payment_redirect_url = None
+    if payload.payment_method == PaymentMethod.ESEWA:
+        payment_redirect_url = f"/payments/esewa/initiate?order_id={order.id}"
+
+    return BuyNowResponse(
+        order_id=order.id,
+        status=order.status.value if hasattr(order.status, "value") else str(order.status),
+        total_price=total_price,
+        seller_count=seller_count,
+        payment_method=order.payment_method,
         payment_redirect_url=payment_redirect_url,
     )

@@ -68,6 +68,10 @@ class BuyNowRequest(BaseModel):
     quantity: int = Field(..., gt=0)
     payment_method: PaymentMethod
     
+class BuyCartRequest(BaseModel):
+    cart_id: UUID
+    payment_method: PaymentMethod
+    
 class BuyNowResponse(BaseModel):
     order_id: UUID
     status: str

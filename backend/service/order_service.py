@@ -6,7 +6,7 @@ from typing import Tuple
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from sqlalchemy import update
 from sqlalchemy.orm import Session, selectinload,joinedload
-from backend.service.checkout_service import checkout,prepare_buy_now_checkout
+from backend.service.checkout_service import prepare_buy_now_checkout
 from backend.core.error_handler import error_handler
 from backend.models.address import Address
 from backend.models.cart import Cart
@@ -129,8 +129,171 @@ def buy_now_service(
         raise HTTPException(status_code=400,
                             detail="database error")
     
-    
-    
+def buy_from_cart_service(
+    db: Session,
+    *,
+    user_id: UUID,
+    cart_id: UUID,
+    paymentmethod: PaymentMethod,
+) -> Tuple[Order, Decimal, int]:
+    try:
+        address = (
+            db.query(Address)
+            .filter(Address.customer_id == user_id)
+            .first()
+        )
+
+        if not address:
+            raise error_handler(404, "Address not found")
+
+        cart = (
+            db.query(Cart)
+            .filter(Cart.id == cart_id, Cart.buyer_id == user_id)
+            .with_for_update()
+            .options(
+                selectinload(Cart.items)
+                .selectinload(CartItem.variant)
+                .selectinload(ProductVariant.product)
+                .selectinload(Product.seller)
+                .selectinload(Seller.delivery)
+            )
+            .first()
+        )
+
+        if not cart:
+            raise error_handler(404, "Cart not found")
+
+        selected_items = [item for item in cart.items if item.selected]
+        if not selected_items:
+            raise error_handler(400, "cart items not found")
+
+        seller_subtotals = defaultdict(lambda: Decimal("0.00"))
+        subtotal = Decimal("0.00")
+        seller_delivery_map = {}
+        prepared_items = []
+
+        for item in selected_items:
+            variant = item.variant
+            if not variant:
+                raise error_handler(400, "Cart item variant not found")
+
+            product = variant.product
+            if not product:
+                raise error_handler(400, "Product not found")
+
+            seller = product.seller
+            if not seller:
+                raise error_handler(400, "Seller not found")
+
+            if item.quantity <= 0:
+                raise error_handler(400, f"Invalid quantity for item {item.id}")
+
+            if not variant.is_active:
+                raise error_handler(400, f"Variant {variant.id} is inactive")
+
+            if variant.stock_quantity < item.quantity:
+                raise error_handler(400, f"Insufficient stock for {product.product_name}")
+
+            unit_price = Decimal(str(item.price))
+            line_total = unit_price * item.quantity
+
+            subtotal += line_total
+            seller_subtotals[seller.id] += line_total
+
+            if seller.id not in seller_delivery_map:
+                seller_delivery_map[seller.id] = (
+                    seller.delivery[0].delivery_charge
+                    if seller.delivery else Decimal("0.00")
+                )
+
+            prepared_items.append({
+                "cart_item": item,
+                "variant": variant,
+                "product": product,
+                "seller": seller,
+                "unit_price": unit_price,
+                "line_total": line_total,
+            })
+
+        delivery_charge = sum(seller_delivery_map.values(), Decimal("0.00"))
+        grand_total = subtotal + delivery_charge
+
+        order = Order(
+            buyer_id=user_id,
+            status="PLACED",
+            total_price=grand_total,
+            payment_method=paymentmethod,
+        )
+
+        db.add(order)
+        db.flush()
+
+        db.add(
+            OrderAddress(
+                order_id=order.id,
+                full_name=address.full_name,
+                phone_number=address.phone_number,
+                region=address.region,
+                line1=address.line1,
+                line2=address.line2,
+                country=address.country or "Nepal",
+                latitude=address.latitude,
+                longitude=address.longitude,
+            )
+        )
+
+        for row in prepared_items:
+            item = row["cart_item"]
+            variant = row["variant"]
+            product = row["product"]
+            seller = row["seller"]
+            unit_price = row["unit_price"]
+            line_total = row["line_total"]
+
+            db.add(
+                OrderItem(
+                    order_id=order.id,
+                    seller_id=seller.id,
+                    product_id=product.id,
+                    variant_id=variant.id,
+                    quantity=item.quantity,
+                    unit_price=unit_price,
+                    line_total=line_total,
+                    item_status=OrderItemStatus.PENDING,
+                )
+            )
+
+            variant.stock_quantity -= item.quantity
+            db.delete(item)
+
+        for seller_id, seller_subtotal in seller_subtotals.items():
+            db.add(
+                OrderFulfillment(
+                    order_id=order.id,
+                    seller_id=seller_id,
+                    fulfillment_status=FulfillmentStatus.PENDING,
+                    seller_subtotal=seller_subtotal,
+                )
+            )
+
+        db.commit()
+        db.refresh(order)
+
+        return order, grand_total, len(seller_subtotals)
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Duplicated order")
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
+                
+            
+            
+            
+            
+            
+            
 def place_order_service(
     db: Session,
     *,

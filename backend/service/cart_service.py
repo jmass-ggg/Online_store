@@ -202,6 +202,49 @@ def select_cart_item(
     db.refresh(cart_item)
     cart=get_or_create_active_cart(db,buyer_id)
     return to_cart_out(db,cart)
+
+
+def increase_decrease_cart_item(
+    db: Session,
+    buyer_id: UUID,
+    cart_item_id: UUID,
+    quantity: int
+) -> dict:
+    if quantity < 1:
+        raise error_handler(400, "Quantity cannot be less than 1")
+
+    cart_item = (
+        db.query(CartItem)
+        .join(Cart, Cart.id == CartItem.cart_id)
+        .filter(
+            CartItem.id == cart_item_id,
+            Cart.buyer_id == buyer_id,
+            Cart.status == "ACTIVE",
+        )
+        .options(
+            selectinload(CartItem.variant)
+            .selectinload(ProductVariant.product)
+            .selectinload(Product.seller)
+        )
+        .with_for_update()
+        .first()
+    )
+
+    if not cart_item:
+        raise error_handler(404, "Cart item not found")
+
+    if cart_item.variant.stock_quantity < quantity:
+        raise error_handler(400, "Insufficient stock")
+
+    cart_item.quantity = quantity
+    db.commit()
+    db.refresh(cart_item)
+
+    cart = get_or_create_active_cart(db, buyer_id)
+    return to_cart_out(db, cart)
+    
+    
+    
 # def get_item_by_variant_id(db: Session, buyer_id: UUID, variant_id: UUID) :
 #     cart = get_or_create_active_cart(db, buyer_id)
 

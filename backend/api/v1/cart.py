@@ -12,7 +12,7 @@ from backend.service.cart_service import (
     get_or_create_active_cart,
     uncart_the_product,
     decrease__item_quantity,
-    clear_cart,select_cart_item
+    clear_cart,select_cart_item,increase_decrease_cart_item
     
 )
 from backend.schemas.cart import (CartItemAdd,
@@ -175,6 +175,14 @@ def items_selected(
 ):
     return select_cart_item(db, current_customer.id, cart_item_id, select)
 
+@router.patch("/increase_decrease_stock/{cart_item_id}")
+def items_decrease_increase(
+    cart_item_id: UUID,
+    quantity: int,
+    db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
+):
+    return increase_decrease_cart_item(db,current_customer.id,cart_item_id,quantity)
 
 @router.delete("/items/{item_id}", response_model=CartProductsOut)
 def remove_cart_item(
