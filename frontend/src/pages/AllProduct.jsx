@@ -1,4 +1,4 @@
-// src/pages/AllProduct.jsx
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AllProduct.css";
@@ -28,7 +28,6 @@ function normalizeProduct(p) {
   const audience = p?.target_audience || "";
   const category = p?.product_category ?? "Other";
 
-  // small helper to make the subtitle match “Men’s Shoes” look
   const subLabel =
     category.toLowerCase().includes("footwear") || category.toLowerCase().includes("shoe")
       ? `${audience ? `${audience}'s ` : ""}Shoes`

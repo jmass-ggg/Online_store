@@ -40,5 +40,5 @@ def customer_cart_checkout(
     cart_id:UUID,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_customer),
-):
+): 
     return cart_to_check_out(db, cart_id, user_id=current_user.id)

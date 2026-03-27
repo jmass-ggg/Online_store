@@ -680,12 +680,7 @@ export default function Payment() {
                 <h3>Order Summary</h3>
               </div>
 
-              <div className="payment-summaryItems">
-                {previewData.items.map((item) => (
-                  <SummaryItemCard key={item.key} item={item} />
-                ))}
-              </div>
-
+              
               <div className="payment-summaryBreakdown">
                 <div className="payment-summaryLine">
                   <span>Items</span>
