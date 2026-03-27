@@ -8,8 +8,8 @@ const BUY_NOW_KEY = "buy_now_item";
 const CART_KEY = "cart_items";
 
 const CHECKOUT_PREVIEW_ENDPOINT = "/checkout/checkout";
-const BUY_NOW_ENDPOINT = "/orders/buy-now";
-const CART_ORDER_ENDPOINT = "/orders/order";
+const BUY_NOW_ENDPOINT = "/orders/buy-now"; // change only if your backend buy-now route is different
+const CART_ORDER_ENDPOINT = "/orders/buy_product";
 
 const TAB_KEYS = {
   ESEWA: "ESEWA",
@@ -126,85 +126,142 @@ function cleanupAfterOrder(mode) {
 function normalizeSeed(parsed) {
   const mode = String(parsed?.mode || "BUY_NOW").toUpperCase();
 
-  if (mode === "BUY_NOW") {
-    return {
-      mode: "BUY_NOW",
-      address_id: toId(parsed?.address_id),
-      variant_id: toId(parsed?.variant_id),
-      quantity: Math.max(1, toNumber(parsed?.quantity, 1)),
-      checkout: parsed?.checkout || null,
-      items: [],
-    };
-  }
-
-  const items = Array.isArray(parsed?.items) ? parsed.items : [];
-
   return {
-    mode: "CART",
+    mode: mode === "CART" ? "CART" : "BUY_NOW",
     address_id: toId(parsed?.address_id),
-    variant_id: "",
-    quantity: 0,
+    cart_id: toId(parsed?.cart_id),
+    variant_id: toId(parsed?.variant_id),
+    quantity: Math.max(1, toNumber(parsed?.quantity, 1)),
+    items: Array.isArray(parsed?.items) ? parsed.items : [],
     checkout: parsed?.checkout || null,
-    items: items
-      .map((item, index) => ({
-        key: `${toId(item?.variant_id ?? item?.id)}_${index}`,
-        variant_id: toId(item?.variant_id ?? item?.id),
-        quantity: Math.max(1, toNumber(item?.quantity, 1)),
-        price: toNumber(item?.price, 0),
-        product_name: String(item?.product_name || "").trim(),
-        product_category: String(item?.product_category || "").trim(),
-        size: String(item?.size || "").trim(),
-        color: String(item?.color || "").trim(),
-        image_url: String(item?.image_url || "").trim(),
-      }))
-      .filter((item) => item.variant_id),
   };
 }
 
-function buildBuyNowPreview(seed, preview) {
-  const quantity = Math.max(1, toNumber(seed?.quantity, 1));
+function normalizeItem(item, index = 0) {
+  const variant = item?.product_variant || item?.variant || {};
+  const product = item?.product || {};
+
+  const variantId = toId(
+    item?.variant_id ||
+      item?.id ||
+      variant?.variant_id ||
+      variant?.id
+  );
+
+  const quantity = Math.max(1, toNumber(item?.quantity, 1));
+  const unitPrice = toNumber(
+    item?.price ??
+      item?.unit_price ??
+      item?.line_price ??
+      variant?.price,
+    0
+  );
+
+  const lineTotal = toNumber(
+    item?.line_total,
+    unitPrice * quantity
+  );
 
   return {
-    mode: "BUY_NOW",
-    seller_id: preview?.seller_id || "",
-    items: [
-      {
-        key: `buy_now_${toId(preview?.variant?.id || seed?.variant_id)}`,
-        variant_id: toId(preview?.variant?.id || seed?.variant_id),
-        quantity,
-        price: toNumber(preview?.unit_price, preview?.variant?.price),
-        product_name: preview?.product?.product_name || "Selected Product",
-        product_category: preview?.product?.product_category || "",
-        size: preview?.variant?.size || "",
-        color: preview?.variant?.color || "",
-        image_url: preview?.product?.image_url || "",
-      },
-    ],
+    key: `${variantId || "item"}_${index}`,
+    variant_id: variantId,
+    quantity,
+    price: unitPrice,
+    line_total: lineTotal,
+    product_name: String(
+      item?.product_name ||
+        product?.product_name ||
+        item?.name ||
+        "Product"
+    ).trim(),
+    product_category: String(
+      item?.product_category ||
+        product?.product_category ||
+        ""
+    ).trim(),
+    size: String(item?.size || variant?.size || "").trim(),
+    color: String(item?.color || variant?.color || "").trim(),
+    image_url: String(
+      item?.image_url ||
+        product?.image_url ||
+        ""
+    ).trim(),
+    sku: String(item?.sku || variant?.sku || "").trim(),
+  };
+}
+
+function buildPreviewFromCheckout(seed) {
+  const checkout = seed?.checkout || {};
+  let items = [];
+
+  if (Array.isArray(checkout?.items) && checkout.items.length) {
+    items = checkout.items.map((item, index) => normalizeItem(item, index));
+  } else if (Array.isArray(seed?.items) && seed.items.length) {
+    items = seed.items.map((item, index) => normalizeItem(item, index));
+  }
+
+  const quantityTotal = items.reduce(
+    (sum, item) => sum + Math.max(1, toNumber(item?.quantity, 1)),
+    0
+  );
+
+  const itemsTotal = toNumber(
+    checkout?.subtotal ?? checkout?.items_subtotal,
+    items.reduce((sum, item) => sum + toNumber(item?.line_total, 0), 0)
+  );
+
+  const deliveryFee = toNumber(checkout?.delivery_charge, 0);
+  const total = toNumber(
+    checkout?.total ?? checkout?.grand_total,
+    itemsTotal + deliveryFee
+  );
+
+  return {
+    mode: seed.mode,
+    cart_id: toId(checkout?.cart_id || seed?.cart_id),
+    address_id: toId(checkout?.address?.id || seed?.address_id),
+    items,
     totals: {
-      itemsCount: quantity,
-      itemsTotal: toNumber(preview?.items_subtotal, 0),
-      deliveryFee: toNumber(preview?.delivery_charge, 0),
-      total: toNumber(preview?.grand_total, 0),
+      lineItems: items.length,
+      quantityTotal,
+      itemsTotal,
+      deliveryFee,
+      total,
     },
   };
 }
 
-function buildCartPreview(seed) {
-  const items = Array.isArray(seed?.items) ? seed.items : [];
-  const itemsCount = items.reduce((sum, item) => sum + Math.max(1, toNumber(item.quantity, 1)), 0);
-  const itemsTotal = items.reduce(
-    (sum, item) => sum + toNumber(item.price, 0) * Math.max(1, toNumber(item.quantity, 1)),
-    0
-  );
+function buildBuyNowPreviewFromApi(seed, preview) {
+  const variant = preview?.variant || preview?.product_variant || {};
+  const product = preview?.product || {};
+  const quantity = Math.max(1, toNumber(preview?.quantity ?? seed?.quantity, 1));
+  const unitPrice = toNumber(preview?.unit_price ?? variant?.price, 0);
+
+  const item = {
+    key: `buy_now_${toId(variant?.id || variant?.variant_id || seed?.variant_id)}`,
+    variant_id: toId(variant?.id || variant?.variant_id || seed?.variant_id),
+    quantity,
+    price: unitPrice,
+    line_total: toNumber(preview?.items_subtotal, quantity * unitPrice),
+    product_name: String(product?.product_name || "Selected Product").trim(),
+    product_category: String(product?.product_category || "").trim(),
+    size: String(variant?.size || "").trim(),
+    color: String(variant?.color || "").trim(),
+    image_url: String(product?.image_url || "").trim(),
+    sku: String(variant?.sku || "").trim(),
+  };
 
   return {
-    mode: "CART",
-    items,
+    mode: "BUY_NOW",
+    cart_id: "",
+    address_id: seed?.address_id,
+    items: [item],
     totals: {
-      itemsCount,
-      itemsTotal,
-      deliveryFee: 0,
-      total: itemsTotal,
+      lineItems: 1,
+      quantityTotal: quantity,
+      itemsTotal: toNumber(preview?.items_subtotal, item.line_total),
+      deliveryFee: toNumber(preview?.delivery_charge, 0),
+      total: toNumber(preview?.grand_total, item.line_total),
     },
   };
 }
@@ -308,8 +365,8 @@ function SummaryItemCard({ item }) {
 
       <div className="payment-summary-itemBody">
         <div className="payment-summary-itemTop">
-          <h4>{item.product_name || `Variant ${item.variant_id}`}</h4>
-          <strong>{money(toNumber(item.price, 0) * toNumber(item.quantity, 1))}</strong>
+          <h4>{item.product_name || "Product"}</h4>
+          <strong>{money(item.line_total)}</strong>
         </div>
 
         <div className="payment-summary-itemMeta">
@@ -317,6 +374,7 @@ function SummaryItemCard({ item }) {
           {item.size ? <span>Size: {item.size}</span> : null}
           {item.color ? <span>Color: {item.color}</span> : null}
           <span>Qty: {item.quantity}</span>
+          {item.sku ? <span>SKU: {item.sku}</span> : null}
         </div>
       </div>
     </div>
@@ -344,18 +402,23 @@ function SuccessView({ successData }) {
         </div>
         <div className="payment-successRow">
           <span>Total</span>
-          <strong>{money(successData?.total_price || 0)}</strong>
+          <strong>{money(successData?.total_price || successData?.total || 0)}</strong>
         </div>
         <div className="payment-successRow">
           <span>Payment Method</span>
-          <strong>{successData?.payment_method || PAYMENT_METHODS.COD}</strong>
+          <strong>{successData?.payment_method || "-"}</strong>
         </div>
       </div>
 
       <div className="payment-stateActions">
-        <button type="button" className="payment-primaryBtn" onClick={() => navigate("/products")}>
+        <button
+          type="button"
+          className="payment-primaryBtn"
+          onClick={() => navigate("/products")}
+        >
           Continue Shopping
         </button>
+
         <Link to="/" className="payment-ghostBtn">
           Back to Home
         </Link>
@@ -376,25 +439,37 @@ export default function Payment() {
   const [successData, setSuccessData] = useState(null);
 
   useEffect(() => {
-    const parsed = safeParse(sessionStorage.getItem(CHECKOUT_CTX_KEY));
-
-    if (!parsed) {
-      setError("Checkout data is missing. Please go back to checkout.");
-      setLoadingPreview(false);
-      return;
-    }
-
-    const normalized = normalizeSeed(parsed);
-    setCheckoutSeed(normalized);
+    let alive = true;
 
     async function loadPreview() {
-      setError("");
       setLoadingPreview(true);
+      setError("");
 
       try {
+        const parsed = safeParse(sessionStorage.getItem(CHECKOUT_CTX_KEY));
+
+        if (!parsed) {
+          throw new Error("Checkout data is missing. Please go back to checkout.");
+        }
+
+        const normalized = normalizeSeed(parsed);
+
+        if (!alive) return;
+        setCheckoutSeed(normalized);
+
+        if (normalized?.checkout) {
+          const built = buildPreviewFromCheckout(normalized);
+          if (!built.items.length) {
+            throw new Error("No checkout items found. Please go back to checkout.");
+          }
+          if (!alive) return;
+          setPreviewData(built);
+          return;
+        }
+
         if (normalized.mode === "BUY_NOW") {
           if (!normalized.address_id || !normalized.variant_id) {
-            throw new Error("Checkout data is incomplete. Please go back to checkout.");
+            throw new Error("Buy now checkout data is incomplete.");
           }
 
           const preview = await apiFetch(CHECKOUT_PREVIEW_ENDPOINT, {
@@ -406,50 +481,62 @@ export default function Payment() {
             }),
           });
 
-          setPreviewData(buildBuyNowPreview(normalized, preview));
-        } else {
-          if (!normalized.address_id || normalized.items.length === 0) {
-            throw new Error("Checkout data is incomplete. Please go back to checkout.");
-          }
-
-          setPreviewData(buildCartPreview(normalized));
+          if (!alive) return;
+          setPreviewData(buildBuyNowPreviewFromApi(normalized, preview));
+          return;
         }
+
+        if (normalized.mode === "CART") {
+          const built = buildPreviewFromCheckout(normalized);
+          if (!built.items.length) {
+            throw new Error("Cart checkout data is incomplete. Please return to checkout.");
+          }
+          if (!alive) return;
+          setPreviewData(built);
+          return;
+        }
+
+        throw new Error("Invalid checkout mode.");
       } catch (e) {
+        if (!alive) return;
+        setPreviewData(null);
         setError(formatApiError(e));
       } finally {
-        setLoadingPreview(false);
+        if (alive) setLoadingPreview(false);
       }
     }
 
     loadPreview();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const methodMeta = useMemo(() => getMethodMeta(activeTab), [activeTab]);
-  const totals = useMemo(
-    () => previewData?.totals || { itemsCount: 0, itemsTotal: 0, deliveryFee: 0, total: 0 },
-    [previewData]
-  );
+
+  const totals = useMemo(() => {
+    return (
+      previewData?.totals || {
+        lineItems: 0,
+        quantityTotal: 0,
+        itemsTotal: 0,
+        deliveryFee: 0,
+        total: 0,
+      }
+    );
+  }, [previewData]);
 
   const primaryButtonLabel = useMemo(() => {
     if (!methodMeta.enabled) return methodMeta.cta;
     return placingOrder ? "Processing..." : methodMeta.cta;
   }, [methodMeta, placingOrder]);
 
-  function handleSelectTab(tab) {
-    setError("");
-    setActiveTab(tab.key);
-  }
-
   async function handlePlaceOrder() {
     setError("");
 
     if (!checkoutSeed || !previewData) {
       setError("Checkout preview is missing.");
-      return;
-    }
-
-    if (!checkoutSeed.address_id) {
-      setError("Address is missing.");
       return;
     }
 
@@ -463,21 +550,29 @@ export default function Payment() {
     try {
       let response;
 
-      if (checkoutSeed.mode === "BUY_NOW") {
+      if (checkoutSeed.mode === "CART") {
+        if (!checkoutSeed.cart_id) {
+          throw new Error("cart_id is missing for cart checkout.");
+        }
+
+        response = await apiFetch(CART_ORDER_ENDPOINT, {
+          method: "POST",
+          body: JSON.stringify({
+            cart_id: checkoutSeed.cart_id,
+            payment_method: methodMeta.paymentMethod,
+          }),
+        });
+      } else {
+        if (!checkoutSeed.address_id || !checkoutSeed.variant_id) {
+          throw new Error("Buy now checkout data is incomplete.");
+        }
+
         response = await apiFetch(BUY_NOW_ENDPOINT, {
           method: "POST",
           body: JSON.stringify({
             address_id: checkoutSeed.address_id,
             variant_id: checkoutSeed.variant_id,
             quantity: checkoutSeed.quantity,
-            payment_method: methodMeta.paymentMethod,
-          }),
-        });
-      } else {
-        response = await apiFetch(CART_ORDER_ENDPOINT, {
-          method: "POST",
-          body: JSON.stringify({
-            address_id: checkoutSeed.address_id,
             payment_method: methodMeta.paymentMethod,
           }),
         });
@@ -524,7 +619,7 @@ export default function Payment() {
           <div className="payment-stateCard">
             <div className="payment-stateBadge">Payment</div>
             <h2>Loading checkout details</h2>
-            <p>Fetching your items, subtotal, delivery fee, and grand total.</p>
+            <p>Fetching your order summary and payment options.</p>
           </div>
         </main>
       </div>
@@ -595,7 +690,7 @@ export default function Payment() {
                       activeTab === tab.key ? "is-active" : "",
                       !tab.enabled ? "is-disabled" : "",
                     ].join(" ")}
-                    onClick={() => handleSelectTab(tab)}
+                    onClick={() => setActiveTab(tab.key)}
                   >
                     <div className="payment-tabIcon">
                       {tab.image ? (
@@ -680,11 +775,21 @@ export default function Payment() {
                 <h3>Order Summary</h3>
               </div>
 
-              
+              <div className="payment-summaryItems">
+                {previewData.items.map((item) => (
+                  <SummaryItemCard key={item.key} item={item} />
+                ))}
+              </div>
+
               <div className="payment-summaryBreakdown">
                 <div className="payment-summaryLine">
-                  <span>Items</span>
-                  <strong>{totals.itemsCount}</strong>
+                  <span>Line Items</span>
+                  <strong>{totals.lineItems}</strong>
+                </div>
+
+                <div className="payment-summaryLine">
+                  <span>Total Quantity</span>
+                  <strong>{totals.quantityTotal}</strong>
                 </div>
 
                 <div className="payment-summaryLine">

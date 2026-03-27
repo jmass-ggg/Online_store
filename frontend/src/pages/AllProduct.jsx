@@ -131,27 +131,8 @@ export default function AllProduct() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2400);
   }
 
-  function addToCart(product) {
-    const cart = safeJsonParse(localStorage.getItem(CART_KEY), []);
-    const list = Array.isArray(cart) ? cart : [];
+  
 
-    const existing = list.find((i) => String(i.id) === String(product.id));
-    if (existing) existing.quantity = (existing.quantity || 1) + 1;
-    else {
-      list.push({
-        id: product.id,
-        productName: product.name,
-        price: product.price,
-        imageUrl: product.image,
-        quantity: 1,
-        inStock: product.status === "active",
-      });
-    }
-
-    localStorage.setItem(CART_KEY, JSON.stringify(list));
-    setCartCount(list.reduce((acc, item) => acc + (item.quantity || 0), 0));
-    showToast(`${product.name} added to cart`);
-  }
 
   function openProduct(p) {
     navigate(`/product/${p.slug}`);
@@ -273,14 +254,7 @@ export default function AllProduct() {
                           <div className="apPrice">{money(p.price)}</div>
                         </div>
 
-                        <button
-                          type="button"
-                          className="apAddBtn"
-                          onClick={() => addToCart(p)}
-                          disabled={p.status !== "active"}
-                        >
-                          {p.status === "active" ? "Add to Cart" : "Out of Stock"}
-                        </button>
+                        
                       </div>
                     </article>
                   ))}

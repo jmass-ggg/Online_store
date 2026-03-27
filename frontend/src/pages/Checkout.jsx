@@ -67,7 +67,6 @@ function parseLine2(line2) {
 
 function addressText(address) {
   if (!address) return "";
-
   return [
     address.line1,
     address.line2,
@@ -129,6 +128,139 @@ function normalizeCartItemsForPayment(items) {
     color: String(item?.product_variant?.color || "").trim(),
     image_url: String(item?.product?.image_url || "").trim(),
   }));
+}
+
+function makeBuyNowFallbackItem(buyNowData) {
+  const item = buyNowData?.item;
+  if (!toId(item?.variant_id)) return null;
+
+  const quantity = Math.max(1, toNumber(item?.quantity, 1));
+  const price = toNumber(item?.price, 0);
+
+  return {
+    cart_item_id: `buy_now_${toId(item.variant_id)}`,
+    quantity,
+    price,
+    line_total: quantity * price,
+    selected: true,
+    product_variant: {
+      variant_id: toId(item.variant_id),
+      sku: String(item?.sku || "").trim(),
+      color: String(item?.color || "").trim(),
+      size: String(item?.size || "").trim(),
+      price,
+      stock_quantity: toNumber(item?.stock_quantity, 0),
+      is_active: true,
+    },
+    product: {
+      product_id: toId(item?.product_id),
+      product_name: String(item?.product_name || "Selected Product").trim(),
+      url_slug: String(item?.url_slug || "").trim(),
+      product_category: String(item?.product_category || "").trim(),
+      target_audience: String(item?.target_audience || "").trim(),
+      description: String(item?.description || "").trim(),
+      image_url: String(item?.image_url || "").trim(),
+      status: "active",
+      seller_id: toId(item?.seller_id),
+    },
+  };
+}
+
+function normalizeCheckoutResponse(raw, { mode, buyNowData, cartId } = {}) {
+  if (!raw || typeof raw !== "object") return null;
+
+  let items = [];
+
+  if (Array.isArray(raw.items) && raw.items.length) {
+    items = raw.items.map((item, index) => ({
+      cart_item_id: toId(item?.cart_item_id || `${toId(item?.product_variant?.variant_id)}_${index}`),
+      quantity: Math.max(1, toNumber(item?.quantity, 1)),
+      price: toNumber(item?.price ?? item?.product_variant?.price, 0),
+      line_total: toNumber(
+        item?.line_total,
+        toNumber(item?.price ?? item?.product_variant?.price, 0) *
+          Math.max(1, toNumber(item?.quantity, 1))
+      ),
+      selected: item?.selected !== false,
+      product_variant: {
+        variant_id: toId(item?.product_variant?.variant_id),
+        sku: String(item?.product_variant?.sku || "").trim(),
+        color: String(item?.product_variant?.color || "").trim(),
+        size: String(item?.product_variant?.size || "").trim(),
+        price: toNumber(item?.product_variant?.price ?? item?.price, 0),
+        stock_quantity: toNumber(item?.product_variant?.stock_quantity, 0),
+        is_active: item?.product_variant?.is_active !== false,
+      },
+      product: {
+        product_id: toId(item?.product?.product_id),
+        product_name: String(item?.product?.product_name || "Product").trim(),
+        url_slug: String(item?.product?.url_slug || "").trim(),
+        product_category: String(item?.product?.product_category || "").trim(),
+        target_audience: String(item?.product?.target_audience || "").trim(),
+        description: String(item?.product?.description || "").trim(),
+        image_url: String(item?.product?.image_url || "").trim(),
+        status: String(item?.product?.status || "").trim(),
+        seller_id: toId(item?.product?.seller_id),
+      },
+    }));
+  } else if (mode === "BUY_NOW") {
+    const fallback = makeBuyNowFallbackItem(buyNowData);
+
+    if (fallback) {
+      const quantity = Math.max(1, toNumber(raw?.quantity ?? fallback.quantity, 1));
+      const unitPrice = toNumber(
+        raw?.unit_price ??
+          raw?.price ??
+          raw?.variant?.price ??
+          raw?.product_variant?.price ??
+          fallback.price,
+        fallback.price
+      );
+
+      items = [
+        {
+          ...fallback,
+          quantity,
+          price: unitPrice,
+          line_total: toNumber(
+            raw?.items_subtotal ?? raw?.subtotal,
+            quantity * unitPrice
+          ),
+          product: {
+            ...fallback.product,
+            ...(raw?.product || {}),
+          },
+          product_variant: {
+            ...fallback.product_variant,
+            ...(raw?.variant || raw?.product_variant || {}),
+            price: unitPrice,
+          },
+        },
+      ];
+    }
+  }
+
+  const subtotal = toNumber(
+    raw?.subtotal ?? raw?.items_subtotal,
+    items.reduce((sum, item) => sum + toNumber(item?.line_total, 0), 0)
+  );
+
+  const delivery_charge = toNumber(raw?.delivery_charge, 0);
+  const total = toNumber(raw?.total ?? raw?.grand_total, subtotal + delivery_charge);
+
+  return {
+    mode,
+    cart_id: toId(raw?.cart_id || cartId),
+    buyer_id: toId(raw?.buyer_id),
+    status: String(raw?.status || "").trim(),
+    selected_count: toNumber(raw?.selected_count, items.length),
+    subtotal,
+    delivery_charge,
+    total,
+    address: raw?.address || null,
+    delivery_breakdown: Array.isArray(raw?.delivery_breakdown) ? raw.delivery_breakdown : [],
+    items,
+  };
 }
 
 const NEPAL = {
@@ -261,6 +393,7 @@ export default function Checkout() {
       setCountryCode("+977");
       setPhone(pn.slice(4));
     } else {
+      setCountryCode("+977");
       setPhone(pn);
     }
 
@@ -318,20 +451,24 @@ export default function Checkout() {
         return;
       }
 
+      if (isBuyNowMode && !toId(buyNowData?.item?.variant_id)) {
+        setCheckoutData(null);
+        return;
+      }
+
+      if (!isBuyNowMode && !cartId) {
+        setCheckoutData(null);
+        return;
+      }
+
       setLoadingCheckout(true);
       setErrorMsg("");
 
       try {
-        let data = null;
+        let raw;
 
         if (isBuyNowMode) {
-          if (!buyNowData?.item?.variant_id) {
-            setCheckoutData(null);
-            setLoadingCheckout(false);
-            return;
-          }
-
-          data = await apiFetch("/checkout/checkout", {
+          raw = await apiFetch("/checkout/checkout", {
             method: "POST",
             body: JSON.stringify({
               address_id: savedAddress.id,
@@ -340,19 +477,22 @@ export default function Checkout() {
             }),
           });
         } else {
-          if (!cartId) {
-            setCheckoutData(null);
-            setLoadingCheckout(false);
-            return;
-          }
-
-          apiFetch(`/checkout/checkout/${cartId}`, {
-    method: "POST",
-  });
-          }
+          raw = await apiFetch(`/checkout/checkout/${cartId}`, {
+            method: "POST",
+            // If your backend needs address_id here, uncomment the next line:
+            // body: JSON.stringify({ address_id: savedAddress.id }),
+          });
+        }
 
         if (cancelled) return;
-        setCheckoutData(data);
+
+        const normalized = normalizeCheckoutResponse(raw, {
+          mode: isBuyNowMode ? "BUY_NOW" : "CART",
+          buyNowData,
+          cartId,
+        });
+
+        setCheckoutData(normalized);
       } catch (e) {
         if (!cancelled) {
           setCheckoutData(null);
@@ -388,6 +528,25 @@ export default function Checkout() {
   }, [cityOptions, city]);
 
   const zoneOptions = useMemo(() => cityObj?.zones || [], [cityObj]);
+
+  const displayAddress = checkoutData?.address || savedAddress || null;
+
+  const displayItems = useMemo(() => {
+    if (Array.isArray(checkoutData?.items) && checkoutData.items.length) {
+      return checkoutData.items;
+    }
+
+    if (isBuyNowMode) {
+      const fallback = makeBuyNowFallbackItem(buyNowData);
+      return fallback ? [fallback] : [];
+    }
+
+    return [];
+  }, [checkoutData, isBuyNowMode, buyNowData]);
+
+  const totalQuantity = useMemo(() => {
+    return displayItems.reduce((sum, item) => sum + Math.max(1, toNumber(item?.quantity, 1)), 0);
+  }, [displayItems]);
 
   function handleProvinceChange(value) {
     setProvince(value);
@@ -469,29 +628,22 @@ export default function Checkout() {
       return;
     }
 
-    if (isBuyNowMode) {
-      sessionStorage.setItem(
-        CHECKOUT_CTX_KEY,
-        JSON.stringify({
-          mode: "BUY_NOW",
-          address_id: toId(savedAddress?.id || checkoutData?.address?.id),
-          variant_id: toId(buyNowData?.item?.variant_id),
-          quantity: Math.max(1, toNumber(buyNowData?.item?.quantity, 1)),
-          checkout: checkoutData,
-        })
-      );
-    } else {
-      sessionStorage.setItem(
-        CHECKOUT_CTX_KEY,
-        JSON.stringify({
-          mode: "CART",
-          address_id: toId(savedAddress?.id || checkoutData?.address?.id),
-          cart_id: toId(checkoutData?.cart_id || cartId),
-          items: normalizeCartItemsForPayment(checkoutData?.items),
-          checkout: checkoutData,
-        })
-      );
-    }
+    sessionStorage.setItem(
+      CHECKOUT_CTX_KEY,
+      JSON.stringify({
+        mode: isBuyNowMode ? "BUY_NOW" : "CART",
+        address_id: toId(savedAddress?.id || checkoutData?.address?.id),
+        cart_id: toId(checkoutData?.cart_id || cartId),
+        variant_id: isBuyNowMode
+          ? toId(displayItems?.[0]?.product_variant?.variant_id)
+          : "",
+        quantity: isBuyNowMode
+          ? Math.max(1, toNumber(displayItems?.[0]?.quantity, 1))
+          : 0,
+        items: normalizeCartItemsForPayment(checkoutData?.items),
+        checkout: checkoutData,
+      })
+    );
 
     navigate("/payment", {
       state: {
@@ -499,22 +651,6 @@ export default function Checkout() {
       },
     });
   }
-
-  const displayAddress = checkoutData?.address || savedAddress || null;
-  const displayProduct = checkoutData?.product || null;
-  const displayVariant = checkoutData?.variant || null;
-
-  const fallbackName = buyNowData?.item?.product_name || "Selected Product";
-  const fallbackCategory = buyNowData?.item?.product_category || "";
-  const fallbackSize = buyNowData?.item?.size || "";
-  const fallbackColor = buyNowData?.item?.color || "";
-  const fallbackQty = Math.max(1, toNumber(buyNowData?.item?.quantity, 1));
-  const fallbackPrice = toNumber(buyNowData?.item?.price, 0);
-
-  const imageSrc =
-    joinUrl(displayProduct?.image_url || buyNowData?.item?.image_url || "") || FALLBACK_IMAGE;
-
-  const cartItems = Array.isArray(checkoutData?.items) ? checkoutData.items : [];
 
   if (isBuyNowMode && !buyNowData?.item?.variant_id) {
     return (
@@ -753,48 +889,14 @@ export default function Checkout() {
             <div className="ck-itemsUnderAddress">
               <div className="ck-itemsHead">
                 <div className="ck-itemsTitle">
-                  {isBuyNowMode
-                    ? "Order Item"
-                    : `Order Items (${toNumber(checkoutData?.selected_count, 0)})`}
+                  Order Items ({displayItems.length})
                 </div>
               </div>
 
               <div className="ck-itemsBody">
-                {isBuyNowMode ? (
-                  <div className="ck-itemRow">
-                    <img
-                      className="ck-itemImg"
-                      src={imageSrc}
-                      alt={displayProduct?.product_name || fallbackName}
-                      onError={(e) => {
-                        e.currentTarget.src = FALLBACK_IMAGE;
-                      }}
-                    />
-
-                    <div className="ck-itemInfo">
-                      <div className="ck-itemName">
-                        {displayProduct?.product_name || fallbackName}
-                      </div>
-                      <div className="ck-itemMeta">
-                        {displayProduct?.product_category || fallbackCategory ? (
-                          <span>
-                            {displayProduct?.product_category || fallbackCategory}
-                          </span>
-                        ) : null}
-                        <span>Size: {displayVariant?.size || fallbackSize || "-"}</span>
-                        <span>Color: {displayVariant?.color || fallbackColor || "-"}</span>
-                        <span>Qty: {fallbackQty}</span>
-                      </div>
-                    </div>
-
-                    <div className="ck-itemPrice">
-                      {money(checkoutData?.unit_price ?? fallbackPrice)}
-                    </div>
-                  </div>
-                ) : cartItems.length > 0 ? (
-                  cartItems.map((item) => {
-                    const itemImage =
-                      joinUrl(item?.product?.image_url || "") || FALLBACK_IMAGE;
+                {displayItems.length > 0 ? (
+                  displayItems.map((item) => {
+                    const itemImage = joinUrl(item?.product?.image_url || "") || FALLBACK_IMAGE;
 
                     return (
                       <div className="ck-itemRow" key={item.cart_item_id}>
@@ -818,18 +920,25 @@ export default function Checkout() {
                             ) : null}
                             <span>Size: {item?.product_variant?.size || "-"}</span>
                             <span>Color: {item?.product_variant?.color || "-"}</span>
-                            <span>Qty: {toNumber(item?.quantity, 1)}</span>
+                            <span>Qty: {Math.max(1, toNumber(item?.quantity, 1))}</span>
+                            {item?.product_variant?.sku ? (
+                              <span>SKU: {item.product_variant.sku}</span>
+                            ) : null}
                           </div>
                         </div>
 
                         <div className="ck-itemPrice">
-                          {money(item?.line_total || 0)}
+                          {money(item?.line_total)}
                         </div>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="ck-hint">No selected items found.</div>
+                  <div className="ck-hint">
+                    {loadingCheckout
+                      ? "Loading selected items…"
+                      : "No selected items found."}
+                  </div>
                 )}
               </div>
             </div>
@@ -850,38 +959,18 @@ export default function Checkout() {
               <div className="ck-lines">
                 <div className="ck-line">
                   <span>Items</span>
-                  <span>
-                    {isBuyNowMode
-                      ? fallbackQty
-                      : toNumber(checkoutData?.selected_count, 0)}
-                  </span>
+                  <span>{displayItems.length}</span>
                 </div>
 
-                {!isBuyNowMode ? (
-                  <div className="ck-line">
-                    <span>Subtotal</span>
-                    <span>{money(checkoutData?.subtotal)}</span>
-                  </div>
-                ) : null}
+                <div className="ck-line">
+                  <span>Total Quantity</span>
+                  <span>{totalQuantity}</span>
+                </div>
 
-                {isBuyNowMode ? (
-                  <>
-                    <div className="ck-line">
-                      <span>Product</span>
-                      <span>{displayProduct?.product_name || fallbackName}</span>
-                    </div>
-
-                    <div className="ck-line">
-                      <span>Unit Price</span>
-                      <span>{money(checkoutData?.unit_price)}</span>
-                    </div>
-
-                    <div className="ck-line">
-                      <span>Items Subtotal</span>
-                      <span>{money(checkoutData?.items_subtotal)}</span>
-                    </div>
-                  </>
-                ) : null}
+                <div className="ck-line">
+                  <span>Subtotal</span>
+                  <span>{money(checkoutData?.subtotal)}</span>
+                </div>
 
                 <div className="ck-line">
                   <span>Delivery Charge</span>
@@ -892,13 +981,7 @@ export default function Checkout() {
 
                 <div className="ck-totalRow">
                   <span className="ck-totalLabel">Grand Total</span>
-                  <span className="ck-totalValue">
-                    {money(
-                      isBuyNowMode
-                        ? checkoutData?.grand_total
-                        : checkoutData?.total
-                    )}
-                  </span>
+                  <span className="ck-totalValue">{money(checkoutData?.total)}</span>
                 </div>
               </div>
             ) : (
