@@ -1,6 +1,6 @@
-from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+
+from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -14,13 +14,18 @@ from backend.schemas.order import (
 )
 from backend.service.order_service import place_order_service, buy_now_service,buy_from_cart_service
 from backend.utils.jwt import get_current_customer
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
+limiter=Limiter(key_func=get_remote_address)
 
 
 @router.post("/order", response_model=PlaceOrderResponse, status_code=201)
+@limiter.limit("10/minute")
 def place_order_api(
-    payload: PlaceOrderRequest,
+    request: Request,
+    payload: PlaceOrderRequest = Body(...),
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_customer),
 ):
@@ -45,7 +50,9 @@ def place_order_api(
     )
 
 @router.post("/buy-now", response_model=BuyNowResponse, status_code=200)
+@limiter.limit("10/minute")
 def buy_now_api(
+    request: Request,
     payload: BuyNowRequest,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_customer),
@@ -74,7 +81,9 @@ def buy_now_api(
     
     
 @router.post("/buy_product", response_model=BuyNowResponse, status_code=200)
+@limiter.limit("10/minute")
 def buy_product_from_cart_to_payment(
+    request: Request,
     payload: BuyCartRequest,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_customer),

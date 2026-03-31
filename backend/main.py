@@ -6,6 +6,9 @@ from backend.api.v1 import (
     customer, product, review, seller, admin, login, cart, address, order,
     seller_management, esewa_router,checkout
 )
+from slowapi import Limiter,_rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from backend.database import Base, engine
 from pathlib import Path
 app = FastAPI()
@@ -17,7 +20,9 @@ origins = [
     "http://frontend:5173",
     "https://unsight-unartificially-mozelle.ngrok-free.dev",
 ]
-
+limiter=Limiter(key_func=get_remote_address)
+app.state.limiter=limiter
+app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

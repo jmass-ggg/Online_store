@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Response, HTTPException, Request
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from backend.database import get_db
 from backend.utils.jwt import create_access_token, create_refresh_token, verify_refresh_token
@@ -13,6 +15,7 @@ from backend.models.customer import Customer
 from backend.models.refresh_token import RefreshToken
 
 router = APIRouter(prefix="/login", tags=["Login"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 class LoginResponse(BaseModel):
@@ -23,26 +26,30 @@ class LoginResponse(BaseModel):
 COOKIE_NAME = "refresh_token"
 COOKIE_MAX_AGE = 7 * 24 * 60 * 60
 
+
 def set_refresh_cookie(response: Response, token: str):
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=False,           
-        samesite="lax",         
+        secure=False,   
+        samesite="lax",
         max_age=COOKIE_MAX_AGE,
-        path="/",               
+        path="/",
     )
+
 
 def delete_refresh_cookie(response: Response):
     response.delete_cookie(
         key=COOKIE_NAME,
-        path="/",               
+        path="/",
     )
 
 
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit("5/minute")
 def login(
+    request: Request,   # required by slowapi
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
@@ -71,11 +78,11 @@ def login(
     refresh_token = create_refresh_token(db, user_id=user.id, role=role)
 
     set_refresh_cookie(response, refresh_token)
-
     return LoginResponse(access_token=access)
 
 
 @router.post("/refresh", response_model=LoginResponse)
+@limiter.limit("10/minute")
 def refresh_access_token(
     request: Request,
     response: Response,
@@ -97,7 +104,6 @@ def refresh_access_token(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-  
     rt.revoked = True
     db.commit()
 
@@ -109,6 +115,7 @@ def refresh_access_token(
 
 
 @router.post("/logout")
+@limiter.limit("20/minute")
 def logout(
     request: Request,
     response: Response,

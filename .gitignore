@@ -23,7 +23,7 @@ alembic.ini
 frontend/node_modules/
 frontend/build/
 frontend/dist/
-
+sqlscript.txt
 # OS files
 .DS_Store
 Thumbs.db

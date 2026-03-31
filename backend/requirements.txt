@@ -15,12 +15,12 @@ colorama==0.4.6
 cryptography==46.0.4
 dnspython==2.8.0
 ecdsa==0.19.1
-
+slowapi
 email-validator==2.3.0
 fastapi==0.116.2
 fastapi-cache2==0.2.2
 fastapi-mail==1.6.1
-
+slowapi
 greenlet==3.2.4
 h11==0.16.0
 httptools==0.6.4

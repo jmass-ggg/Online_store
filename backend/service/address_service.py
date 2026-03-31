@@ -14,20 +14,37 @@ from backend.service.geocoding import (
     reverse_geocode,
 )
 from uuid import UUID
+
 def _dump(pydantic_obj) -> Dict[str, Any]:
     
     if hasattr(pydantic_obj, "model_dump"):
         return pydantic_obj.model_dump(exclude_unset=True)
     return pydantic_obj.dict(exclude_unset=True)
 
+def _check_max_len(value:Optional[str],max_len:int,field:str):
+    if value is not None and len(value) > max_len:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field} must be at most {max_len} characters",
+        )
 
 def _validate_latlng(lat: float, lng: float) -> None:
     if not (-90.0 <= lat <= 90.0):
+
         raise HTTPException(status_code=400, detail="Invalid latitude")
     if not (-180.0 <= lng <= 180.0):
         raise HTTPException(status_code=400, detail="Invalid longitude")
     if not in_nepal_bounds(lat, lng):
         raise HTTPException(status_code=400, detail="Service available only in Nepal")
+
+def _validate_address_lengths(data: Dict[str, Any]) -> None:
+    _check_max_len(data.get("full_name"), 100, "full_name")
+    _check_max_len(data.get("phone_number"), 20, "phone_number")
+    _check_max_len(data.get("region"), 50, "region")
+    _check_max_len(data.get("line1"), 255, "line1")
+    _check_max_len(data.get("line2"), 255, "line2")
+    _check_max_len(data.get("postal_code"), 20, "postal_code")
+    _check_max_len(data.get("country"), 50, "country")
 
 
 def _normalize_str(x: Optional[str]) -> Optional[str]:
@@ -61,7 +78,7 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) ->
     data["line2"] = _normalize_str(data.get("line2"))
     data["postal_code"] = _normalize_str(data.get("postal_code"))
     data["country"] = _normalize_str(data.get("country")) or "Nepal"
-
+    _validate_address_lengths(data)
     if not data["region"]:
         raise HTTPException(status_code=400, detail="Region is required")
     if not data["line1"]:
@@ -96,6 +113,7 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) ->
             raise HTTPException(status_code=400, detail="Address already exists")
 
         db_address = Address(customer_id=customer_id, **data)
+        
         db.add(db_address)
 
         db.commit()
