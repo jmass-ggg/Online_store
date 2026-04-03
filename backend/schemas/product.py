@@ -7,7 +7,7 @@ from uuid import UUID
 
 
 class ProductCreate(BaseModel):
-    product_name: constr(min_length=5, max_length=50)
+    product_name: str
     url_slug: str = Field(..., min_length=3, max_length=80)
     target_audience: TargetAudience
     product_category: ProductCategory
@@ -24,7 +24,7 @@ class ProductRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    product_name: constr(min_length=5, max_length=50)
+    product_name: str
     url_slug: str = Field(..., min_length=3, max_length=80)
     target_audience: TargetAudience
     product_category: ProductCategory

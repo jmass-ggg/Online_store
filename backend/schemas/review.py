@@ -1,6 +1,7 @@
 from pydantic import BaseModel,Field,constr,ConfigDict
 from typing import Optional
 from uuid import UUID
+
 class Review_create(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -9,14 +10,14 @@ class Review_create(BaseModel):
         ..., description="Comment about the product"
     )
 
-        
 class Review_read(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     rating: int = Field(default=1, ge=1, le=5, description="The rating the product")
     comment: str
-        
+
+
 class Review_update(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

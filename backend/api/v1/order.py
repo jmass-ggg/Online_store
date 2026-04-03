@@ -1,5 +1,3 @@
-
-
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
@@ -12,6 +10,8 @@ from backend.schemas.order import (
     BuyNowRequest,
     BuyNowResponse,BuyCartRequest                                                                                                       
 )
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from backend.service.order_service import place_order_service, buy_now_service,buy_from_cart_service
 from backend.utils.jwt import get_current_customer
 from slowapi import Limiter
@@ -22,6 +22,7 @@ limiter=Limiter(key_func=get_remote_address)
 
 
 @router.post("/order", response_model=PlaceOrderResponse, status_code=201)
+
 @limiter.limit("10/minute")
 def place_order_api(
     request: Request,
