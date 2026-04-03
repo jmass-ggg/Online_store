@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, File, UploadFile, Form,Query
+from fastapi import APIRouter, Depends, status, File, UploadFile, Form,Query,Request,Response
 from sqlalchemy.orm import Session
 from typing import List
 from backend.core.settings import UPLOAD_DIR
@@ -21,21 +21,38 @@ from uuid import UUID
 from backend.models.product import Product
 from typing import Optional
 from backend.models.admin import Admin
+from fastapi_cache.decorator import cache
 
 UPLOAD_FOLDER="backend/uploads/"
 router=APIRouter(prefix="/product",tags=["Product"])
+
+def product_cache_key_builder(
+    func,
+    namespace: str = "",
+    *,
+    request: Request = None,
+    response: Response = None,
+    args=(),
+    kwargs=None,
+):
+    if request:
+        return f"{namespace}:{request.method}:{request.url.path}:{dict(request.query_params)}"
+    return f"{namespace}:product-list"
 
 @router.get("/products/{product_id}/options")
 def product_options(product_id: UUID, db: Session = Depends(get_db)):
     return get_product_options(db, product_id)
 
+
 @router.get("/", response_model=List[ProductListRead])
+@cache(expire=120, key_builder=product_cache_key_builder)
 def get_all_product(
     category: Optional[ProductCategory] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    print("get_all_product executed")
     return view_all_product(
         db=db,
         category=category,
@@ -43,7 +60,6 @@ def get_all_product(
         limit=limit,
         only_active=True,
     )
-
 @router.get("/slug/{slug}", response_model=AllProduct)
 def get_product_by_slug(
     slug: str,

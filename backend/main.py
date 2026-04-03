@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -6,12 +6,26 @@ from backend.api.v1 import (
     customer, product, review, seller, admin, login, cart, address, order,
     seller_management, esewa_router,checkout
 )
+from contextlib import asynccontextmanager
 from slowapi import Limiter,_rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from backend.database import Base, engine
 from pathlib import Path
-app = FastAPI()
+from redis import asyncio as redis
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache import FastAPICache
+import time
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    redis_client = redis.from_url("redis://127.0.0.1:6379/0")
+    FastAPICache.init(RedisBackend(redis_client), prefix="mystore-cache")
+    yield
+    await redis_client.close()
+
+
+app = FastAPI(lifespan=lifespan)
 
 origins = [
     "http://localhost:5173",
@@ -53,3 +67,10 @@ app.include_router(checkout.router)
 @app.get("/")
 def hello_world():
     return {"message": "hello this is online store"}
+@app.middleware("http")
+async def add_timing_header(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start
+    response.headers["X-Process-Time"] = f"{process_time:.6f}"
+    return response

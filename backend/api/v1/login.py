@@ -49,7 +49,7 @@ def delete_refresh_cookie(response: Response):
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
 def login(
-    request: Request,   # required by slowapi
+    request: Request,  
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
