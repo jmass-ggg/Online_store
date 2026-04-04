@@ -4,8 +4,30 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 from backend.models.role import RoleChoices
-from backend.models.seller import SellerVerification
+from backend.models.seller import SellerVerification,AccountType
 
+
+class SellerRegister(BaseModel):
+    username: str
+    email: EmailStr
+    phone_number: str
+    hash_password:str
+    account_type:AccountType
+    
+class SellerRegisterRead(BaseModel):
+    id:UUID
+    username: str
+    email: EmailStr
+    phone_number: str
+    account_type:str
+    status:str
+    is_verified:bool
+    is_email_verified:bool
+    role_name:str
+    
+    
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class SellerBase(BaseModel):
     username: str

@@ -1,23 +1,104 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import status
+from fastapi import status,BackgroundTasks,Depends
 from jwt import ExpiredSignatureError, InvalidTokenError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.core.error_handler import error_handler
 from backend.core.permission import check_permission
-from backend.models.seller import Seller, SellerVerification
+from backend.models.seller import Seller, SellerVerification,AccountType,SellerEmailTokenVerification
 from backend.schemas.seller import (
     SellerApplicationCreate,
     SellerResponse,
     SellerUpdate,
-    SellerVerificationUpdate,
+    SellerVerificationUpdate,SellerRegister,SellerRegisterRead
 )
+from backend.utils.seller_email_verification import generate_email_token,hash_email_token,send_seller_verification_email
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.jwt import verify_token
 from uuid import UUID
+from datetime import timedelta
+
+def create_new_verification(db:Session,seller:Seller)->str:
+    old_token=db.query(SellerEmailTokenVerification).filter(SellerEmailTokenVerification.user_id == seller.id,SellerEmailTokenVerification.used == False).first()
+    if old_token:
+        db.delete(old_token)
+        db.commit()
+    raw_token=generate_email_token()
+    token_hashed=hash_email_token(raw_token)
+    
+    verification=SellerEmailTokenVerification(
+        user_id=seller.id,
+        token_hash=token_hashed,
+        expired_at=datetime.utcnow() + timedelta(minutes=10),
+        used=False
+        
+    )
+    db.add(verification)
+    db.commit()
+    db.refresh(verification)
+    return raw_token
+    
+
+def seller_register(db:Session,data:SellerRegister,background_tasks: BackgroundTasks):
+    existing_seller=db.query(Seller).filter(Seller.email == data.email).first()
+    if existing_seller is None:
+        seller=Seller(
+            username=data.username,
+            email=data.email,
+            phone_number=data.phone_number,
+            hashed_password=hashed_pwd(data.hash_password),
+            account_type=data.account_type
+        )
+        db.add(seller)
+        db.commit()
+        db.refresh(seller)
+        
+        raw_token=create_new_verification(db,seller)
+        background_tasks.add_task(
+            send_seller_verification_email,seller.email,raw_token,
+        )
+        return SellerRegisterRead.model_validate(seller)
+    raw_token=create_new_verification(db,existing_seller)
+    background_tasks.add_task(
+        send_seller_verification_email,
+        existing_seller.email,
+        raw_token,
+    )
+    return SellerRegisterRead.model_validate(existing_seller)
+
+def verified_seller_email(token:str,db:Session,):
+    token_hash=hash_email_token(token)
+    verification=db.query(SellerEmailTokenVerification).filter(SellerEmailTokenVerification.token_hash == token_hash).first()
+    if verification is None:
+        raise error_handler(
+            status.HTTP_400_BAD_REQUEST,
+            "Invalid verification token."
+        )
+
+    if verification.used:
+        raise error_handler(
+            status.HTTP_400_BAD_REQUEST,
+            "This verification link was already used."
+        )
+
+    if datetime.utcnow() > verification.expired_at:
+        raise error_handler(
+            status.HTTP_400_BAD_REQUEST,
+            "Verification link expired. Please register again or resend verification."
+        )
+    seller=db.query(Seller).filter(Seller.id == verification.user_id).first()
+    if seller is None:
+        raise error_handler(
+            status.HTTP_400_BAD_REQUEST,
+            "Seller not found"
+        )
+    seller.is_email_verified=True
+    verification.used=True
+    db.commit()
+    return {"email ":"verified"}
 
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
     now = datetime.utcnow()
