@@ -29,6 +29,30 @@ class SellerRegisterRead(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+class SellerInforMation(BaseModel):
+    legal_name:str
+    pan_number:str
+    
+    account_name:str
+    account_number:str
+    bank_name:str
+    branch_name:str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class SellerInforMationRead(BaseModel):
+    id:UUID
+    user_id:UUID
+    legal_name:str
+    pan_number:str
+    business_document_photo:str
+    account_name:str
+    account_number:str
+    bank_name:str
+    branch_name:str
+    cheque_photo:str
+    model_config = ConfigDict(from_attributes=True)
+    
 class SellerBase(BaseModel):
     username: str
     email: EmailStr

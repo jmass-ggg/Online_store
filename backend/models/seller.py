@@ -91,6 +91,7 @@ class SellerInformation(Base):
     pan_number: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     business_document_photo: Mapped[str] = mapped_column(String, nullable=False)
     account_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    account_number: Mapped[str] = mapped_column(String, nullable=False, index=True)
     bank_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     branch_name: Mapped[str] = mapped_column(String, nullable=False)
     cheque_photo: Mapped[str] = mapped_column(String, nullable=False)

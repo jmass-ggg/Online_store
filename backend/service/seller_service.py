@@ -1,18 +1,18 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import status,BackgroundTasks,Depends
+from fastapi import status,BackgroundTasks,Depends,UploadFile
 from jwt import ExpiredSignatureError, InvalidTokenError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.core.error_handler import error_handler
 from backend.core.permission import check_permission
-from backend.models.seller import Seller, SellerVerification,AccountType,SellerEmailTokenVerification
+from backend.models.seller import Seller, SellerVerification,AccountType,SellerEmailTokenVerification,SellerInformation
 from backend.schemas.seller import (
     SellerApplicationCreate,
     SellerResponse,
-    SellerUpdate,
+    SellerUpdate,SellerInforMation,SellerInforMationRead,
     SellerVerificationUpdate,SellerRegister,SellerRegisterRead
 )
 from backend.utils.seller_email_verification import generate_email_token,hash_email_token,send_seller_verification_email
@@ -20,6 +20,8 @@ from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.jwt import verify_token
 from uuid import UUID
 from datetime import timedelta
+
+UPLOAD_FOLDER="backend/important_document/"
 
 def create_new_verification(db:Session,seller:Seller)->str:
     old_token=db.query(SellerEmailTokenVerification).filter(SellerEmailTokenVerification.user_id == seller.id,SellerEmailTokenVerification.used == False).first()
@@ -61,6 +63,8 @@ def seller_register(db:Session,data:SellerRegister,background_tasks: BackgroundT
             send_seller_verification_email,seller.email,raw_token,
         )
         return SellerRegisterRead.model_validate(seller)
+    if existing_seller.is_email_verified:
+        raise error_handler(400,"Seller is already register please Login")
     raw_token=create_new_verification(db,existing_seller)
     background_tasks.add_task(
         send_seller_verification_email,
@@ -99,6 +103,66 @@ def verified_seller_email(token:str,db:Session,):
     verification.used=True
     db.commit()
     return {"email ":"verified"}
+import os
+import shutil
+from   uuid import uuid4
+def save_upload_file(file: UploadFile, upload_folder: str) -> str:
+    os.makedirs(upload_folder, exist_ok=True)
+
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"{uuid4().hex}{ext}"
+    file_path = os.path.join(upload_folder, filename)
+
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    return filename
+def seller_information_fill(
+    db: Session,
+    current_seller,
+    legal_name: str,
+    pan_number: str,
+    account_name: str,
+    account_number: str,
+    bank_name: str,
+    branch_name: str,
+    business_document_photo_filename: str,
+    cheque_photo_filename: str,
+):
+    if not current_seller.is_email_verified:
+        raise error_handler(400, "Seller email not verified")
+
+    seller_information = SellerInformation(
+        user_id=current_seller.id,
+        legal_name=legal_name,
+        pan_number=pan_number,
+        business_document_photo=f"/important_document/{business_document_photo_filename}",
+        account_name=account_name,
+        account_number=account_number,
+        bank_name=bank_name,
+        branch_name=branch_name,
+        cheque_photo=f"/important_document/{cheque_photo_filename}",
+    )
+
+    db.add(seller_information)
+    db.commit()
+    db.refresh(seller_information)
+
+    return SellerInforMationRead.model_validate(seller_information)
+
+def seller_information_read(
+    db:Session,current_seller:Seller
+):
+    seller_information=db.query(SellerInformation).filter(SellerInformation.user_id == current_seller.id).first()
+    if not seller_information:
+        raise error_handler(
+            400,"Seller information not found"
+        )
+    if not current_seller.is_verified:
+        raise error_handler(
+            400,"Seller  not verified"
+        )
+    return SellerInforMationRead.model_validate(seller_information)
 
 def create_seller_application(db: Session, data: SellerApplicationCreate) -> SellerResponse:
     now = datetime.utcnow()

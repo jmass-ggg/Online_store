@@ -19,6 +19,14 @@ from backend.core.error_handler import error_handler
 from backend.utils.jwt import get_current_seller
 
 
+def verify_email_seller_or_not(
+    seller: Seller = Depends(get_current_seller)
+):
+    
+    if not seller.is_email_verified:
+        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
+    return seller
+
 def verify_seller_or_not(
     seller: Seller = Depends(get_current_seller)
 ):
@@ -27,5 +35,6 @@ def verify_seller_or_not(
 
     if not seller.is_verified:
         raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
-
+    if not seller.is_email_verified:
+        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
     return seller
