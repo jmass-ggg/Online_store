@@ -57,7 +57,9 @@ class Seller(Base):
     seller_information: Mapped[list["SellerInformation"]] = relationship(
         "SellerInformation", back_populates="seller", cascade="all, delete-orphan"
     )
-
+    seller_business_address: Mapped[list["SellerBusinessAddress"]] = relationship(
+        "SellerBusinessAddress", back_populates="seller", cascade="all, delete-orphan"
+    )
     def __repr__(self):
         return f"<Seller(username={self.username}, email={self.email})>"
 
@@ -100,3 +102,18 @@ class SellerInformation(Base):
         "Seller", back_populates="seller_information"
     )
 
+class SellerBusinessAddress(Base):
+    __tablename__ = "seller_business_address" 
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seller.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    country: Mapped[str] = mapped_column(String, default="NEPAL",nullable=False, index=True)
+    province: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    district: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    area: Mapped[str] = mapped_column(String, nullable=False)
+
+    seller: Mapped["Seller"] = relationship(
+        "Seller", back_populates="seller_business_address"
+    )
