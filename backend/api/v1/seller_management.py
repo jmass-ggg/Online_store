@@ -3,9 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from backend.database import get_db
 from backend.schemas.seller import (
-    SellerApplicationCreate,
-    SellerResponse,
-    SellerReviewUpdate,SellerVerificationUpdate
+    SellerVerificationUpdate
 )
 from backend.models.order import Order,PaymentMethod
 from fastapi import APIRouter, Depends

@@ -80,3 +80,10 @@ class SellerVerificationUpdate(BaseModel):
     is_verified: bool
 
     model_config = ConfigDict(from_attributes=True)
+    
+class SellerDetail(BaseModel):
+    sellerDetail: SellerRegisterRead
+    sellerInformation: SellerInforMationRead
+    sellerAddress: SellerBusinessAddressRead
+    
+    model_config = ConfigDict(from_attributes=True)

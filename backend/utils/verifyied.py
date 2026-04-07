@@ -6,12 +6,9 @@ from backend.database import get_db
 from backend.models.seller import Seller
 from backend.models.role import Roles
 from backend.schemas.seller import (
-   SellerApplicationCreate,
-   SellerReviewUpdate,
-   SellerResponse,
-   SellerUpdate,SellerVerificationUpdate
+   SellerVerificationUpdate
 )
-from backend.schemas.seller import TokenResponse
+
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.utils.hashed import  verify_password
 from backend.core.permission import check_permission

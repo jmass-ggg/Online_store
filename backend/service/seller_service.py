@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import BackgroundTasks, UploadFile, status
 from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import selectinload,joinedload
 from backend.core.error_handler import error_handler
 from backend.models.seller import (
     Seller,
@@ -23,7 +23,7 @@ from backend.schemas.seller import (
     SellerInforMationRead,
     SellerBusinessAddressCreate,
     SellerBusinessAddressRead,
-    SellerVerificationUpdate,
+    SellerVerificationUpdate,SellerDetail
 )
 from backend.utils.seller_email_verification import (
     generate_email_token,
@@ -258,3 +258,30 @@ def admin_approve_account(
     db.commit()
     db.refresh(seller)
     return SellerRegisterRead.model_validate(seller)
+
+from backend.models.seller import Seller,SellerBusinessAddress,SellerEmailTokenVerification,SellerInformation
+def get_seller_detail(db: Session, seller_id: UUID):
+    seller = (
+        db.query(Seller)
+        .filter(Seller.id == seller_id)
+        .options(
+            selectinload(Seller.seller_information),
+            selectinload(Seller.seller_business_address),
+        )
+        .first()
+    )
+
+    if not seller:
+        raise error_handler(400, "Seller not found")
+
+    if not seller.seller_information:
+        raise error_handler(400, "Seller information not found")
+
+    if not seller.seller_business_address:
+        raise error_handler(400, "Seller business address not found")
+
+    return SellerDetail(
+        sellerDetail=SellerRegisterRead.model_validate(seller),
+        sellerInformation=SellerInforMationRead.model_validate(seller.seller_information[0]),
+        sellerAddress=SellerBusinessAddressRead.model_validate(seller.seller_business_address[0]),
+    )
