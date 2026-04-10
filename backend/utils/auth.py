@@ -1,4 +1,8 @@
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+bearer_scheme = HTTPBearer()
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/login")
+def get_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    return credentials.credentials

@@ -25,7 +25,7 @@ from backend.service.seller_product_service import (
 from backend.utils.verifyied import verify_seller_or_not
 from backend.service.seller_product_service import seller_carts
 from backend.models.seller import Seller
-from backend.utils.auth import oauth2_scheme
+
 from backend.schemas.seller_dashboard import SellerDashboardOut
 from backend.core.error_handler import error_handler 
 from uuid import UUID

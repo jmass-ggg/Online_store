@@ -16,7 +16,7 @@ from backend.service.customer_service import (
     # delete_account_by_admin,
     get_user
 )
-from backend.utils.auth import oauth2_scheme
+
 
 router=APIRouter(prefix="/user",tags=["Customer"] )
 limiter=Limiter(key_func=get_remote_address)

@@ -4,11 +4,11 @@ from typing import Any
 import os
 import shutil
 from uuid import uuid4
-
 from fastapi import BackgroundTasks, UploadFile, status
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import selectinload,joinedload
 from backend.core.error_handler import error_handler
+
 from backend.models.seller import (
     Seller,
     SellerVerification,
@@ -25,6 +25,7 @@ from backend.schemas.seller import (
     SellerBusinessAddressRead,
     SellerVerificationUpdate,SellerDetail
 )
+from backend.service.auth_lookup_service import identity_exists
 from backend.utils.seller_email_verification import (
     generate_email_token,
     hash_email_token,
@@ -63,8 +64,15 @@ def create_new_verification(db: Session, seller: Seller) -> str:
     db.refresh(verification)
     return raw_token
 
-
 def seller_register(db: Session, data: SellerRegister, background_tasks: BackgroundTasks):
+    email_check = identity_exists(db, email=data.email)
+    if email_check["exists"] and email_check["role"] != "Seller":
+        raise error_handler(400, f"Email already exists in {email_check['role']} account")
+
+    username_check = identity_exists(db, username=data.username)
+    if username_check["exists"]:
+        raise error_handler(400, f"Username already exists in {username_check['role']} account")
+
     existing_seller = db.query(Seller).filter(Seller.email == data.email).first()
 
     if existing_seller is None:
@@ -93,7 +101,6 @@ def seller_register(db: Session, data: SellerRegister, background_tasks: Backgro
         raw_token,
     )
     return SellerRegisterRead.model_validate(existing_seller)
-
 
 def verified_seller_email(token: str, db: Session):
     token_hash = hash_email_token(token)

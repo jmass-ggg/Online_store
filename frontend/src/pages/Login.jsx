@@ -21,17 +21,20 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("username", email.trim());
-      formData.append("password", password);
-
       const data = await apiFetch("/login/login", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
       });
 
-      if (!data?.access_token) throw new Error("Missing access token from server");
+      if (!data?.access_token) {
+        throw new Error("Missing access token from server");
+      }
 
       setStoredAccessToken(data.access_token);
       nav("/", { replace: true });

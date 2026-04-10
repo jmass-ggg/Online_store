@@ -3,11 +3,12 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timedelta
+from typing import Literal, TypedDict, Union
+
 from jose import jwt
 from jose.exceptions import JWTError
-
 from fastapi import Depends, HTTPException, status
-
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 
@@ -17,8 +18,20 @@ from backend.models.admin import Admin
 from backend.models.customer import Customer
 from backend.models.refresh_token import RefreshToken
 from backend.models.seller import Seller
-from backend.utils.auth import oauth2_scheme
 
+
+RoleType = Literal["Admin", "Seller", "Customer"]
+
+
+class TokenPayload(TypedDict):
+    email: str
+    role: RoleType
+
+
+class CurrentUser(TypedDict):
+    email: str
+    role: RoleType
+    user: Union[Admin, Seller, Customer]
 
 
 class Settings(BaseSettings):
@@ -27,11 +40,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     database_url: str
+
     class Config:
         env_file = ".env"
 
 
 settings = Settings()
+bearer_scheme = HTTPBearer()
 
 
 def _now() -> datetime:
@@ -42,8 +57,17 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _get_user_by_role(db: Session, email: str, role: RoleType):
+    if role == "Admin":
+        return db.query(Admin).filter(Admin.email == email).first()
+    if role == "Seller":
+        return db.query(Seller).filter(Seller.email == email).first()
+    if role == "Customer":
+        return db.query(Customer).filter(Customer.email == email).first()
+    return None
 
-def create_access_token(email: str, role: str) -> str:
+
+def create_access_token(email: str, role: RoleType) -> str:
     payload = {
         "sub": email,
         "role": role,
@@ -54,25 +78,45 @@ def create_access_token(email: str, role: str) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def verify_token(token: str) -> dict:
+def verify_token(token: str) -> TokenPayload:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+        )
 
         if payload.get("type") != "access":
-            raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid access token type")
+            raise error_handler(
+                status.HTTP_401_UNAUTHORIZED,
+                "Invalid access token type",
+            )
 
         email = payload.get("sub")
         role = payload.get("role")
 
         if not email or not role:
-            raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid token payload")
+            raise error_handler(
+                status.HTTP_401_UNAUTHORIZED,
+                "Invalid token payload",
+            )
+
+        if role not in ("Admin", "Seller", "Customer"):
+            raise error_handler(
+                status.HTTP_401_UNAUTHORIZED,
+                "Invalid user role in token",
+            )
 
         return {"email": email, "role": role}
 
     except JWTError:
-        raise error_handler(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
+        raise error_handler(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid or expired token",
+        )
 
-def create_refresh_token(db: Session, user_id: int, role: str) -> str:
+
+def create_refresh_token(db: Session, user_id: int, role: RoleType) -> str:
     raw = secrets.token_urlsafe(48)
     token_hash = _hash_token(raw)
 
@@ -86,13 +130,20 @@ def create_refresh_token(db: Session, user_id: int, role: str) -> str:
 
     db.add(rt)
     db.commit()
+    db.refresh(rt)
+
     return raw
 
 
 def verify_refresh_token(db: Session, token: str) -> RefreshToken:
     token_hash = _hash_token(token)
 
-    rt = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+    rt = (
+        db.query(RefreshToken)
+        .filter(RefreshToken.token_hash == token_hash)
+        .first()
+    )
+
     if not rt:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
@@ -107,10 +158,29 @@ def verify_refresh_token(db: Session, token: str) -> RefreshToken:
     return rt
 
 
+def get_bearer_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> str:
+    return credentials.credentials
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    return verify_token(token)
 
+def get_current_user(
+    token: str = Depends(get_bearer_token),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    payload = verify_token(token)
+    email = payload["email"]
+    role = payload["role"]
+
+    user = _get_user_by_role(db, email=email, role=role)
+    if not user:
+        raise error_handler(status.HTTP_404_NOT_FOUND, f"{role} not found")
+
+    return {
+        "email": email,
+        "role": role,
+        "user": user,
+    }
 
 def get_current_customer(
     user=Depends(get_current_user),

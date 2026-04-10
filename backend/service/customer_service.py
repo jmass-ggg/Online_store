@@ -11,7 +11,7 @@ from backend.utils.jwt import create_access_token, verify_token, create_refresh_
 from backend.utils.hashed import verify_password
 from backend.utils.hashed import hashed_password as hashed_pwd
 from backend.core.error_handler import error_handler
-
+from backend.service.auth_lookup_service import identity_exists
 
 def create_customer(
     db: Session,
@@ -20,6 +20,15 @@ def create_customer(
     password: str,
     phone_number: str,
 ) -> CustomerRead:
+
+    email_check = identity_exists(db, email=email)
+    if email_check["exists"]:
+        raise error_handler(400, f"Email already exists in {email_check['role']} account")
+
+    username_check = identity_exists(db, username=username)
+    if username_check["exists"]:
+        raise error_handler(400, f"Username already exists in {username_check['role']} account")
+
     new_user = Customer(
         username=username,
         email=email,
@@ -35,14 +44,6 @@ def create_customer(
 
     except IntegrityError as exc:
         db.rollback()
-        error_message = str(exc.orig).lower()
-
-        if "username" in error_message:
-            raise error_handler(400, "Username already exists")
-
-        if "email" in error_message:
-            raise error_handler(400, "Email already exists")
-
         raise error_handler(400, "Invalid customer data")
 
     except SQLAlchemyError:

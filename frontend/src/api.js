@@ -28,7 +28,6 @@ export function joinUrl(u) {
   return `${ASSET_ORIGIN}${u.startsWith("/") ? u : `/${u}`}`;
 }
 
-// ---------- error parsing ----------
 async function parseError(res) {
   try {
     const ct = res.headers.get("content-type") || "";
@@ -42,26 +41,26 @@ async function parseError(res) {
   }
 }
 
-// ---------- refresh lock (prevents multiple refresh calls at once) ----------
 let refreshPromise = null;
 
 async function refreshAccessTokenOnce() {
-  // If a refresh is already happening, await it.
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
     const res = await fetch(`${API_BASE_URL}/login/refresh`, {
       method: "POST",
-      credentials: "include", // ✅ send refresh cookie
+      credentials: "include",
     });
 
     if (!res.ok) {
-      // Refresh failed: session expired
       throw new Error(await parseError(res));
     }
 
     const data = await res.json();
-    if (!data?.access_token) throw new Error("Refresh did not return access_token");
+
+    if (!data?.access_token) {
+      throw new Error("Refresh did not return access_token");
+    }
 
     setStoredAccessToken(data.access_token);
     return data.access_token;
@@ -74,22 +73,22 @@ async function refreshAccessTokenOnce() {
   }
 }
 
-// ---------- main fetch ----------
 export async function apiFetch(path, options = {}) {
-  const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE_URL}${normalizedPath}`;
+  const isRefreshRequest = normalizedPath === "/login/refresh";
 
   const makeHeaders = (token) => {
     const headers = new Headers(options.headers || {});
-
     const isFormData = options.body instanceof FormData;
     const hasBody = options.body !== undefined && options.body !== null;
 
-    // Only set JSON content type if caller didn't set it and body is not FormData
     if (!headers.has("Content-Type") && hasBody && !isFormData) {
       headers.set("Content-Type", "application/json");
     }
 
-    if (token && !headers.has("Authorization")) {
+    // do not attach Authorization header to refresh endpoint
+    if (token && !headers.has("Authorization") && !isRefreshRequest) {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
@@ -97,36 +96,31 @@ export async function apiFetch(path, options = {}) {
   };
 
   const doFetch = async (token) => {
-    const res = await fetch(url, {
+    return fetch(url, {
       ...options,
       headers: makeHeaders(token),
-      credentials: "include", // ✅ include cookies always
+      credentials: "include",
     });
-    return res;
   };
 
-  // 1) try normally with current token
   let token = getStoredAccessToken();
   let res = await doFetch(token);
 
-  // 2) if 401 try refresh once, then retry
-  if (res.status === 401) {
+  // only auto-refresh for NON-refresh endpoints
+  if (res.status === 401 && !isRefreshRequest) {
     try {
       token = await refreshAccessTokenOnce();
       res = await doFetch(token);
     } catch (e) {
-      // refresh failed => log user out
       clearStoredAccessToken();
       throw e instanceof Error ? e : new Error("Session expired. Please login again.");
     }
   }
 
-  // 3) handle non-ok
   if (!res.ok) {
     throw new Error(await parseError(res));
   }
 
-  // 4) return json or text
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) return res.json();
   return res.text();

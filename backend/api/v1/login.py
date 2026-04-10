@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Response, HTTPException, Request
 from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -13,9 +12,15 @@ from backend.models.admin import Admin
 from backend.models.seller import Seller
 from backend.models.customer import Customer
 from backend.models.refresh_token import RefreshToken
+from backend.service.auth_lookup_service import find_user_by_email
 
 router = APIRouter(prefix="/login", tags=["Login"])
 limiter = Limiter(key_func=get_remote_address)
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class LoginResponse(BaseModel):
@@ -32,8 +37,8 @@ def set_refresh_cookie(response: Response, token: str):
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=False,   
-        samesite="lax",
+        secure=False,      # localhost only
+        samesite="lax",    # localhost only
         max_age=COOKIE_MAX_AGE,
         path="/",
     )
@@ -46,39 +51,37 @@ def delete_refresh_cookie(response: Response):
     )
 
 
+def find_user_by_id_and_role(db: Session, owner_id, role: str):
+    if role == "Admin":
+        return db.query(Admin).filter(Admin.id == owner_id).first()
+    if role == "Seller":
+        return db.query(Seller).filter(Seller.id == owner_id).first()
+    if role == "Customer":
+        return db.query(Customer).filter(Customer.id == owner_id).first()
+    return None
+
+
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
 def login(
-    request: Request,  
+    request: Request,
     response: Response,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    payload: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    email = form_data.username
-    password = form_data.password
-
-    user = db.query(Admin).filter(Admin.email == email).first()
-    role = "Admin"
-
-    if not user:
-        user = db.query(Seller).filter(Seller.email == email).first()
-        role = "Seller"
-
-    if not user:
-        user = db.query(Customer).filter(Customer.email == email).first()
-        role = "Customer"
+    user, role = find_user_by_email(db, payload.email)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    access = create_access_token(email=user.email, role=role)
+    access_token = create_access_token(email=user.email, role=role)
     refresh_token = create_refresh_token(db, user_id=user.id, role=role)
 
     set_refresh_cookie(response, refresh_token)
-    return LoginResponse(access_token=access)
+    return LoginResponse(access_token=access_token)
 
 
 @router.post("/refresh", response_model=LoginResponse)
@@ -89,18 +92,13 @@ def refresh_access_token(
     db: Session = Depends(get_db),
 ):
     rt_raw = request.cookies.get(COOKIE_NAME)
+
     if not rt_raw:
         raise HTTPException(status_code=401, detail="Missing refresh token")
 
     rt: RefreshToken = verify_refresh_token(db, rt_raw)
 
-    if rt.role == "Admin":
-        user = db.query(Admin).filter(Admin.id == rt.owner_id).first()
-    elif rt.role == "Seller":
-        user = db.query(Seller).filter(Seller.id == rt.owner_id).first()
-    else:
-        user = db.query(Customer).filter(Customer.id == rt.owner_id).first()
-
+    user = find_user_by_id_and_role(db, rt.owner_id, rt.role)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -122,6 +120,7 @@ def logout(
     db: Session = Depends(get_db),
 ):
     rt_raw = request.cookies.get(COOKIE_NAME)
+
     if rt_raw:
         try:
             rt = verify_refresh_token(db, rt_raw)
@@ -131,4 +130,4 @@ def logout(
             pass
 
     delete_refresh_cookie(response)
-    return {"message": "logged out"}
+    return {"message": "Logged out"}
