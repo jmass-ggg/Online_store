@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.customer import Customer
+from backend.models.customer import CustomerProfile
 from backend.models.order import PaymentMethod
 from backend.schemas.order import (
     PlaceOrderRequest,
@@ -23,7 +23,7 @@ from uuid import UUID
 def customer_checkout(
     payload: Checkout,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user: CustomerProfile = Depends(get_current_customer),
 ):
     checkout_result = prepare_buy_now_checkout(
         db=db,
@@ -39,6 +39,6 @@ def customer_checkout(
 def customer_cart_checkout(
     cart_id:UUID,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user: CustomerProfile = Depends(get_current_customer),
 ): 
     return cart_to_check_out(db, cart_id, user_id=current_user.id)

@@ -8,16 +8,16 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session, selectinload,joinedload
 from backend.service.checkout_service import prepare_buy_now_checkout
 from backend.core.error_handler import error_handler
-from backend.models.address import Address
+from backend.models.address import AddressCustomer
 from backend.models.cart import Cart
 from backend.models.cart_items import CartItem
-from backend.models.ProductVariant import ProductVariant
+from backend.models.product_variant import ProductVariant
 from backend.models.order import Order
 from backend.models.order_address import OrderAddress
-from backend.models.order_iteam import OrderItem, OrderItemStatus
+from backend.models.order_item import OrderItem, OrderItemStatus
 from backend.models.order_fullments import OrderFulfillment, FulfillmentStatus
 from backend.models.seller import Seller
-from backend.models.deliveryCharge import DeliveryCharge
+from backend.models.delivery_charge import DeliveryCharge
 from backend.models.product import Product
 from uuid import UUID
 
@@ -59,8 +59,8 @@ def buy_now_service(
             delivery_charge=data["delivery_charge"]
             grand_total=data["grand_total"]
             address = (
-                db.query(Address)
-                .filter(Address.id == address_id, Address.customer_id == user_id)
+                db.query(AddressCustomer)
+                .filter(AddressCustomer.id == address_id, AddressCustomer.customer_id == user_id)
                 .first()
             )
             if not address:
@@ -138,8 +138,8 @@ def buy_from_cart_service(
 ) -> Tuple[Order, Decimal, int]:
     try:
         address = (
-            db.query(Address)
-            .filter(Address.customer_id == user_id)
+            db.query(AddressCustomer)
+            .filter(AddressCustomer.customer_id == user_id)
             .first()
         )
 
@@ -305,8 +305,8 @@ def place_order_service(
     tx= _begin_tx(db)
     with tx:
         address = (
-            db.query(Address)
-            .filter(Address.customer_id == user_id, Address.id == address_id)
+            db.query(AddressCustomer)
+            .filter(AddressCustomer.customer_id == user_id, AddressCustomer.id == address_id)
             .first()
         )
         if not address:

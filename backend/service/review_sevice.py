@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.customer import Customer
+from backend.models.customer import CustomerProfile
 from backend.models.product import Product
 from backend.models.review import Review
 from backend.schemas.review import Review_read, Review_create, Review_update
@@ -14,8 +14,9 @@ def reveiw_the_product(
     product_id: UUID,
     add_review: Review_create,
     db: Session,
-    current_user: Customer
+    current_user: CustomerProfile
 ) -> Review_read:
+    
     if not check_permission(current_user, "review_the_prduct"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
@@ -40,8 +41,9 @@ def update_product_review(
     product_id: UUID,
     update_review: Review_update,
     db: Session,
-    current_user: Customer
+    current_user: CustomerProfile
 ) -> Review_read:
+    
     if not check_permission(current_user, "review_the_prduct"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
 
@@ -63,7 +65,7 @@ def update_product_review(
 def get_reviews(
     product_id: UUID,
     db: Session,
-    current_user: Customer
+    current_user: CustomerProfile
 ) -> list[Review_read]:
     if not check_permission(current_user, "review_the_prduct"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")
@@ -77,7 +79,7 @@ def get_reviews(
 def review_delete_by_customer(
     review_id: UUID,
     db: Session,
-    current_user: Customer
+    current_user: CustomerProfile
 ) -> dict:
     if not check_permission(current_user, "delete_the_review"):
         raise error_handler(status.HTTP_401_UNAUTHORIZED, "Unauthorized action")

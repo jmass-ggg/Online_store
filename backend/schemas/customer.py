@@ -1,54 +1,41 @@
-from uuid import UUID
-from pydantic import BaseModel, EmailStr, constr, Field, field_validator
-import re
+from __future__ import annotations
+
 from enum import Enum
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-class CustomerStatus(str, Enum):
-    active = "active"
-    inactive = "inactive"
-    suspended = "suspended"
 
+class UserPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id:UUID
+    username:str
+    email:str
+    is_email_verified: bool
+    
+class CustomerRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-class CustomerBase(BaseModel):
-    username: str
-    email: EmailStr = Field(..., description="Valid email")
-    phone_number: str = Field(..., description="Contact phone number")
-
-    model_config = {"from_attributes": True}
-
-
-class CustomerCreate(CustomerBase):
-    password: str = Field(..., min_length=6, max_length=30)
-
-    @field_validator("password")
-    @classmethod
-    def strong_password(cls, v: str) -> str:
-        if not re.search("[A-Z]", v):
-            raise ValueError("Password must contain at least one uppercase letter")
-        if not re.search("[a-z]", v):
-            raise ValueError("Password must contain at least one lowercase letter")
-        return v
-
-
-class CustomerRead(BaseModel):
-    id: UUID
-    username: str
+    username: str = Field(min_length=3, max_length=100)
     email: EmailStr
-    phone_number: str
-    role_name: str = "Customer"
-    status: CustomerStatus
+    password: str = Field(min_length=8, max_length=128)
 
-    model_config = {"from_attributes": True}
+
+class CustomerProfileResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    
+    role_name: str
+    user:UserPublic
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 
 class CustomerUpdate(BaseModel):
-    username: constr(min_length=5, max_length=15)
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=3, max_length=100)
     email: EmailStr
-    phone_number: str
 
-    model_config = {"from_attributes": True}
-
-
-class TokenResponse(BaseModel):
-    token_type: str

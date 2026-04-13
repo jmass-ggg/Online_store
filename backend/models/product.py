@@ -1,13 +1,15 @@
 from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import (
-    Integer, String, ForeignKey, DateTime, Enum as SAEnum, Text
-)
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from backend.database import Base
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+
+from backend.database import Base
+
 
 class ProductCategory(str, Enum):
     CLOTHES = "Clothes"
@@ -15,24 +17,25 @@ class ProductCategory(str, Enum):
     FOOTWEAR = "Footwear"
     JEWELRY = "Jewelry"
 
+
 class TargetAudience(str, Enum):
     MEN = "Men"
     WOMEN = "Women"
     KIDS = "Kids"
     UNISEX = "Unisex"
 
+
 class ProductStatus(str, Enum):
-    active = "active"
-    inactive = "inactive"
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
 
 
 class Product(Base):
-    __tablename__ = "products"
+    __tablename__ = "product"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
-
-    product_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    url_slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    url_slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
     product_category: Mapped[ProductCategory] = mapped_column(
         SAEnum(ProductCategory, name="product_category"),
@@ -42,55 +45,43 @@ class Product(Base):
         SAEnum(TargetAudience, name="target_audience"),
         default=TargetAudience.UNISEX,
         nullable=False,
-        index=True,
     )
-    description: Mapped[str | None] = mapped_column(Text)
-    image_url: Mapped[str | None] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
 
     status: Mapped[ProductStatus] = mapped_column(
         SAEnum(ProductStatus, name="product_status"),
-        default=ProductStatus.inactive,
+        default=ProductStatus.INACTIVE,
         nullable=False,
     )
 
-    seller_id: Mapped[UUID] = mapped_column(
-         ForeignKey("seller.id"), nullable=False
+    seller_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sellers.id", ondelete="CASCADE"),
+        nullable=False,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     seller: Mapped["Seller"] = relationship("Seller", back_populates="products")
-
+    images: Mapped[list["ProductImage"]] = relationship(
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductImage.sort_order",
+    )
     variants: Mapped[list["ProductVariant"]] = relationship(
         "ProductVariant",
         back_populates="product",
         cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    images: Mapped[list["ProductImage"]] = relationship(  
-        "ProductImage",
-        back_populates="product",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-        order_by="ProductImage.sort_order",
-    )
-    order_items: Mapped[list["OrderItem"]] = relationship(
-        "OrderItem",
-        back_populates="product",
-        
     )
     reviews: Mapped[list["Review"]] = relationship(
         "Review",
         back_populates="product",
         cascade="all, delete-orphan",
     )
+    order_items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="product")
+
     def __repr__(self) -> str:
-        return (
-            f"<OrderItem(id={self.id}, order_id={self.order_id}, product_id={self.product_id}, "
-            f"qty={self.quantity}, price={self.price})>"
-        )
+        return f"<Product(id={self.id}, product_name={self.product_name})>"

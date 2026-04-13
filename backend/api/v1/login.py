@@ -8,11 +8,10 @@ from backend.database import get_db
 from backend.utils.jwt import create_access_token, create_refresh_token, verify_refresh_token
 from backend.utils.hashed import verify_password
 
-from backend.models.admin import Admin
+from backend.models.admin import AdminProfile
 from backend.models.seller import Seller
-from backend.models.customer import Customer
+from backend.models.customer import CustomerProfile
 from backend.models.refresh_token import RefreshToken
-from backend.service.auth_lookup_service import find_user_by_email
 
 router = APIRouter(prefix="/login", tags=["Login"])
 limiter = Limiter(key_func=get_remote_address)
@@ -49,16 +48,70 @@ def delete_refresh_cookie(response: Response):
         key=COOKIE_NAME,
         path="/",
     )
+from backend.models.user import User
+def find_user_by_email(db: Session, email: str):
+    email = email.strip().lower()
+
+    admin = (
+        db.query(AdminProfile)
+        .join(AdminProfile.user)
+        .filter(User.email == email)
+        .first()
+    )
+    if admin:
+        return admin.user, "Admin"
+
+    seller = (
+        db.query(Seller)
+        .join(Seller.user)
+        .filter(User.email == email)
+        .first()
+    )
+    if seller:
+        return seller.user, "Seller"
+
+    customer = (
+        db.query(CustomerProfile)
+        .join(CustomerProfile.user)
+        .filter(User.email == email)
+        .first()
+    )
+    if customer:
+        return customer.user, "Customer"
+
+    return None, None
 
 
-def find_user_by_id_and_role(db: Session, owner_id, role: str):
+def find_user_by_id_and_role(db: Session, user_id, role: str):
     if role == "Admin":
-        return db.query(Admin).filter(Admin.id == owner_id).first()
+        admin = (
+            db.query(AdminProfile)
+            .join(AdminProfile.user)
+            .filter(User.id == user_id)
+            .first()
+        )
+        return admin.user if admin else None
+
     if role == "Seller":
-        return db.query(Seller).filter(Seller.id == owner_id).first()
+        seller = (
+            db.query(Seller)
+            .join(Seller.user)
+            .filter(User.id == user_id)
+            .first()
+        )
+        return seller.user if seller else None
+
     if role == "Customer":
-        return db.query(Customer).filter(Customer.id == owner_id).first()
+        customer = (
+            db.query(CustomerProfile)
+            .join(CustomerProfile.user)
+            .filter(User.id == user_id)
+            .first()
+        )
+        return customer.user if customer else None
+
     return None
+
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -71,7 +124,7 @@ def login(
 ):
     user, role = find_user_by_email(db, payload.email)
 
-    if not user:
+    if not user or not role:
         raise HTTPException(status_code=404, detail="User not found")
 
     if not verify_password(payload.password, user.hashed_password):

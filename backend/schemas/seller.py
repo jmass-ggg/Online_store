@@ -1,48 +1,34 @@
-from datetime import datetime
+from __future__ import annotations
+
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from backend.models.role import RoleChoices
-from backend.models.seller import SellerVerification, AccountType
-
-
-class SellerRegister(BaseModel):
-    username: str
-    email: EmailStr
-    phone_number: str
-    hash_password: str
-    account_type: AccountType
+from backend.models.seller import AccountType, SellerStatus
 
 
-class SellerRegisterRead(BaseModel):
-    id: UUID
-    username: str
-    email: EmailStr
-    phone_number: str
-    account_type: str
-    status: str
-    is_verified: bool
-    is_email_verified: bool
-    role_name: str
+class SellerPersonalInformationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(from_attributes=True)
-
-
-class SellerInforMation(BaseModel):
     legal_name: str
     pan_number: str
+    
     account_name: str
     account_number: str
     bank_name: str
     branch_name: str
+    
+class SellerRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(from_attributes=True)
+    username: str = Field(min_length=3, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    account_type: AccountType = AccountType.BUSINESS
 
-
-class SellerInforMationRead(BaseModel):
+class SellerPersonalInformationRead(BaseModel):
     id: UUID
-    user_id: UUID
+    seller_id: UUID
     legal_name: str
     pan_number: str
     business_document_photo: str
@@ -56,17 +42,17 @@ class SellerInforMationRead(BaseModel):
 
 
 class SellerBusinessAddressCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     country: str = "NEPAL"
     province: str
     district: str
     area: str
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 class SellerBusinessAddressRead(BaseModel):
     id: UUID
-    user_id: UUID
+    seller_id: UUID
     country: str
     province: str
     district: str
@@ -75,15 +61,45 @@ class SellerBusinessAddressRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+
+
+class SellerRegisterResponse(BaseModel):
+    message: str
+    user_id: UUID
+    seller_id: UUID
+    username: str
+    email: EmailStr
+    role_name: str
+    account_type: str
+    status: str
+    is_verified: bool
+    is_email_verified:bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SellerRegisterRead(BaseModel):
+    seller_id: UUID
+    user_id: UUID
+    username: str
+    email: EmailStr
+    account_type: str
+    status: str
+    is_verified: bool
+    role_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SellerVerificationUpdate(BaseModel):
-    status: SellerVerification
+    status: SellerStatus
     is_verified: bool
 
     model_config = ConfigDict(from_attributes=True)
-    
+
+
 class SellerDetail(BaseModel):
-    sellerDetail: SellerRegisterRead
-    sellerInformation: SellerInforMationRead
-    sellerAddress: SellerBusinessAddressRead
-    
+    seller_detail: SellerRegisterRead
+    seller_information: SellerPersonalInformationRead
+    seller_address: SellerBusinessAddressRead
+
     model_config = ConfigDict(from_attributes=True)

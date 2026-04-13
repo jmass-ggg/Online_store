@@ -5,22 +5,11 @@ from decimal import Decimal
 from enum import Enum
 import uuid
 
-from sqlalchemy import (
-    DateTime,
-    ForeignKey,
-    Numeric,
-    Enum as SAEnum,
-    UniqueConstraint,
-    Index,
-    func,
-    text,
-)
-from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
-from sqlalchemy.sql import and_
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Numeric, UniqueConstraint, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from backend.database import Base
-from backend.models.order_iteam import OrderItem
 
 
 class FulfillmentStatus(str, Enum):
@@ -32,31 +21,23 @@ class FulfillmentStatus(str, Enum):
 
 
 class OrderFulfillment(Base):
-    __tablename__ = "order_fulfillments"
+    __tablename__ = "order_fulfillment"
     __table_args__ = (
-        UniqueConstraint("order_id", "seller_id", name="uq_order_fulfillments_order_seller"),
-        Index("ix_order_fulfillments_order_id", "order_id"),
-        Index("ix_order_fulfillments_seller_id", "seller_id"),
-        Index("ix_order_fulfillments_status", "fulfillment_status"),
-        Index("ix_order_fulfillments_order_seller", "order_id", "seller_id"),
+        UniqueConstraint("order_id", "seller_id", name="uq_order_fulfillment_order_seller"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("orders.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
-
     seller_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("seller.id", ondelete="CASCADE"),
+        ForeignKey("sellers.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     fulfillment_status: Mapped[FulfillmentStatus] = mapped_column(
@@ -64,45 +45,18 @@ class OrderFulfillment(Base):
         default=FulfillmentStatus.PENDING,
         nullable=False,
     )
-
-    seller_subtotal: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2),
-        nullable=False,
-        server_default=text("0"),
-    )
+    seller_subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
 
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     packed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     order: Mapped["Order"] = relationship("Order", back_populates="fulfillments")
-    seller: Mapped["Seller"] = relationship("Seller", back_populates="orderfulfillments")
-
-    items: Mapped[list["OrderItem"]] = relationship(
-        "OrderItem",
-        primaryjoin=lambda: and_(
-            foreign(OrderItem.order_id) == OrderFulfillment.order_id,
-            foreign(OrderItem.seller_id) == OrderFulfillment.seller_id,
-        ),
-        viewonly=True,
-        lazy="selectin",
-    )
+    seller: Mapped["Seller"] = relationship("Seller", back_populates="order_fulfillments")
 
     def __repr__(self) -> str:
-        return (
-            f"<OrderFulfillment(order_id={self.order_id}, "
-            f"seller_id={self.seller_id}, status={self.fulfillment_status})>"
-        )
+        return f"<OrderFulfillment(id={self.id}, order_id={self.order_id}, seller_id={self.seller_id})>"

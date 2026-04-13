@@ -6,7 +6,7 @@ from sqlalchemy import update, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.models.address import Address
+from backend.models.address import AddressCustomer
 from backend.schemas.address import AddressCreate, AddressUpdate
 from backend.service.geocoding import (
     REVERSE_GEOCODE_ENABLED,
@@ -54,7 +54,7 @@ def _normalize_str(x: Optional[str]) -> Optional[str]:
     return x or None
 
 
-def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) -> Address:
+def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) -> AddressCustomer:
     data = _dump(address_in)
 
     lat = float(data["latitude"])
@@ -88,23 +88,23 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) ->
       
         if data.get("is_default_shipping"):
             db.execute(
-                update(Address)
-                .where(Address.customer_id == customer_id)
+                update(AddressCustomer)
+                .where(AddressCustomer.customer_id == customer_id)
                 .values(is_default_shipping=False)
             )
         if data.get("is_default_billing"):
             db.execute(
-                update(Address)
-                .where(Address.customer_id == customer_id)
+                update(AddressCustomer)
+                .where(AddressCustomer.customer_id == customer_id)
                 .values(is_default_billing=False)
             )
         existing = (
-        db.query(Address)
+        db.query(AddressCustomer)
         .filter(
-            Address.customer_id == customer_id,
-            Address.line1 == data["line1"],
-            Address.latitude == lat,
-            Address.longitude == lng,
+            AddressCustomer.customer_id == customer_id,
+            AddressCustomer.line1 == data["line1"],
+            AddressCustomer.latitude == lat,
+            AddressCustomer.longitude == lng,
             )
             .first()
         )
@@ -112,7 +112,7 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) ->
         if existing:
             raise HTTPException(status_code=400, detail="Address already exists")
 
-        db_address = Address(customer_id=customer_id, **data)
+        db_address = AddressCustomer(customer_id=customer_id, **data)
         
         db.add(db_address)
 
@@ -125,13 +125,13 @@ def create_address(db: Session, address_in: AddressCreate, customer_id: UUID) ->
         raise HTTPException(status_code=400, detail="Address save failed (invalid data)")
 
 
-def list_addresses(db: Session, customer_id: UUID) -> list[Address]:
-    stmt = select(Address).where(Address.customer_id == customer_id).order_by(Address.created_at.desc())
+def list_addresses(db: Session, customer_id: UUID) -> list[AddressCustomer]:
+    stmt = select(AddressCustomer).where(AddressCustomer.customer_id == customer_id).order_by(AddressCustomer.created_at.desc())
     return list(db.execute(stmt).scalars().all())
 
 
 def delete_address(db: Session, customer_id: UUID, address_id: UUID) -> None:
-    addr = db.get(Address, address_id)
+    addr = db.get(AddressCustomer, address_id)
     if not addr or addr.customer_id != customer_id:
         raise HTTPException(status_code=404, detail="Address not found")
 
@@ -139,8 +139,8 @@ def delete_address(db: Session, customer_id: UUID, address_id: UUID) -> None:
         db.delete(addr)
 
 
-def update_address(db: Session, customer_id: UUID, address_id: UUID, patch: AddressUpdate) -> Address:
-    addr = db.get(Address, address_id)
+def update_address(db: Session, customer_id: UUID, address_id: UUID, patch: AddressUpdate) -> AddressCustomer:
+    addr = db.get(AddressCustomer, address_id)
     if not addr or addr.customer_id != customer_id:
         raise HTTPException(status_code=404, detail="Address not found")
 
@@ -173,14 +173,14 @@ def update_address(db: Session, customer_id: UUID, address_id: UUID, patch: Addr
         with db.begin():
             if data.get("is_default_shipping") is True:
                 db.execute(
-                    update(Address)
-                    .where(Address.customer_id == customer_id)
+                    update(AddressCustomer)
+                    .where(AddressCustomer.customer_id == customer_id)
                     .values(is_default_shipping=False)
                 )
             if data.get("is_default_billing") is True:
                 db.execute(
-                    update(Address)
-                    .where(Address.customer_id == customer_id)
+                    update(AddressCustomer)
+                    .where(AddressCustomer.customer_id == customer_id)
                     .values(is_default_billing=False)
                 )
 
