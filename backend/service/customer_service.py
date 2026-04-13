@@ -1,48 +1,59 @@
-from __future__ import annotations
-
+from datetime import datetime, timedelta
 from uuid import UUID
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from fastapi import HTTPException, status
-from backend.models.customer import CustomerProfile
-from backend.schemas.customer import CustomerRegisterRequest,CustomerProfileResponse,CustomerUpdate
-from backend.service.user_service import ensure_user_not_exists,create_user_instance
-from backend.api.v1.login import LoginResponse
-from backend.utils.jwt import create_access_token, verify_token, create_refresh_token
-from backend.utils.hashed import verify_password
-from backend.utils.hashed import hashed_password as hashed_pwd
-from backend.core.error_handler import error_handler
-from backend.models.email_token_verification import EmailTokenVerification
-from backend.utils.seller_email_verification import (generate_email_token,hash_email_token,send_seller_verification_email,)
-from datetime import datetime,timedelta
-from sqlalchemy.orm import selectinload,joinedload
 
-def create_new_verification(db:Session,customer:CustomerProfile):
-    old_tokens=(
-        db.query(EmailTokenVerification).filter(
+from fastapi import HTTPException, status, BackgroundTasks
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session, joinedload
+
+from backend.core.error_handler import error_handler
+from backend.models.customer import CustomerProfile
+from backend.models.email_token_verification import EmailTokenVerification
+from backend.models.user import User
+from backend.schemas.customer import (
+    CustomerRegisterRequest,
+    CustomerProfileResponse,
+    CustomerUpdate,
+)
+from backend.service.user_service import create_user_instance
+from backend.utils.seller_email_verification import (
+    generate_email_token,
+    hash_email_token,
+    send_customer_verification_email,
+)
+
+
+def create_new_verification(db: Session, customer: CustomerProfile) -> str:
+    old_tokens = (
+        db.query(EmailTokenVerification)
+        .filter(
             EmailTokenVerification.user_id == customer.user_id,
-            EmailTokenVerification.used.is_(False)
+            EmailTokenVerification.used.is_(False),
         )
         .all()
     )
-    for tokens in old_tokens:
-        db.delete(tokens)
+
+    for token in old_tokens:
+        db.delete(token)
+
     raw_token = generate_email_token()
     token_hashed = hash_email_token(raw_token)
-    
-    verification=EmailTokenVerification(
-         user_id=customer.user_id,
+
+    verification = EmailTokenVerification(
+        user_id=customer.user_id,
         token_hash=token_hashed,
         expired_at=datetime.utcnow() + timedelta(minutes=10),
         used=False,
     )
     db.add(verification)
     db.flush()
+
     return raw_token
+
 
 def register_customer(
     db: Session,
     payload: CustomerRegisterRequest,
+    background_tasks: BackgroundTasks,
 ) -> CustomerProfileResponse:
     try:
         user = create_user_instance(
@@ -61,34 +72,37 @@ def register_customer(
         db.add(customer)
         db.flush()
 
+        raw_token = create_new_verification(db, customer)
+
         db.commit()
-        db.refresh(user)
         db.refresh(customer)
+
+        background_tasks.add_task(
+            send_customer_verification_email,  
+            user.email,
+            raw_token,
+        )
 
         return CustomerProfileResponse.model_validate(customer)
 
-    except HTTPException as e:
+    except HTTPException:
         db.rollback()
-        print("HTTPException:", e.detail)
         raise
 
     except IntegrityError as e:
         db.rollback()
-        print("IntegrityError:", str(e.orig))  
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e.orig),   
+            detail=str(e.orig),
         )
 
     except Exception as e:
         db.rollback()
-        print("Unexpected error:", repr(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
-        
-from backend.models.user import User
+
 
 def verify_user_email(token: str, db: Session) -> dict:
     token_hash = hash_email_token(token)
@@ -124,19 +138,23 @@ def verify_user_email(token: str, db: Session) -> dict:
             detail="User not found.",
         )
 
-    seller = db.query(CustomerProfile).filter(CustomerProfile.user_id == user.id).first()
-    if seller is None:
+    customer = (
+        db.query(CustomerProfile)
+        .filter(CustomerProfile.user_id == user.id)
+        .first()
+    )
+    if customer is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Seller not found.",
+            detail="Customer not found.",
         )
 
-    user.is_email_verified = True
+    customer.is_email_verified = True
     verification.used = True
 
     db.commit()
 
-    return {"message": "Seller email verified successfully."}
+    return {"message": "Customer email verified successfully."}
 
 
 def customer_info_update(
@@ -144,20 +162,27 @@ def customer_info_update(
     user_update: CustomerUpdate,
     user_id: UUID,
 ) -> CustomerProfileResponse:
-    user = (db.query(CustomerProfile).options(joinedload(CustomerProfile.user)).filter(CustomerProfile.user_id == user_id).one_or_none()
-)
-    if not user:
+    customer = (
+        db.query(CustomerProfile)
+        .options(joinedload(CustomerProfile.user))
+        .filter(CustomerProfile.user_id == user_id)
+        .one_or_none()
+    )
+
+    if not customer:
         raise error_handler(404, "User not found")
 
-    user.username = user_update.username
-    user.email = user_update.email
-    user.phone_number = user_update.phone_number
+    if user_update.username is not None:
+        customer.user.username = user_update.username
+    if user_update.email is not None:
+        customer.user.email = user_update.email
+    if user_update.phone_number is not None:
+        customer.phone_number = user_update.phone_number
 
     try:
-        db.add(user)
         db.commit()
-        db.refresh(user)
-        return CustomerProfile.model_validate(user)
+        db.refresh(customer)
+        return CustomerProfileResponse.model_validate(customer)
 
     except IntegrityError as exc:
         db.rollback()
@@ -176,22 +201,21 @@ def customer_info_update(
         raise error_handler(500, "Profile update failed")
 
 
-def delete_account_by_owner(db: Session, current_id: UUID) -> dict:
-    user = db.query(CustomerProfile).filter(CustomerProfile.user_id == current_id).first()
+def delete_account_by_owner(db: Session, current_user_id: UUID) -> dict:
+    customer = (
+        db.query(CustomerProfile)
+        .filter(CustomerProfile.user_id == current_user_id)
+        .first()
+    )
 
-    if not user:
+    if not customer:
         raise error_handler(404, "User not found")
 
     try:
-        db.delete(user)
+        db.delete(customer)
         db.commit()
         return {"message": "Your account has been deleted successfully."}
 
     except SQLAlchemyError:
         db.rollback()
         raise error_handler(500, "Account deletion failed")
-
-
-def get_user(token: str) -> dict:
-    user_email = verify_token(token)
-    return {"email": user_email}
