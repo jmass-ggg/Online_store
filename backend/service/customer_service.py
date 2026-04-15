@@ -149,7 +149,7 @@ def verify_user_email(token: str, db: Session) -> dict:
             detail="Customer not found.",
         )
 
-    customer.is_email_verified = True
+    user.is_email_verified = True
     verification.used = True
 
     db.commit()
@@ -176,9 +176,7 @@ def customer_info_update(
         customer.user.username = user_update.username
     if user_update.email is not None:
         customer.user.email = user_update.email
-    if user_update.phone_number is not None:
-        customer.phone_number = user_update.phone_number
-
+    
     try:
         db.commit()
         db.refresh(customer)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import backend.models  # important: register all models first
+import backend.models  
 
 from backend.database import SessionLocal
 from backend.core import error_handler
