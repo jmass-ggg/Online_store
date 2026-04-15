@@ -65,7 +65,7 @@ def register_customer(
 
         customer = CustomerProfile(
             user_id=user.id,
-            is_email_verified=False,
+            
             status="ACTIVE",
             role_name="Customer",
         )
@@ -199,18 +199,19 @@ def customer_info_update(
         raise error_handler(500, "Profile update failed")
 
 
-def delete_account_by_owner(db: Session, current_user_id: UUID) -> dict:
-    customer = (
-        db.query(CustomerProfile)
-        .filter(CustomerProfile.user_id == current_user_id)
+def delete_account_by_owner(db: Session, current_id: UUID) -> dict:
+    user = (
+        db.query(User)
+        .options(joinedload(User.customer_profile))
+        .filter(User.id == current_id)
         .first()
     )
 
-    if not customer:
+    if not user:
         raise error_handler(404, "User not found")
 
     try:
-        db.delete(customer)
+        db.delete(user)
         db.commit()
         return {"message": "Your account has been deleted successfully."}
 

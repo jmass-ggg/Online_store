@@ -27,7 +27,13 @@ class User(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     admin_profile: Mapped["AdminProfile | None"] = relationship("AdminProfile", back_populates="user", uselist=False)
-    customer_profile: Mapped["CustomerProfile | None"] = relationship("CustomerProfile", back_populates="user", uselist=False)
+    customer_profile: Mapped["CustomerProfile | None"] = relationship(
+    "CustomerProfile",
+    back_populates="user",
+    uselist=False,
+    cascade="all, delete-orphan",
+    passive_deletes=True,
+    )
     seller: Mapped["Seller | None"] = relationship("Seller", back_populates="user", uselist=False)
 
     email_tokens: Mapped[list["EmailTokenVerification"]] = relationship(

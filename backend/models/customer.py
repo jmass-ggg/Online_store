@@ -6,10 +6,14 @@ import uuid
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
-
+from enum import Enum
 from backend.database import Base
 
-
+class CustomerStatus(str, Enum):
+    PENDING = "PENDING"
+    REJECTED = "REJECTED"
+    APPROVED = "APPROVED"
+    
 class CustomerProfile(Base):
     __tablename__ = "customer_profiles"
     __table_args__ = (
@@ -22,8 +26,7 @@ class CustomerProfile(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default="ACTIVE", nullable=False)
+    status: Mapped[str] = mapped_column(String(50),  default=CustomerStatus.PENDING.value, nullable=False, index=True)
     role_name: Mapped[str] = mapped_column(ForeignKey("roles.role_name"), default="Customer", nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

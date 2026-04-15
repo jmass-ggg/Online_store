@@ -134,7 +134,7 @@ def register_seller(
             detail="Something went wrong while registering seller.",
         )
 from backend.models.email_token_verification import EmailTokenVerification
-
+from backend.models.customer import CustomerProfile
 def verify_seller_email(token: str, db: Session) -> dict:
     token_hash = hash_email_token(token)
 
@@ -178,6 +178,7 @@ def verify_seller_email(token: str, db: Session) -> dict:
 
     user.is_email_verified = True
     verification.used = True
+  
 
     db.commit()
 
@@ -338,7 +339,28 @@ def admin_approve_account(
 
     db.commit()
     db.refresh(seller)
-    return SellerRegisterRead.model_validate(seller)
+
+    return SellerDetail(
+        seller_detail=SellerRegisterRead(
+            seller_id=seller.id,
+            user_id=seller.user_id,
+            username=seller.user.username,
+            email=seller.user.email,
+            account_type=seller.account_type,
+            status=seller.status,
+            is_verified=seller.is_verified,
+            is_email_verified=seller.user.is_email_verified,
+            role_name=seller.role_name,
+        ),
+        seller_information=[
+            SellerPersonalInformationRead.model_validate(info)
+            for info in seller.personal_information
+        ],
+        seller_address=[
+            SellerBusinessAddressRead.model_validate(address)
+            for address in seller.business_addresses
+        ],
+    )
 
 def get_seller_detail(db: Session, seller_id: UUID):
     seller = (

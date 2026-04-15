@@ -14,7 +14,7 @@ from backend.schemas.seller import (
     SellerPersonalInformationRead,
     SellerRegisterRead,
     SellerRegisterRequest,
-    SellerRegisterResponse,
+    SellerRegisterResponse
 )
 from backend.service.seller_service import (
     get_seller_detail,
@@ -25,7 +25,7 @@ from backend.service.seller_service import (
     seller_information_read,
     verify_seller_email,
 )
-from backend.utils.jwt import get_current_seller
+from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.utils.verifyied import verify_email_seller_or_not
 
 router = APIRouter(prefix="/seller", tags=["Seller"])
@@ -50,8 +50,6 @@ def email_verified(
     db: Session = Depends(get_db),
 ):
     return verify_seller_email(token, db)
-
-
 
 
 
@@ -125,25 +123,36 @@ def get_business_address(
 
 @router.get(
     "/me",
-    response_model=SellerRegisterRead,
+    response_model=SellerDetail,
     status_code=status.HTTP_200_OK,
 )
 def get_seller(
     current_seller: Seller = Depends(get_current_seller),
 ):
-    return SellerRegisterRead(
-        seller_id=current_seller.id,
-        user_id=current_seller.user_id,
-        username=current_seller.user.username,
-        email=current_seller.user.email,
-        account_type=current_seller.account_type,
-        status=current_seller.status,
-        is_verified=current_seller.is_verified,
-        is_email_verified=current_seller.user.is_email_verified,
-        role_name=current_seller.role_name,
+    return SellerDetail(
+        seller_detail=SellerRegisterRead(
+            seller_id=current_seller.id,
+            user_id=current_seller.user_id,
+            username=current_seller.user.username,
+            email=current_seller.user.email,
+            account_type=current_seller.account_type,
+            status=current_seller.status,
+            is_verified=current_seller.is_verified,
+            is_email_verified=current_seller.user.is_email_verified,
+            role_name=current_seller.role_name,
+        ),
+        seller_information=[
+            SellerPersonalInformationRead.model_validate(info)
+            for info in current_seller.personal_information
+        ],
+        seller_address=[
+            SellerBusinessAddressRead.model_validate(address)
+            for address in current_seller.business_addresses
+        ],
     )
     
-    
+from backend.models.admin import AdminProfile
+
 @router.get(
     "/{seller_id}/detail",
     response_model=SellerDetail,
@@ -151,6 +160,6 @@ def get_seller(
 )
 def seller_detail(
     seller_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),admin:AdminProfile=Depends(get_current_admin)
 ):
     return get_seller_detail(db, seller_id)

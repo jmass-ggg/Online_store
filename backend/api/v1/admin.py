@@ -20,7 +20,7 @@ def seller_details(seller_id: UUID,
     ):
     return get_seller_detail(db,seller_id)
 
-@router.put("/{seller_id}/approved", response_model=SellerRegisterRead)
+@router.put("/{seller_id}/approved", response_model=SellerDetail)
 def review_seller(
     seller_id: UUID,
     seller_approved: SellerVerificationUpdate,

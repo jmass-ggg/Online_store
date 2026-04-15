@@ -48,14 +48,14 @@ def update_user(
 ):
     return customer_info_update(db, user_update, current_user.user_id)
 
-
 @router.delete("/delete", status_code=status.HTTP_200_OK)
 def delete_own_account(
     db: Session = Depends(get_db),
     current_user: CustomerProfile = Depends(get_current_customer),
 ):
+    print("current_user:", current_user)
+    print("current_user.user_id:", current_user.user_id)
     return delete_account_by_owner(db, current_user.user_id)
-
 
 @router.get("/me", response_model=CustomerProfileResponse)
 def get_me(

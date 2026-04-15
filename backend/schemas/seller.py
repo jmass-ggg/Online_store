@@ -12,12 +12,12 @@ class SellerPersonalInformationCreate(BaseModel):
 
     legal_name: str
     pan_number: str
-    
     account_name: str
     account_number: str
     bank_name: str
     branch_name: str
-    
+
+
 class SellerRegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -25,6 +25,7 @@ class SellerRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     account_type: AccountType = AccountType.BUSINESS
+
 
 class SellerPersonalInformationRead(BaseModel):
     id: UUID
@@ -61,8 +62,6 @@ class SellerBusinessAddressRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-
-
 class SellerRegisterResponse(BaseModel):
     message: str
     user_id: UUID
@@ -73,7 +72,8 @@ class SellerRegisterResponse(BaseModel):
     account_type: str
     status: str
     is_verified: bool
-    is_email_verified:bool
+    is_email_verified: bool
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -85,6 +85,7 @@ class SellerRegisterRead(BaseModel):
     account_type: str
     status: str
     is_verified: bool
+    is_email_verified: bool
     role_name: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -99,7 +100,7 @@ class SellerVerificationUpdate(BaseModel):
 
 class SellerDetail(BaseModel):
     seller_detail: SellerRegisterRead
-    seller_information: SellerPersonalInformationRead
-    seller_address: SellerBusinessAddressRead
+    seller_information: list[SellerPersonalInformationRead]
+    seller_address: list[SellerBusinessAddressRead]
 
     model_config = ConfigDict(from_attributes=True)
