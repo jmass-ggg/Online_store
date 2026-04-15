@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from backend.models.order_fullments import OrderFulfillment, FulfillmentStatus
 from backend.models.order import Order,OrderStatus
-from backend.models.order_iteam import OrderItem,OrderItemStatus
+from backend.models.order_item import OrderItem,OrderItemStatus
 from sqlalchemy.orm import selectinload
 from backend.core.error_handler import error_handler
 from datetime import datetime

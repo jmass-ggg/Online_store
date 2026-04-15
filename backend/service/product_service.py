@@ -11,12 +11,12 @@ from backend.utils.verifyied import verify_seller_or_not
 from backend.models.product import Product,ProductStatus,ProductCategory,TargetAudience
 from backend.models.seller import Seller
 from backend.models.product_img import ProductImage
-from backend.models.ProductVariant import ProductVariant
+from backend.models.product_variant import ProductVariant
 from backend.schemas.product import ProductCreate,ProductRead,ProductUpdate,ProductVariantCreate,ProductVariantRead,AllProduct,ProductImageBase,ProductImageRead,ProductImageUpdate
 from backend.core.sku import  generate_hybrid_sku
 from backend.core.permission import check_permission
 from backend.core.error_handler import error_handler
-from backend.models.admin import Admin
+from backend.models.admin import AdminProfile
 from sqlalchemy import or_, func
 from typing import Optional
 from backend.core.random_slang_url import generate_unique_url_slug
@@ -179,7 +179,9 @@ def upload_multiple_product_images(
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to upload product images")
-    
+
+
+
 def add_product_variant(
     db: Session,
     product_id: UUID,
@@ -270,6 +272,7 @@ def search_products(
     limit: int,
     db: Session,
 ) -> AllProduct:
+    
     term = q.strip()
     if not term:
         return []
@@ -456,7 +459,7 @@ def edit_product_by_seller(
 def delete_product_by_admin(
     db: Session,
     product_id: UUID,
-    current_admin: Admin,
+    current_admin: AdminProfile,
 ) -> dict:
 
     if current_admin.role != "Admin":

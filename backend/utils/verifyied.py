@@ -1,37 +1,41 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from datetime import datetime
-from backend.database import get_db
-from backend.models.seller import Seller
-from backend.models.role import Roles
-from backend.schemas.seller import (
-   SellerVerificationUpdate
-)
+from __future__ import annotations
 
-from backend.utils.hashed import hashed_password as hashed_pwd
-from backend.utils.hashed import  verify_password
-from backend.core.permission import check_permission
-from backend.core.error_handler import error_handler
+from fastapi import Depends, HTTPException, status
+
+from backend.models.seller import Seller
 from backend.utils.jwt import get_current_seller
 
 
 def verify_email_seller_or_not(
-    seller: Seller = Depends(get_current_seller)
-):
-    
-    if not seller.is_email_verified:
-        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
+    seller: Seller = Depends(get_current_seller),
+) -> Seller:
+    if not seller.user.is_email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller email not verified",
+        )
     return seller
 
+
 def verify_seller_or_not(
-    seller: Seller = Depends(get_current_seller)
-):
+    seller: Seller = Depends(get_current_seller),
+) -> Seller:
     if seller.status == "REJECTED":
-        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller rejected")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller rejected",
+        )
 
     if not seller.is_verified:
-        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
-    if not seller.is_email_verified:
-        raise error_handler(status.HTTP_403_FORBIDDEN, "Seller not verified")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller account not approved",
+        )
+
+    if not seller.user.is_email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller email not verified",
+        )
+
     return seller

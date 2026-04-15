@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.customer import Customer
+from backend.models.customer import CustomerProfile
 from backend.models.order import PaymentMethod
+from backend.models.address import AddressCustomer
 from backend.schemas.order import (
     PlaceOrderRequest,
     PlaceOrderResponse,
@@ -28,7 +29,7 @@ def place_order_api(
     request: Request,
     payload: PlaceOrderRequest = Body(...),
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user: CustomerProfile = Depends(get_current_customer),
 ):
     order, total_price, seller_count = place_order_service(
         db,
@@ -56,7 +57,7 @@ def buy_now_api(
     request: Request,
     payload: BuyNowRequest,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user: CustomerProfile = Depends(get_current_customer),
 ):
     order, total_price, seller_count = buy_now_service(
         db,
@@ -87,7 +88,7 @@ def buy_product_from_cart_to_payment(
     request: Request,
     payload: BuyCartRequest,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user: CustomerProfile = Depends(get_current_customer),
 ):
     order, total_price, seller_count = buy_from_cart_service(
         db=db,

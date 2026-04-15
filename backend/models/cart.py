@@ -1,34 +1,47 @@
 from __future__ import annotations
-from backend.database import Base
-from sqlalchemy import Integer,String,Float,ForeignKey,Column,DateTime, func,Numeric
+
 from datetime import datetime
-from sqlalchemy.orm import relationship,Mapped,mapped_column
 from enum import Enum
-from decimal import Decimal
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-class CartStauts(str,Enum):
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+
+from backend.database import Base
+
+
+class CartStatus(str, Enum):
     ACTIVE = "ACTIVE"
     CHECKED_OUT = "CHECKED_OUT"
     ABANDONED = "ABANDONED"
 
+
 class Cart(Base):
     __tablename__ = "carts"
 
-    id: Mapped[uuid.uuid4] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
-    buyer_id: Mapped[UUID] = mapped_column(
-        ForeignKey("customer.id", ondelete="CASCADE"), nullable=False
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("customer_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
-    status: Mapped[str] = mapped_column(String, default="ACTIVE", nullable=False)
+    status: Mapped[CartStatus] = mapped_column(
+        SAEnum(CartStatus, name="cart_status"),
+        default=CartStatus.ACTIVE,
+        nullable=False,
+    )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    buyer: Mapped["Customer"] = relationship("Customer", back_populates="carts")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    customer: Mapped["CustomerProfile"] = relationship("CustomerProfile", back_populates="carts")
     items: Mapped[list["CartItem"]] = relationship(
-    "CartItem", back_populates="cart", cascade="all, delete-orphan"
-)
+        "CartItem",
+        back_populates="cart",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
-        return f"<Cart(id={self.id}, buyer_id={self.buyer_id}, status={self.status})>"
+        return f"<Cart(id={self.id}, customer_id={self.customer_id}, status={self.status})>"

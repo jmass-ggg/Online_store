@@ -1,24 +1,21 @@
-from sqlalchemy import Integer, String, Enum as SAEnum
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from __future__ import annotations
+
+from sqlalchemy import Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
-from enum import Enum
 
-class RoleChoices(str,Enum):
-    seller="Seller"
-    customer="Customer"
-    admin="Admin"
-    
-class Roles(Base):
+
+class Role(Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    role_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    descripted: Mapped[str | None] = mapped_column(String, nullable=True)
+    role_name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    descripted: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    admin: Mapped[list["Admin"]] = relationship("Admin", back_populates="roles")
-    users: Mapped[list["Customer"]] = relationship("Customer", back_populates="role")
+    admin_profiles: Mapped[list["AdminProfile"]] = relationship("AdminProfile", back_populates="role")
+    customer_profiles: Mapped[list["CustomerProfile"]] = relationship("CustomerProfile", back_populates="role")
     sellers: Mapped[list["Seller"]] = relationship("Seller", back_populates="role")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Role(id={self.id}, role_name={self.role_name})>"

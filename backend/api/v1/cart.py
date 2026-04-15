@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.schemas.cart import CartOut, CartItemAdd, DecreaseQty
 from backend.utils.jwt import get_current_customer
-from backend.models.customer import Customer
+from backend.models.customer import CustomerProfile
 from backend.models.cart import Cart
 from backend.models.cart_items import CartItem
 from backend.service.cart_service import (
@@ -20,7 +20,7 @@ from backend.schemas.cart import (CartItemAdd,
     CartItemSelectIn,CartProductsOut,
     CartSelectionOut,CartItemOut,CartOut,ProductOnlyOut,ProductVariantOnlyOut,CartItemProductOut,ProductMiniOut,ProductVariantMiniOut,CartItemSelectIn,SelectedCartItemOut,CartSelectionOut
     )
-from backend.models.ProductVariant import ProductVariant
+from backend.models.product_variant import ProductVariant
 from backend.models.product import Product
 from sqlalchemy.orm import Session, selectinload,joinedload
 from uuid import UUID
@@ -146,7 +146,7 @@ def serialize_cart(cart: Cart) -> CartOut:
 @router.get("/me")
 def get_my_cart(
     db: Session = Depends(get_db),
-    current_customer: Customer = Depends(get_current_customer),
+    current_customer: CustomerProfile = Depends(get_current_customer),
 ):
     cart = get_or_create_active_cart(db, buyer_id=current_customer.id)
     return to_cart_out(db, cart)
@@ -155,7 +155,7 @@ def get_my_cart(
 def add_to_cart(
     payload: CartItemAdd,
     db: Session = Depends(get_db),
-    current_customer: Customer = Depends(get_current_customer),
+    current_customer: CustomerProfile = Depends(get_current_customer),
 ):
     cart = add_to_cart_by_customer(
         db=db,
@@ -171,7 +171,7 @@ def items_selected(
     cart_item_id: UUID,
     select: bool,
     db: Session = Depends(get_db),
-    current_customer: Customer = Depends(get_current_customer),
+    current_customer: CustomerProfile = Depends(get_current_customer),
 ):
     return select_cart_item(db, current_customer.id, cart_item_id, select)
 
@@ -180,7 +180,7 @@ def items_decrease_increase(
     cart_item_id: UUID,
     quantity: int,
     db: Session = Depends(get_db),
-    current_customer: Customer = Depends(get_current_customer),
+    current_customer: CustomerProfile = Depends(get_current_customer),
 ):
     return increase_decrease_cart_item(db,current_customer.id,cart_item_id,quantity)
 
@@ -188,7 +188,7 @@ def items_decrease_increase(
 def remove_cart_item(
     item_id: UUID,
     db: Session = Depends(get_db),
-    current_customer: Customer = Depends(get_current_customer),
+    current_customer: CustomerProfile = Depends(get_current_customer),
 ):
     cart = uncart_the_product(db=db, buyer_id=current_customer.id, item_id=item_id)
     return to_cart_out(db, cart)
@@ -197,7 +197,7 @@ def remove_cart_item(
 @router.delete("/all-item/delete", response_model=CartProductsOut)
 def delete_all_item(
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_customer),
+    current_user: CustomerProfile = Depends(get_current_customer),
 ):
     cart = clear_cart(db, current_user.id)
     return to_cart_out(db, cart)

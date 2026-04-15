@@ -3,26 +3,26 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
 from backend.schemas.cart import DecreaseQty
-from backend.models.cart import Cart, CartStauts
+from backend.models.cart import Cart, CartStatus
 from backend.models.cart_items import CartItem
-from backend.models.ProductVariant import ProductVariant
+from backend.models.product_variant import ProductVariant
 from backend.core.error_handler import error_handler
 from decimal import Decimal
 from uuid import UUID
 from backend.models.product import Product
 from backend.models.seller import Seller
-from backend.models.deliveryCharge import DeliveryCharge
+from backend.models.delivery_charge import DeliveryCharge
 
 
 def get_or_create_active_cart(db:Session,buyer_id:UUID)->Cart:
-    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
+    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStatus.ACTIVE).first()
     if cart:
         return cart
-    cart=Cart(buyer_id=buyer_id,status=CartStauts.ACTIVE.value)
+    cart=Cart(buyer_id=buyer_id,status=CartStatus.ACTIVE.value)
     db.add(cart)
     db.commit()
     db.refresh(cart)
-    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStauts.ACTIVE).first()
+    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStatus.ACTIVE).first()
     return cart
 
 def add_to_cart_by_customer(
@@ -79,6 +79,7 @@ def add_to_cart_by_customer(
         .filter(Cart.id == cart.id)
         .first()
     )
+
 
 def to_cart_out(db:Session,cart: Cart) -> dict:
     loaded_cart=(
@@ -170,6 +171,11 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
         ]
     }
 
+
+
+
+
+
 def select_cart_item(
     db: Session,
     buyer_id:UUID,
@@ -202,6 +208,7 @@ def select_cart_item(
     db.refresh(cart_item)
     cart=get_or_create_active_cart(db,buyer_id)
     return to_cart_out(db,cart)
+
 
 
 def increase_decrease_cart_item(

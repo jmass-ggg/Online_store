@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import List
 
 from pydantic import BaseModel, Field, ConfigDict
-from backend.models.cart import CartStauts
+from backend.models.cart import CartStatus
 from uuid import UUID
 
 class CartItemAdd(BaseModel):

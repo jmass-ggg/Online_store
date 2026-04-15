@@ -2,7 +2,7 @@ import re
 from uuid import uuid4
 from sqlalchemy.orm import Session
 
-from backend.models.ProductVariant import ProductVariant
+from backend.models.product_variant import ProductVariant
 
 
 def _clean_part(text: str) -> str:

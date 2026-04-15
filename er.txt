@@ -1,0 +1,280 @@
+erDiagram
+    direction TB
+
+    ROLES {
+        int id PK ""
+        string role_name UK ""
+        string descripted ""
+    }
+
+    USER {
+        uuid id PK ""
+        string username UK ""
+        string email UK ""
+        string hashed_password ""
+        string account_status ""
+        boolean is_email_verified ""
+        datetime last_login_at ""
+        datetime created_at ""
+        datetime updated_at ""
+        datetime deleted_at ""
+    }
+
+    ADMIN_PROFILES {
+        uuid id PK ""
+        uuid user_id FK ""
+        datetime created_at ""
+        datetime updated_at ""
+        string role_name FK ""
+    }
+
+    CUSTOMER_PROFILES {
+        uuid id PK ""
+        uuid user_id FK ""
+        boolean is_email_verified ""
+        datetime created_at ""
+        datetime updated_at ""
+        string status ""
+        string role_name FK ""
+    }
+
+    SELLER {
+        uuid id PK ""
+        uuid user_id FK ""
+        string account_type ""
+        datetime created_at ""
+        datetime updated_at ""
+        string status ""
+        boolean is_verified ""
+        string role_name FK ""
+    }
+
+    ADDRESS_CUSTOMER {
+        uuid id PK ""
+        uuid customer_id FK ""
+        string full_name ""
+        string phone_number ""
+        string region ""
+        string line1 ""
+        string line2 ""
+        string postal_code ""
+        string country ""
+        float latitude ""
+        float longitude ""
+        boolean is_default_shipping ""
+        boolean is_default_billing ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    CART {
+        uuid id PK ""
+        uuid customer_id FK ""
+        string status ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    CART_ITEM {
+        uuid id PK ""
+        uuid cart_id FK ""
+        uuid variant_id FK ""
+        int quantity ""
+        decimal price ""
+        boolean selected ""
+    }
+
+    PRODUCT {
+        uuid id PK ""
+        string product_name ""
+        string url_slug UK ""
+        enum product_category ""
+        enum target_audience ""
+        text description ""
+        string image_url ""
+        enum status ""
+        uuid seller_id FK ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    PRODUCT_IMAGE {
+        uuid id PK ""
+        uuid product_id FK ""
+        string color ""
+        string image_url ""
+        boolean is_primary ""
+        int sort_order ""
+        datetime created_at ""
+    }
+
+    PRODUCT_VARIANT {
+        uuid id PK ""
+        uuid product_id FK ""
+        string sku UK ""
+        string color ""
+        string size ""
+        decimal price ""
+        int stock_quantity ""
+        boolean is_active ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    REVIEW {
+        uuid id PK ""
+        int rating ""
+        text comment ""
+        uuid product_id FK ""
+        uuid customer_id FK ""
+    }
+
+    ORDERS {
+        uuid id PK ""
+        uuid customer_id FK ""
+        enum status ""
+        decimal total_price ""
+        enum payment_method ""
+        datetime order_placed ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    ORDER_ADDRESS {
+        uuid id PK ""
+        uuid order_id FK "UK"
+        string full_name ""
+        string phone_number ""
+        string region ""
+        string line1 ""
+        string line2 ""
+        string country ""
+        float latitude ""
+        float longitude ""
+        datetime created_at ""
+    }
+
+    ORDER_ITEM {
+        uuid id PK ""
+        uuid order_id FK ""
+        uuid seller_id FK ""
+        uuid product_id FK ""
+        uuid variant_id FK ""
+        int quantity ""
+        decimal unit_price ""
+        decimal line_total ""
+        enum item_status ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    ORDER_FULFILLMENT {
+        uuid id PK ""
+        uuid order_id FK ""
+        uuid seller_id FK ""
+        enum fulfillment_status ""
+        decimal seller_subtotal ""
+        datetime accepted_at ""
+        datetime packed_at ""
+        datetime shipped_at ""
+        datetime delivered_at ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    PAYMENT {
+        uuid id PK ""
+        uuid order_id FK ""
+        enum provider ""
+        enum status ""
+        decimal amount ""
+        string ref_id ""
+        string transaction_uuid UK ""
+        datetime initiated_at ""
+        datetime verified_at ""
+        datetime created_at ""
+        datetime updated_at ""
+    }
+
+    REFRESH_TOKEN {
+        uuid id PK ""
+        string token_hash UK ""
+        string role ""
+        uuid owner_id ""
+        datetime expires_at ""
+        boolean revoked ""
+    }
+
+    DELIVERY_CHARGE {
+        uuid id PK ""
+        decimal delivery_charge ""
+        uuid seller_id FK ""
+    }
+
+    EMAIL_TOKEN_VERIFICATION {
+        uuid id PK ""
+        uuid user_id FK ""
+        string token_hash ""
+        datetime expired_at ""
+        boolean used ""
+        datetime created_at ""
+    }
+
+    Seller_personal_information {
+        uuid id PK ""
+        uuid seller_id FK ""
+        string legal_name ""
+        string pan_number ""
+        string business_document_photo ""
+        string account_name ""
+        string account_number ""
+        string bank_name ""
+        string branch_name ""
+        string cheque_photo ""
+    }
+
+    SELLER_BUSINESS_ADDRESS {
+        uuid id PK ""
+        uuid seller_id FK ""
+        string country ""
+        string province ""
+        string district ""
+        string area ""
+    }
+
+    ROLES ||--o{ ADMIN_PROFILES : has
+    ROLES ||--o{ CUSTOMER_PROFILES : has
+    ROLES ||--o{ SELLER : has
+
+    USER ||--|| ADMIN_PROFILES : profile
+    USER ||--|| CUSTOMER_PROFILES : profile
+    USER ||--|| SELLER : profile
+    USER ||--o{ EMAIL_TOKEN_VERIFICATION : verifies
+    USER ||--o{ REFRESH_TOKEN : owns
+
+    CUSTOMER_PROFILES ||--o{ ADDRESS_CUSTOMER : has
+    CUSTOMER_PROFILES ||--o{ CART : owns
+    CUSTOMER_PROFILES ||--o{ ORDERS : places
+    CUSTOMER_PROFILES ||--o{ REVIEW : writes
+
+    CART ||--o{ CART_ITEM : contains
+    PRODUCT_VARIANT ||--o{ CART_ITEM : referenced_by
+
+    SELLER ||--o{ PRODUCT : sells
+    SELLER ||--o{ DELIVERY_CHARGE : has
+    SELLER ||--o{ Seller_personal_information : has
+    SELLER ||--o{ SELLER_BUSINESS_ADDRESS : has
+    SELLER ||--o{ ORDER_ITEM : fulfills_item
+    SELLER ||--o{ ORDER_FULFILLMENT : fulfills_order_part
+
+    PRODUCT ||--o{ PRODUCT_IMAGE : has
+    PRODUCT ||--o{ PRODUCT_VARIANT : has
+    PRODUCT ||--o{ REVIEW : receives
+    PRODUCT ||--o{ ORDER_ITEM : appears_in
+
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : selected_as
+
+    ORDERS ||--|| ORDER_ADDRESS : has
+    ORDERS ||--o{ ORDER_ITEM : contains
+    ORDERS ||--o{ ORDER_FULFILLMENT : split_into
+    ORDERS ||--o{ PAYMENT : paid_by
