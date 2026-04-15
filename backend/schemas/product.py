@@ -1,21 +1,22 @@
-from pydantic import BaseModel, Field, constr, ConfigDict
 from decimal import Decimal
-from backend.models.product import ProductCategory, ProductStatus, TargetAudience
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import BaseModel, Field, ConfigDict
+
+from backend.models.product import ProductCategory, ProductStatus, TargetAudience
+
 
 class ProductCreate(BaseModel):
-    product_name: str
-    url_slug: str = Field(..., min_length=3, max_length=80)
+    product_name: str = Field(..., min_length=2, max_length=255)
     target_audience: TargetAudience
     product_category: ProductCategory
     description: Optional[str] = None
 
 
 class ProductUpdate(BaseModel):
-    product_name: Optional[str] = Field(None, min_length=5, max_length=50)
+    product_name: Optional[str] = Field(None, min_length=2, max_length=255)
     description: Optional[str] = None
     status: Optional[ProductStatus] = None
 
@@ -25,13 +26,14 @@ class ProductRead(BaseModel):
 
     id: UUID
     product_name: str
-    url_slug: str = Field(..., min_length=3, max_length=80)
+    url_slug: str
     target_audience: TargetAudience
     product_category: ProductCategory
     description: Optional[str] = None
     status: ProductStatus
     seller_id: UUID
-    image_url: str | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class ProductListRead(ProductRead):
@@ -48,27 +50,19 @@ class ProductVariantCreate(BaseModel):
     stock_quantity: int = Field(..., ge=0)
 
 
-class ProductVariantRead(ProductVariantCreate):
+class ProductVariantRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     product_id: UUID
     sku: str
-
-
-class AllProduct(ProductRead):
-    model_config = ConfigDict(from_attributes=True)
-
-    variants: List[ProductVariantRead] = []
-
-
-class ProductSuggestion(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    product_name: str
-    url_slug: str
-    image_url: str | None = None
+    color: str | None = None
+    size: str | None = None
+    price: Decimal
+    stock_quantity: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class ProductImageBase(BaseModel):
@@ -89,6 +83,22 @@ class ProductImageRead(ProductImageBase):
 class ProductImageUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    color: Optional[str] = None
     is_primary: Optional[bool] = None
     sort_order: Optional[int] = Field(None, ge=0)
-    color: str | None = None
+
+
+class AllProduct(ProductRead):
+    model_config = ConfigDict(from_attributes=True)
+
+    variants: List[ProductVariantRead] = []
+    images: List[ProductImageRead] = []
+
+
+class ProductSuggestion(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    product_name: str
+    url_slug: str
+    image_url: str | None = None

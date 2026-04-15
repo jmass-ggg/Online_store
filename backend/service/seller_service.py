@@ -108,6 +108,7 @@ def register_seller(
 
         return SellerRegisterResponse(
             message="Seller registered successfully. Please verify your email first.",
+        
             user_id=user.id,
             seller_id=seller.id,
             username=user.username,
@@ -365,17 +366,13 @@ def admin_approve_account(
 def get_seller_detail(db: Session, seller_id: UUID):
     seller = (
         db.query(Seller)
-        .options(
-            joinedload(Seller.user),
-            selectinload(Seller.personal_information),
-            selectinload(Seller.business_addresses),
-        )
+        .options(joinedload(Seller.user))
         .filter(Seller.id == seller_id)
-        .first()
+        .one_or_none()
     )
 
-    if not seller:
-        raise HTTPException(status_code=404, detail="Seller not found")
+    if seller is None:
+        raise error_handler(status.HTTP_404_NOT_FOUND, "Seller not found")
 
     if not seller.personal_information:
         raise HTTPException(status_code=404, detail="Seller information not found")
@@ -395,6 +392,12 @@ def get_seller_detail(db: Session, seller_id: UUID):
             is_email_verified=seller.user.is_email_verified,
             role_name=seller.role_name,
         ),
-        seller_information=SellerPersonalInformationRead.model_validate(seller.personal_information[0]),
-        seller_address=SellerBusinessAddressRead.model_validate(seller.business_addresses[0]),
+        seller_information=[
+            SellerPersonalInformationRead.model_validate(info)
+            for info in seller.personal_information
+        ],
+        seller_address=[
+            SellerBusinessAddressRead.model_validate(address)
+            for address in seller.business_addresses
+        ],
     )
