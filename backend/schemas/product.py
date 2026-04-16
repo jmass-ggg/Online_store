@@ -90,7 +90,7 @@ class ProductImageUpdate(BaseModel):
 
 class AllProduct(ProductRead):
     model_config = ConfigDict(from_attributes=True)
-
+    
     variants: List[ProductVariantRead] = []
     images: List[ProductImageRead] = []
 

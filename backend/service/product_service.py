@@ -25,7 +25,7 @@ from backend.schemas.product import (
     ProductImageUpdate,
     ProductRead,
     ProductUpdate,
-    ProductVariantCreate,
+    ProductVariantCreate,ProductVariantRead
 )
 
 
@@ -430,33 +430,12 @@ def view_all_product(
     skip: int = 0,
     limit: int = 20,
     only_active: bool = True,
-) -> list[dict]:
-    V = aliased(ProductVariant)
-
-    first_variant_sq = (
-        db.query(
-            ProductVariant.product_id.label("pid"),
-            func.min(ProductVariant.created_at).label("first_created_at"),
-        )
-        .filter(ProductVariant.is_active.is_(True))
-        .group_by(ProductVariant.product_id)
-        .subquery()
-    )
-
+) -> list[AllProduct]:
     q = (
-        db.query(
-            Product,
-            V.id.label("default_variant_id"),
-            V.price.label("default_price"),
-        )
-        .outerjoin(first_variant_sq, first_variant_sq.c.pid == Product.id)
-        .outerjoin(
-            V,
-            and_(
-                V.product_id == first_variant_sq.c.pid,
-                V.created_at == first_variant_sq.c.first_created_at,
-                V.is_active.is_(True),
-            ),
+        db.query(Product)
+        .options(
+            selectinload(Product.variants),
+            selectinload(Product.images),
         )
     )
 
@@ -466,17 +445,33 @@ def view_all_product(
     if category is not None:
         q = q.filter(Product.product_category == category)
 
-    rows = q.order_by(Product.created_at.desc()).offset(skip).limit(limit).all()
+    products = (
+        q.order_by(Product.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
-    output: list[dict] = []
-    for product, default_variant_id, default_price in rows:
-        item = ProductRead.model_validate(product).model_dump()
-        item["default_variant_id"] = default_variant_id
-        item["default_price"] = default_price
+    output: list[AllProduct] = []
+    for product in products:
+        item = AllProduct.model_validate(product)
+
+ 
+        item.variants = [
+            ProductVariantRead.model_validate(variant)
+            for variant in product.variants
+            if variant.is_active
+        ]
+
+ 
+        item.images = [
+            ProductImageRead.model_validate(image)
+            for image in sorted(product.images, key=lambda x: (x.sort_order, x.created_at))
+        ]
+
         output.append(item)
 
     return output
-
 
 def get_product_options(db: Session, product_id: UUID):
     variants = db.execute(
@@ -617,11 +612,33 @@ def delete_product_by_seller(
     return {"message": "Product deleted successfully"}
 
 
-def view_all_product_seller(*, seller_id: UUID, db: Session) -> list[ProductRead]:
+def view_all_product_seller(*, seller_id: UUID, db: Session) -> list[AllProduct]:
     products = (
         db.query(Product)
-        .filter(Product.seller_id == seller_id)
+        .options(
+            joinedload(Product.seller),
+            selectinload(Product.variants),
+            selectinload(Product.images),
+        )
+        .filter(
+            Product.status == ProductStatus.ACTIVE,
+            Product.seller_id == seller_id,
+        )
         .order_by(Product.created_at.desc())
         .all()
     )
-    return [ProductRead.model_validate(product) for product in products]
+    
+    output:list[AllProduct]=[]
+    for product in products:
+        item=AllProduct.model_validate(product)
+        item.variants=[
+            ProductVariantRead.model_validate(variant)
+            for variant in product.variants
+            if variant.is_active
+        ]
+        item.images = [
+            ProductImageRead.model_validate(image)
+            for image in sorted(product.images, key=lambda x: (x.sort_order, x.created_at))
+        ]
+        output.append(item)
+    return output

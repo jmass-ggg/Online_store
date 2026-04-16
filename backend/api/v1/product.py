@@ -55,7 +55,7 @@ def product_cache_key_builder(
     return f"{namespace}:product-list"
 
 
-@router.get("/", response_model=List[ProductListRead])
+@router.get("/", response_model=List[AllProduct])
 @cache(expire=120, key_builder=product_cache_key_builder)
 def get_all_product(
     category: Optional[ProductCategory] = Query(None),
@@ -70,7 +70,6 @@ def get_all_product(
         limit=limit,
         only_active=True,
     )
-
 
 @router.get("/search", response_model=List[ProductRead])
 def product_search(
@@ -97,7 +96,7 @@ def get_product_by_slug(
     return view_product_by_slug(db, slug)
 
 
-@router.get("/seller/me", response_model=list[ProductRead])
+@router.get("/seller/me", response_model=list[AllProduct])
 def my_products(
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(get_current_seller),
