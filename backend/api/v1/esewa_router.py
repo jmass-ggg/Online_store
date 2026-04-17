@@ -229,7 +229,7 @@ def initiate(order_id: UUID, request: Request, db: Session = Depends(get_db)):
     return auto_submit_form(ESEWA_FORM_URL, fields)
 
 
-@router.api_route("/success", methods=["GET", "POST"], name="esewa_success")
+@router.api_route("/success", name="esewa_success")
 async def success(request: Request, db: Session = Depends(get_db)):
     order_id_from_query = request.query_params.get("order_id")
 
@@ -242,7 +242,7 @@ async def success(request: Request, db: Session = Depends(get_db)):
         if order_id_from_query and order_id_from_query.isdigit():
             return RedirectResponse(
                 url=build_frontend_result_url(
-                    order_id=int(order_id_from_query),
+                    order_id=UUID(order_id_from_query),
                     payment_status="FAILED",
                     esewa_status="FAILED",
                 ),
@@ -307,12 +307,13 @@ async def success(request: Request, db: Session = Depends(get_db)):
     )
 
 
-@router.api_route("/failure", methods=["GET", "POST"], name="esewa_failure")
-async def failure(request: Request, db: Session = Depends(get_db)):
+
+@router.api_route("/failure", name="esewa_failure")
+def failure(request: Request, db: Session = Depends(get_db)):
     order_id = request.query_params.get("order_id")
 
     if order_id and order_id.isdigit():
-        numeric_order_id = int(order_id)
+        numeric_order_id = UUID(order_id)
         _mark_latest_order_payment_failed(db, numeric_order_id)
 
         return RedirectResponse(

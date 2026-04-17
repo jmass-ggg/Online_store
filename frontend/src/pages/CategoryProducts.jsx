@@ -11,6 +11,7 @@ function toNumber(value) {
 
 function formatMoney(value) {
   const n = toNumber(value);
+
   return new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
@@ -18,26 +19,60 @@ function formatMoney(value) {
   }).format(n);
 }
 
-function ProductCard({ p, cardMeta }) {
-  const [activeIdx, setActiveIdx] = useState(0);
+function getPrimaryImage(images = []) {
+  if (!Array.isArray(images) || images.length === 0) return "";
 
-  const images = (p.images?.length ? p.images : [p.image]).filter(Boolean);
-  const thumbs = images.slice(0, 5);
-  const extraCount = Math.max(0, images.length - thumbs.length);
-  const hero = images[activeIdx] || images[0] || "/shoes.jpg";
+  const sorted = [...images].sort((a, b) => {
+    if (a?.is_primary && !b?.is_primary) return -1;
+    if (!a?.is_primary && b?.is_primary) return 1;
+    return (a?.sort_order ?? 9999) - (b?.sort_order ?? 9999);
+  });
+
+  return sorted[0]?.image_url || "";
+}
+
+function getAllImages(images = []) {
+  if (!Array.isArray(images)) return [];
+
+  return [...images]
+    .sort((a, b) => {
+      if (a?.is_primary && !b?.is_primary) return -1;
+      if (!a?.is_primary && b?.is_primary) return 1;
+      return (a?.sort_order ?? 9999) - (b?.sort_order ?? 9999);
+    })
+    .map((img) => joinUrl(img.image_url))
+    .filter(Boolean);
+}
+
+function getDefaultPrice(product) {
+  if (product.default_price) return product.default_price;
+
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const active = product.variants.filter((v) => v.is_active);
+    if (active.length > 0) return active[0].price;
+  }
+
+  return "0.00";
+}
+
+function ProductCard({ product }) {
+  const hero =
+    (Array.isArray(product.images) && product.images[0]) ||
+    product.image ||
+    "/shoes.jpg";
 
   return (
     <article className="plp-card">
       <Link
-        to={`/product/${p.url_slug}`}
+        to={`/product/${product.url_slug}`}
         className="plp-hit"
-        aria-label={p.title}
+        aria-label={product.title}
       />
 
-      <div className="plp-media" aria-hidden="true">
+      <div className="plp-media">
         <img
           src={hero}
-          alt=""
+          alt={product.title}
           loading="lazy"
           onError={(e) => {
             e.currentTarget.src = "/shoes.jpg";
@@ -45,47 +80,24 @@ function ProductCard({ p, cardMeta }) {
         />
       </div>
 
-      {thumbs.length > 1 && (
-        <div className="plp-thumbs" aria-hidden="true">
-          {thumbs.map((src, idx) => (
-            <button
-              key={`${src}-${idx}`}
-              className={`plp-thumb ${idx === activeIdx ? "is-active" : ""}`}
-              type="button"
-              onMouseEnter={() => setActiveIdx(idx)}
-              onFocus={() => setActiveIdx(idx)}
-              tabIndex={-1}
-            >
-              <img
-                src={src}
-                alt=""
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src = "/shoes.jpg";
-                }}
-              />
-            </button>
-          ))}
-          {extraCount > 0 && <span className="plp-more">+{extraCount}</span>}
-        </div>
-      )}
-
       <div className="plp-info">
-        <div className="plp-title" title={p.title}>
-          {p.title}
+        <h3 className="plp-title" title={product.title}>
+          {product.title}
+        </h3>
+
+        <div className="plp-bottomRow">
+          <div className="plp-price">{formatMoney(product.price)}</div>
         </div>
-        <div className="plp-meta">{cardMeta}</div>
-        <div className="plp-price">{formatMoney(p.price)}</div>
       </div>
     </article>
   );
 }
 
-function ProductGrid({ products, cardMeta }) {
+function ProductGrid({ products }) {
   return (
     <div className="plp-grid">
-      {products.map((p) => (
-        <ProductCard key={p.id} p={p} cardMeta={cardMeta} />
+      {products.map((product) => (
+        <ProductCard key={product.id} product={product} />
       ))}
     </div>
   );
@@ -94,41 +106,30 @@ function ProductGrid({ products, cardMeta }) {
 export default function CategoryProducts({
   category,
   pageTitle,
-  cardMeta = "Products",
+  className = "",
 }) {
   const navigate = useNavigate();
+  const profileRef = useRef(null);
 
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [error, setError] = useState("");
-
   const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef(null);
 
   const mappedProducts = useMemo(() => {
     return products.map((p) => {
-      const image = joinUrl(p.image_url || "");
-
-      const rawImages =
-        (Array.isArray(p.images) && p.images) ||
-        (Array.isArray(p.image_urls) && p.image_urls) ||
-        [];
-
-      const images = rawImages.length
-        ? rawImages.map((u) => joinUrl(u))
-        : [image].filter(Boolean);
-
-      const price =
-        p.default_price ?? p.defaultPrice ?? p.price ?? p.base_price ?? "0.00";
+      const primaryImage = joinUrl(getPrimaryImage(p.images));
+      const allImages = getAllImages(p.images);
+      const price = getDefaultPrice(p);
 
       return {
         id: p.id,
         url_slug: p.url_slug,
         title: p.product_name,
         price,
-        image,
-        images,
+        image: primaryImage,
+        images: allImages,
       };
     });
   }, [products]);
@@ -154,31 +155,34 @@ export default function CategoryProducts({
 
   useEffect(() => {
     fetchProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   useEffect(() => {
-    const t = setTimeout(() => fetchProducts({ q: search }), 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const timer = setTimeout(() => {
+      fetchProducts({ q: search });
+    }, 350);
+
+    return () => clearTimeout(timer);
   }, [search, category]);
 
   useEffect(() => {
-    function onDocMouseDown(e) {
+    function handleClickOutside(e) {
       if (!profileRef.current) return;
-      if (!profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (!profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
     }
 
-    function onEsc(e) {
+    function handleEsc(e) {
       if (e.key === "Escape") setProfileOpen(false);
     }
 
-    document.addEventListener("mousedown", onDocMouseDown);
-    window.addEventListener("keydown", onEsc);
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleEsc);
 
     return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      window.removeEventListener("keydown", onEsc);
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleEsc);
     };
   }, []);
 
@@ -190,13 +194,13 @@ export default function CategoryProducts({
   function logout() {
     setProfileOpen(false);
     localStorage.removeItem("access_token");
-    localStorage.removeItem("token");
+    localStorage.removeItem("auth_token");
     localStorage.removeItem("refresh_token");
     navigate("/login");
   }
 
   return (
-    <div className="shoes-page">
+    <div className={`shoes-page ${className}`}>
       <header className="top-header">
         <div className="wrap header-row">
           <div className="brand">
@@ -206,14 +210,10 @@ export default function CategoryProducts({
           </div>
 
           <nav className="top-nav">
-            <a href="#">Men</a>
-            <a href="#">Women</a>
-            <a href="#">Kids</a>
-            <a href="#">Jordan</a>
-            <a href="#">Collections</a>
-            <a href="#" className="sale">
-              Sale
-            </a>
+            <Link to="/shoes">Shoes</Link>
+            <Link to="/clothes">Clothes</Link>
+            <Link to="/jewellery">Jewellery</Link>
+            <Link to="/accessories">Accessories</Link>
           </nav>
 
           <div className="header-actions">
@@ -232,9 +232,8 @@ export default function CategoryProducts({
             <button
               className="icon-btn"
               type="button"
-              aria-label="Favorites"
+              aria-label="Wishlist"
               onClick={() => navigate("/wishlist")}
-              title="Wishlist"
             >
               ♡
             </button>
@@ -242,9 +241,8 @@ export default function CategoryProducts({
             <button
               className="icon-btn"
               type="button"
-              aria-label="Bag"
-              onClick={() => navigate("/checkout")}
-              title="Cart / Checkout"
+              aria-label="Cart"
+              onClick={() => navigate("/cart")}
             >
               👜
             </button>
@@ -255,8 +253,7 @@ export default function CategoryProducts({
                 type="button"
                 aria-label="Account"
                 aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((v) => !v)}
-                title="Account"
+                onClick={() => setProfileOpen((prev) => !prev)}
               >
                 <span className="profile-avatar">👤</span>
               </button>
@@ -266,51 +263,17 @@ export default function CategoryProducts({
                   <button
                     className="profile-item"
                     type="button"
-                    role="menuitem"
                     onClick={() => go("/account")}
                   >
-                    <span className="pi-ico">🙂</span>
-                    <span>Manage My Account</span>
+                    Manage My Account
                   </button>
 
                   <button
                     className="profile-item"
                     type="button"
-                    role="menuitem"
                     onClick={() => go("/orders")}
                   >
-                    <span className="pi-ico">🧾</span>
-                    <span>My Orders</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/wishlist")}
-                  >
-                    <span className="pi-ico">♡</span>
-                    <span>My Wishlist &amp; Followed Stores</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/reviews")}
-                  >
-                    <span className="pi-ico">⭐</span>
-                    <span>My Reviews</span>
-                  </button>
-
-                  <button
-                    className="profile-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => go("/returns")}
-                  >
-                    <span className="pi-ico">↩</span>
-                    <span>My Returns &amp; Cancellations</span>
+                    My Orders
                   </button>
 
                   <div className="profile-divider" />
@@ -318,11 +281,9 @@ export default function CategoryProducts({
                   <button
                     className="profile-item danger"
                     type="button"
-                    role="menuitem"
                     onClick={logout}
                   >
-                    <span className="pi-ico">⎋</span>
-                    <span>Log out</span>
+                    Log out
                   </button>
                 </div>
               )}
@@ -335,12 +296,15 @@ export default function CategoryProducts({
         <section className="content">
           <div className="content-top">
             <h1 className="page-title">{pageTitle}</h1>
+            
           </div>
 
-          {loading && <p className="state">Loading...</p>}
+          {loading && <p className="state">Loading products...</p>}
           {error && <p className="state error">{error}</p>}
 
-          <ProductGrid products={mappedProducts} cardMeta={cardMeta} />
+          {!loading && !error && mappedProducts.length > 0 && (
+            <ProductGrid products={mappedProducts} />
+          )}
 
           {!loading && !error && mappedProducts.length === 0 && (
             <p className="state">No {pageTitle.toLowerCase()} products found.</p>

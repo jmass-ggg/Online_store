@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from backend.database import get_db
-from backend.utils.jwt import create_refresh_token,get_current_seller,get_current_admin
+from backend.utils.jwt import get_current_seller,get_current_admin
 from backend.models.seller import Seller
 from backend.utils.hashed import verify_password
 from backend.schemas.seller_dashboard import (CustomerOut,ShippingAddressOut,DashboardItemOut,SellerDashboardOut,OrderActionResponse)

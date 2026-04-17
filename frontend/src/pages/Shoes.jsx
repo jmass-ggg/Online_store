@@ -4,8 +4,8 @@ export default function Shoes() {
   return (
     <CategoryProducts
       category="Footwear"
-      pageTitle="Footwear"
-      cardMeta="Men's Shoes"
+      pageTitle="Shoes"
+      cardMeta="Footwear"
     />
   );
 }

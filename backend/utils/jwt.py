@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Literal, TypedDict, Union
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
@@ -49,13 +49,34 @@ class Settings(BaseSettings):
 settings = Settings()
 bearer_scheme = HTTPBearer()
 
+REFRESH_COOKIE_NAME = "refresh_token"
+
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
 
 
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=False,  # change to True in production with HTTPS
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
+    )
+
+
+def clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path="/",
+    )
 
 
 def _get_user_by_role(db: Session, user_id: UUID, role: RoleType):
@@ -90,12 +111,13 @@ def _get_user_by_role(db: Session, user_id: UUID, role: RoleType):
 
 
 def create_access_token(user_id: UUID, role: RoleType) -> str:
+    now = _now()
     payload = {
         "sub": str(user_id),
         "role": role,
         "type": "access",
-        "iat": int(_now().timestamp()),
-        "exp": _now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "iat": int(now.timestamp()),
+        "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -129,7 +151,7 @@ def verify_token(token: str) -> TokenPayload:
                 detail="Invalid user role in token",
             )
 
-        return {"user_id": user_id, "role": role}
+        return {"user_id": UUID(user_id), "role": role}
 
     except JWTError:
         raise HTTPException(
@@ -139,10 +161,10 @@ def verify_token(token: str) -> TokenPayload:
 
 
 def create_refresh_token(db: Session, user_id: UUID, role: RoleType) -> str:
-    raw = secrets.token_urlsafe(48)
-    token_hash = _hash_token(raw)
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = _hash_token(raw_token)
 
-    rt = RefreshToken(
+    refresh_token = RefreshToken(
         token_hash=token_hash,
         role=role,
         owner_id=user_id,
@@ -150,43 +172,58 @@ def create_refresh_token(db: Session, user_id: UUID, role: RoleType) -> str:
         revoked=False,
     )
 
-    db.add(rt)
+    db.add(refresh_token)
     db.commit()
-    db.refresh(rt)
+    db.refresh(refresh_token)
 
-    return raw
+    return raw_token
 
 
 def verify_refresh_token(db: Session, token: str) -> RefreshToken:
     token_hash = _hash_token(token)
 
-    rt = (
+    refresh_token = (
         db.query(RefreshToken)
         .filter(RefreshToken.token_hash == token_hash)
         .first()
     )
 
-    if not rt:
+    if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
         )
 
-    if rt.revoked:
+    if refresh_token.revoked:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token revoked",
         )
 
-    if rt.expires_at < _now():
-        rt.revoked = True
+    if refresh_token.expires_at < _now():
+        refresh_token.revoked = True
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token expired",
         )
 
-    return rt
+    return refresh_token
+
+
+def rotate_refresh_token(db: Session, refresh_token: RefreshToken) -> str:
+    new_raw_token = secrets.token_urlsafe(48)
+    refresh_token.token_hash = _hash_token(new_raw_token)
+    refresh_token.expires_at = _now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token.revoked = False
+    db.commit()
+    db.refresh(refresh_token)
+    return new_raw_token
+
+
+def revoke_refresh_token(db: Session, refresh_token: RefreshToken) -> None:
+    refresh_token.revoked = True
+    db.commit()
 
 
 def get_bearer_token(
@@ -200,7 +237,7 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> CurrentUser:
     payload = verify_token(token)
-    user_id = UUID(payload["user_id"])
+    user_id = payload["user_id"]
     role = payload["role"]
 
     user = _get_user_by_role(db, user_id=user_id, role=role)
@@ -212,7 +249,7 @@ def get_current_user(
         )
 
     return {
-        "user_id": str(user_id),
+        "user_id": user_id,
         "role": role,
         "user": user,
     }

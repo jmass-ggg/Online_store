@@ -1,7 +1,9 @@
+
+
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, HTTPException, Request, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Body
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -14,51 +16,41 @@ from backend.models.seller import Seller
 from backend.models.user import User
 from backend.utils.hashed import verify_password
 from backend.utils.jwt import (
+    REFRESH_COOKIE_NAME,
+    clear_refresh_cookie,
     create_access_token,
     create_refresh_token,
+    revoke_refresh_token,
+    rotate_refresh_token,
+    set_refresh_cookie,
     verify_refresh_token,
 )
 
-router = APIRouter(prefix="/login", tags=["Login"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 limiter = Limiter(key_func=get_remote_address)
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 
-class LoginResponse(BaseModel):
+class AccessTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 
-COOKIE_NAME = "refresh_token"
-COOKIE_MAX_AGE = 7 * 24 * 60 * 60
+class LogoutResponse(BaseModel):
+    message: str
 
 
-def set_refresh_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=COOKIE_MAX_AGE,
-        path="/",
-    )
-
-
-def delete_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(
-        key=COOKIE_NAME,
-        path="/",
-    )
+def is_user_authorized(user: User) -> bool:
+    if hasattr(user, "account_status"):
+        return user.account_status == "ACTIVE"
+    return True
 
 
 def find_user_by_email(db: Session, email: str):
-
-
     admin = (
         db.query(AdminProfile)
         .join(AdminProfile.user)
@@ -120,85 +112,115 @@ def find_user_by_id_and_role(db: Session, user_id: UUID, role: str):
     return None
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=AccessTokenResponse)
 @limiter.limit("5/minute")
 def login(
     request: Request,
     response: Response,
-    payload: LoginRequest,
+    payload: LoginRequest = Body(...),
     db: Session = Depends(get_db),
 ):
     user, role = find_user_by_email(db, payload.email)
 
     if not user or not role:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
         )
 
     if not verify_password(payload.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Information",
+            detail="Invalid credentials",
         )
-  
+
+    if not is_user_authorized(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not authorized to log in",
+        )
+
     access_token = create_access_token(user_id=user.id, role=role)
     refresh_token = create_refresh_token(db, user_id=user.id, role=role)
 
     set_refresh_cookie(response, refresh_token)
-    return LoginResponse(access_token=access_token)
+
+    return AccessTokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+    )
 
 
-@router.post("/refresh", response_model=LoginResponse)
+@router.post("/refresh", response_model=AccessTokenResponse)
 @limiter.limit("10/minute")
 def refresh_access_token(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ):
-    rt_raw = request.cookies.get(COOKIE_NAME)
+    raw_refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
 
-    if not rt_raw:
+    if not raw_refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing refresh token",
         )
 
-    rt: RefreshToken = verify_refresh_token(db, rt_raw)
+    refresh_token_record: RefreshToken = verify_refresh_token(db, raw_refresh_token)
 
-    user = find_user_by_id_and_role(db, rt.owner_id, rt.role)
+    user = find_user_by_id_and_role(
+        db=db,
+        user_id=refresh_token_record.owner_id,
+        role=refresh_token_record.role,
+    )
+
     if not user:
+        revoke_refresh_token(db, refresh_token_record)
+        clear_refresh_cookie(response)
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token owner",
         )
 
-    rt.revoked = True
-    db.commit()
+    if not is_user_authorized(user):
+        revoke_refresh_token(db, refresh_token_record)
+        clear_refresh_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is no longer authorized",
+        )
 
-    new_refresh = create_refresh_token(db, user_id=rt.owner_id, role=rt.role)
-    set_refresh_cookie(response, new_refresh)
+    new_access_token = create_access_token(
+        user_id=user.id,
+        role=refresh_token_record.role,
+    )
 
-    new_access = create_access_token(user_id=user.id, role=rt.role)
-    return LoginResponse(access_token=new_access)
+    new_refresh_token = rotate_refresh_token(db, refresh_token_record)
+
+    set_refresh_cookie(response, new_refresh_token)
+
+    return AccessTokenResponse(
+        access_token=new_access_token,
+        token_type="bearer",
+    )
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=LogoutResponse)
 @limiter.limit("20/minute")
 def logout(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ):
-    rt_raw = request.cookies.get(COOKIE_NAME)
+    raw_refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
 
-    if rt_raw:
+    if raw_refresh_token:
         try:
-            rt = verify_refresh_token(db, rt_raw)
-            rt.revoked = True
-            db.commit()
+            refresh_token_record = verify_refresh_token(db, raw_refresh_token)
+            revoke_refresh_token(db, refresh_token_record)
         except HTTPException:
             pass
 
-    delete_refresh_cookie(response)
-    return {"message": "Logged out"}
+    clear_refresh_cookie(response)
+
+    return LogoutResponse(message="Logged out successfully")

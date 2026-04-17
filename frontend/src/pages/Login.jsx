@@ -1,19 +1,29 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./login.css";
 import { apiFetch, setStoredAccessToken } from "../api";
 
 export default function Login() {
-  const nav = useNavigate();
+  const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
 
-  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function onSubmit(e) {
+  function handleChange(e) {
+    const { id, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     if (loading) return;
 
@@ -23,12 +33,9 @@ export default function Login() {
     try {
       const data = await apiFetch("/login/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
-          email: email.trim(),
-          password,
+          email: form.email.trim(),
+          password: form.password,
         }),
       });
 
@@ -37,7 +44,7 @@ export default function Login() {
       }
 
       setStoredAccessToken(data.access_token);
-      nav("/", { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -50,23 +57,25 @@ export default function Login() {
       <section className="login-left">
         <div className="login-formWrap">
           <div className="login-logo">
-            <Link to="/" className="login-logoText">JAMES</Link>
+            <Link to="/" className="login-logoText">
+              JAMES
+            </Link>
           </div>
 
           <h1 className="login-title">Welcome Back!</h1>
           <p className="login-sub">Please enter your details to sign in</p>
 
-          {error && <p className="login-error">{error}</p>}
+          {error ? <p className="login-error">{error}</p> : null}
 
-          <form className="login-form" onSubmit={onSubmit}>
+          <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="email">Email</label>
               <input
                 id="email"
                 type="email"
                 placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={form.email}
+                onChange={handleChange}
                 required
                 autoComplete="email"
               />
@@ -78,19 +87,19 @@ export default function Login() {
               <div className="login-passwordRow">
                 <input
                   id="password"
-                  type={showPw ? "text" : "password"}
+                  type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={form.password}
+                  onChange={handleChange}
                   required
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   className="login-showBtn"
-                  onClick={() => setShowPw((v) => !v)}
+                  onClick={() => setShowPassword((prev) => !prev)}
                 >
-                  {showPw ? "Hide" : "Show"}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
 
@@ -99,7 +108,11 @@ export default function Login() {
               </Link>
             </div>
 
-            <button className="login-btn login-primary" type="submit" disabled={loading}>
+            <button
+              className="login-btn login-primary"
+              type="submit"
+              disabled={loading}
+            >
               {loading ? "Signing in..." : "Sign in"}
             </button>
 

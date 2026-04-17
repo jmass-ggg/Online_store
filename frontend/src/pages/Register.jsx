@@ -1,52 +1,52 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./login.css";
 import { apiFetch } from "../api";
 
 export default function Register() {
-  const nav = useNavigate();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState({
     username: "",
     email: "",
-    phone_number: "",
     password: "",
   });
 
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function handleChange(e) {
-    setForm((prev) => ({ ...prev, [e.target.id]: e.target.value }));
+    const { id, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
   }
 
   function continueWithGoogle() {
     alert("Google login not connected yet. Add your OAuth URL here.");
   }
 
-  async function onSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    if (loading) return;
+
     setError("");
     setLoading(true);
-
-    const payload = {
-      username: form.username.trim(),
-      email: form.email.trim(),
-      phone_number: form.phone_number.trim(),
-      password: form.password,
-    };
 
     try {
       await apiFetch("/user/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          username: form.username.trim(),
+          email: form.email.trim(),
+          password: form.password,
+        }),
       });
 
-      // after register, go to login page only
-      nav("/login", { replace: true });
+      navigate("/login", { replace: true });
     } catch (err) {
-      setError(err?.message || "Something went wrong");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -57,15 +57,17 @@ export default function Register() {
       <section className="login-left">
         <div className="login-formWrap">
           <div className="login-logo">
-            <Link to="/" className="login-logoText">JAMES</Link>
+            <Link to="/" className="login-logoText">
+              JAMES
+            </Link>
           </div>
 
           <h1 className="login-title">Create Account</h1>
           <p className="login-sub">Please fill in your details to register</p>
 
-          {error && <p className="login-error">{error}</p>}
+          {error ? <p className="login-error">{error}</p> : null}
 
-          <form className="login-form" onSubmit={onSubmit}>
+          <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="username">Username</label>
               <input
@@ -74,6 +76,8 @@ export default function Register() {
                 value={form.username}
                 onChange={handleChange}
                 required
+                autoComplete="username"
+                placeholder="Enter your username"
               />
             </div>
 
@@ -85,17 +89,8 @@ export default function Register() {
                 value={form.email}
                 onChange={handleChange}
                 required
-              />
-            </div>
-
-            <div className="login-field">
-              <label htmlFor="phone_number">Phone Number</label>
-              <input
-                id="phone_number"
-                type="tel"
-                value={form.phone_number}
-                onChange={handleChange}
-                required
+                autoComplete="email"
+                placeholder="Enter your email"
               />
             </div>
 
@@ -107,10 +102,16 @@ export default function Register() {
                 value={form.password}
                 onChange={handleChange}
                 required
+                autoComplete="new-password"
+                placeholder="Create a password"
               />
             </div>
 
-            <button className="login-btn login-primary" type="submit" disabled={loading}>
+            <button
+              className="login-btn login-primary"
+              type="submit"
+              disabled={loading}
+            >
               {loading ? "Creating account..." : "Create Account"}
             </button>
 
@@ -120,7 +121,9 @@ export default function Register() {
               onClick={continueWithGoogle}
               disabled={loading}
             >
-              <span className="login-gIcon" aria-hidden="true">G</span>
+              <span className="login-gIcon" aria-hidden="true">
+                G
+              </span>
               Continue with Google
             </button>
 
