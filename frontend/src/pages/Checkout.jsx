@@ -81,8 +81,18 @@ function addressText(address) {
 function readBuyNow() {
   try {
     const raw = JSON.parse(localStorage.getItem(BUY_NOW_KEY) || "null");
-    if (!toId(raw?.item?.variant_id)) return null;
-    return raw;
+
+    const variantId = toId(raw?.item?.variant_id);
+    if (!variantId) return null;
+
+    return {
+      ...raw,
+      item: {
+        ...raw.item,
+        variant_id: variantId,
+        quantity: Math.max(1, toNumber(raw?.item?.quantity, 1)),
+      },
+    };
   } catch {
     return null;
   }
@@ -173,7 +183,9 @@ function normalizeCheckoutResponse(raw, { mode, buyNowData, cartId } = {}) {
 
   if (Array.isArray(raw.items) && raw.items.length) {
     items = raw.items.map((item, index) => ({
-      cart_item_id: toId(item?.cart_item_id || `${toId(item?.product_variant?.variant_id)}_${index}`),
+      cart_item_id: toId(
+        item?.cart_item_id || `${toId(item?.product_variant?.variant_id)}_${index}`
+      ),
       quantity: Math.max(1, toNumber(item?.quantity, 1)),
       price: toNumber(item?.price ?? item?.product_variant?.price, 0),
       line_total: toNumber(
@@ -222,10 +234,7 @@ function normalizeCheckoutResponse(raw, { mode, buyNowData, cartId } = {}) {
           ...fallback,
           quantity,
           price: unitPrice,
-          line_total: toNumber(
-            raw?.items_subtotal ?? raw?.subtotal,
-            quantity * unitPrice
-          ),
+          line_total: toNumber(raw?.items_subtotal ?? raw?.subtotal, quantity * unitPrice),
           product: {
             ...fallback.product,
             ...(raw?.product || {}),
@@ -233,6 +242,13 @@ function normalizeCheckoutResponse(raw, { mode, buyNowData, cartId } = {}) {
           product_variant: {
             ...fallback.product_variant,
             ...(raw?.variant || raw?.product_variant || {}),
+            variant_id: toId(
+              raw?.variant?.id ||
+                raw?.variant?.variant_id ||
+                raw?.product_variant?.id ||
+                raw?.product_variant?.variant_id ||
+                fallback.product_variant.variant_id
+            ),
             price: unitPrice,
           },
         },
@@ -359,8 +375,10 @@ export default function Checkout() {
     return toId(checkoutContext?.cart_id || checkoutData?.cart_id);
   }, [checkoutContext, checkoutData]);
 
-  function handleSearchSubmit(query) {
-    navigate(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
+  function handleSearchSubmit(event) {
+    if (event?.preventDefault) event.preventDefault();
+    const q = typeof event === "string" ? event : search;
+    navigate(q ? `/products?search=${encodeURIComponent(q)}` : "/products");
   }
 
   useEffect(() => {
@@ -451,9 +469,14 @@ export default function Checkout() {
         return;
       }
 
-      if (isBuyNowMode && !toId(buyNowData?.item?.variant_id)) {
-        setCheckoutData(null);
-        return;
+      if (isBuyNowMode) {
+        const variantId = toId(buyNowData?.item?.variant_id);
+
+        if (!variantId) {
+          setCheckoutData(null);
+          setErrorMsg("Variant not found in buy now data");
+          return;
+        }
       }
 
       if (!isBuyNowMode && !cartId) {
@@ -468,19 +491,21 @@ export default function Checkout() {
         let raw;
 
         if (isBuyNowMode) {
+          const payload = {
+            address_id: toId(savedAddress.id),
+            variant_id: toId(buyNowData?.item?.variant_id),
+            quantity: Math.max(1, toNumber(buyNowData?.item?.quantity, 1)),
+          };
+
+          console.log("CHECKOUT BUY_NOW PAYLOAD:", payload);
+
           raw = await apiFetch("/checkout/checkout", {
             method: "POST",
-            body: JSON.stringify({
-              address_id: savedAddress.id,
-              variant_id: buyNowData.item.variant_id,
-              quantity: Math.max(1, toNumber(buyNowData.item.quantity, 1)),
-            }),
+            body: JSON.stringify(payload),
           });
         } else {
           raw = await apiFetch(`/checkout/checkout/${cartId}`, {
             method: "POST",
-            // If your backend needs address_id here, uncomment the next line:
-            // body: JSON.stringify({ address_id: savedAddress.id }),
           });
         }
 
@@ -634,12 +659,8 @@ export default function Checkout() {
         mode: isBuyNowMode ? "BUY_NOW" : "CART",
         address_id: toId(savedAddress?.id || checkoutData?.address?.id),
         cart_id: toId(checkoutData?.cart_id || cartId),
-        variant_id: isBuyNowMode
-          ? toId(displayItems?.[0]?.product_variant?.variant_id)
-          : "",
-        quantity: isBuyNowMode
-          ? Math.max(1, toNumber(displayItems?.[0]?.quantity, 1))
-          : 0,
+        variant_id: isBuyNowMode ? toId(displayItems?.[0]?.product_variant?.variant_id) : "",
+        quantity: isBuyNowMode ? Math.max(1, toNumber(displayItems?.[0]?.quantity, 1)) : 0,
         items: normalizeCartItemsForPayment(checkoutData?.items),
         checkout: checkoutData,
       })
@@ -888,9 +909,7 @@ export default function Checkout() {
 
             <div className="ck-itemsUnderAddress">
               <div className="ck-itemsHead">
-                <div className="ck-itemsTitle">
-                  Order Items ({displayItems.length})
-                </div>
+                <div className="ck-itemsTitle">Order Items ({displayItems.length})</div>
               </div>
 
               <div className="ck-itemsBody">
@@ -924,20 +943,19 @@ export default function Checkout() {
                             {item?.product_variant?.sku ? (
                               <span>SKU: {item.product_variant.sku}</span>
                             ) : null}
+                            {item?.product_variant?.variant_id ? (
+                              <span>Variant: {item.product_variant.variant_id}</span>
+                            ) : null}
                           </div>
                         </div>
 
-                        <div className="ck-itemPrice">
-                          {money(item?.line_total)}
-                        </div>
+                        <div className="ck-itemPrice">{money(item?.line_total)}</div>
                       </div>
                     );
                   })
                 ) : (
                   <div className="ck-hint">
-                    {loadingCheckout
-                      ? "Loading selected items…"
-                      : "No selected items found."}
+                    {loadingCheckout ? "Loading selected items…" : "No selected items found."}
                   </div>
                 )}
               </div>

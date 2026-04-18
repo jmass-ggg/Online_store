@@ -56,7 +56,7 @@ def buy_now_service(
             seller_id=data["seller_id"]
             unit_price=data["unit_price"]
             items_subtotal=data["items_subtotal"]
-            delivery_charge=data["delivery_charge"]
+            delivery_charge=data["delivery_charges"]
             grand_total=data["grand_total"]
             address = (
                 db.query(AddressCustomer)
@@ -70,12 +70,12 @@ def buy_now_service(
             db.query(ProductVariant)
             .options(joinedload(ProductVariant.product)
                      .joinedload(Product.seller)
-                     .joinedload(Seller.delivery))
+                     .joinedload(Seller.delivery_charges))
             .filter(ProductVariant.id == variant_id)
             .first()
             )
             order = Order(
-                buyer_id=user_id,
+                customer_id=user_id,
                 status="PLACED",
                 total_price=grand_total,
                 payment_method=paymentmethod,

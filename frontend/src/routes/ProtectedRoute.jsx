@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { apiFetch, setStoredAccessToken, clearStoredAccessToken } from "../api";
+import { apiFetch, getStoredAccessToken } from "../api";
 
 export default function ProtectedRoute({ children }) {
   const [status, setStatus] = useState("loading");
@@ -9,20 +9,23 @@ export default function ProtectedRoute({ children }) {
     let mounted = true;
 
     async function verifyAuth() {
-      try {
-        const refreshData = await apiFetch("/login/refresh", {
-          method: "POST",
-        });
+      const token = getStoredAccessToken();
 
-        if (!refreshData?.access_token) {
-          throw new Error("Missing access token");
+      if (token) {
+        if (mounted) setStatus("authenticated");
+        return;
+      }
+
+      try {
+        const data = await apiFetch("/auth/refresh", { method: "POST" });
+
+        if (data?.access_token && mounted) {
+          setStatus("authenticated");
+          return;
         }
 
-        setStoredAccessToken(refreshData.access_token);
-
-        if (mounted) setStatus("authenticated");
+        if (mounted) setStatus("unauthenticated");
       } catch {
-        clearStoredAccessToken();
         if (mounted) setStatus("unauthenticated");
       }
     }

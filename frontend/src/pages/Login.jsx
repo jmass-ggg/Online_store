@@ -31,7 +31,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const data = await apiFetch("/login/login", {
+      const data = await apiFetch("/auth/login", {
         method: "POST",
         body: JSON.stringify({
           email: form.email.trim(),

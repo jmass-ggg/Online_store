@@ -34,7 +34,8 @@ class User(Base):
     cascade="all, delete-orphan",
     passive_deletes=True,
     )
-    seller: Mapped["Seller | None"] = relationship("Seller", back_populates="user", uselist=False)
+    seller: Mapped["Seller | None"] = relationship("Seller", back_populates="user", uselist=False,cascade="all, delete-orphan",
+    passive_deletes=True,)
 
     email_tokens: Mapped[list["EmailTokenVerification"]] = relationship(
         "EmailTokenVerification",

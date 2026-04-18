@@ -5,7 +5,7 @@ import StoreTopBar from "./components/cart/StoreTopBar";
 import "./Product.css";
 
 const FALLBACK_IMAGE = "/shoes.jpg";
-const BUY_NOW_KEY = "buy_now_payload";
+const BUY_NOW_KEY = "buy_now_item";
 
 function toNumber(value) {
   if (value === null || value === undefined || value === "") return 0;
@@ -35,7 +35,7 @@ function sortImages(images = []) {
 function normalizeImages(images = []) {
   return sortImages(images)
     .map((img) => ({
-      id: img?.id || "",
+      id: String(img?.id || ""),
       url: joinUrl(img?.image_url || ""),
       isPrimary: !!img?.is_primary,
       sortOrder: img?.sort_order ?? 9999,
@@ -49,13 +49,14 @@ function normalizeVariants(variants = []) {
   return variants
     .filter((v) => v?.is_active)
     .map((v) => ({
-      id: v.id,
-      sku: v.sku || "",
-      size: v.size || "",
-      color: v.color || "",
-      price: toNumber(v.price),
-      stock: toNumber(v.stock_quantity),
-      isActive: !!v.is_active,
+      id: String(v?.id || "").trim(),
+      sku: String(v?.sku || "").trim(),
+      size: String(v?.size || "").trim(),
+      color: String(v?.color || "").trim(),
+      price: toNumber(v?.price),
+      stock: toNumber(v?.stock_quantity),
+      stock_quantity: toNumber(v?.stock_quantity),
+      isActive: !!v?.is_active,
     }));
 }
 
@@ -155,6 +156,7 @@ export default function Product() {
         const normalizedVariants = normalizeVariants(data?.variants || []);
         const firstInStock = normalizedVariants.find((v) => v.stock > 0);
         const firstAny = normalizedVariants[0];
+
         setSelectedVariantId(firstInStock?.id || firstAny?.id || "");
         setQty(1);
       } catch (err) {
@@ -210,7 +212,7 @@ export default function Product() {
 
     return {
       variant: chosenVariant,
-      variantId: chosenVariant.id,
+      variantId: String(chosenVariant.id).trim(),
       stock: chosenVariant.stock,
       safeQty,
     };
@@ -259,6 +261,8 @@ export default function Product() {
         color: info.variant.color || "",
         price: info.variant.price,
         stock: info.stock,
+        stock_quantity: info.stock,
+        sku: info.variant.sku || "",
         inStock: info.stock > 0,
         quantity: info.safeQty,
       });
@@ -282,19 +286,25 @@ export default function Product() {
       item: {
         variant_id: info.variantId,
         quantity: info.safeQty,
-        product_id: product?.id,
+        product_id: String(product?.id || "").trim(),
         product_name: product?.product_name || "",
         product_category: product?.product_category || "",
-        url_slug: product?.url_slug || slug,
+        url_slug: product?.url_slug || slug || "",
         image_url: activeImg,
         size: info.variant.size || "",
         color: info.variant.color || "",
         price: info.variant.price,
+        sku: info.variant.sku || "",
+        stock_quantity: info.stock,
       },
     };
 
+    localStorage.removeItem("buy_now_payload");
     localStorage.setItem(BUY_NOW_KEY, JSON.stringify(payload));
     window.dispatchEvent(new Event("buy_now:updated"));
+
+    console.log("BUY_NOW SAVED:", payload);
+
     navigate("/checkout?mode=buy_now");
   }
 
@@ -404,6 +414,9 @@ export default function Product() {
                 {product?.product_category}
               </p>
               <p className="pprice">{formatMoney(displayPrice)}</p>
+              {chosenVariant?.id ? (
+                <p className="pnote">Variant ID: {chosenVariant.id}</p>
+              ) : null}
             </div>
 
             <div className="psizeBlock">

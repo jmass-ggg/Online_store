@@ -57,7 +57,7 @@ def prepare_buy_now_checkout(
     product = (
         db.query(Product)
         .options(
-            joinedload(Product.seller).joinedload(Seller.delivery)
+            joinedload(Product.seller).joinedload(Seller.delivery_charges)
         )
         .filter(Product.id == variant.product_id)
         .first()
@@ -71,15 +71,15 @@ def prepare_buy_now_checkout(
     if variant.stock_quantity < quantity:
         raise error_handler(400, "Insufficient stock")
 
-    if product.status.value != "active":
+    if product.status.value != "ACTIVE":
         raise error_handler(400, "Product is inactive")
 
     unit_price = Decimal(variant.price)
     items_subtotal = unit_price * quantity
 
     delivery_charge = Decimal("0.00")
-    if product.seller and product.seller.delivery:
-        delivery_charge = Decimal(product.seller.delivery[0].delivery_charge)
+    if product.seller and product.seller.delivery_charges:
+        delivery_charge = Decimal(product.seller.delivery_charges[0].delivery_charge)
 
     grand_total = items_subtotal + delivery_charge
 
@@ -90,7 +90,7 @@ def prepare_buy_now_checkout(
         "seller_id": product.seller_id,
         "unit_price": unit_price,
         "items_subtotal": items_subtotal,
-        "delivery_charge": delivery_charge,
+        "delivery_charges": delivery_charge,
         "grand_total": grand_total,
     }
 
