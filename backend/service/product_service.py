@@ -117,7 +117,7 @@ def upload_single_product_image(
     image: UploadFile,
     db: Session,
     current_seller: Seller,
-    color: str | None = None,
+   
     is_primary: bool | None = None,
     sort_order: int | None = None,
 ) -> ProductImageRead:
@@ -144,7 +144,7 @@ def upload_single_product_image(
 
         row = ProductImage(
             product_id=product_id,
-            color=color,
+            
             image_url=f"/uploads/{filename}",
             is_primary=make_primary,
             sort_order=sort_value,
@@ -174,7 +174,7 @@ def upload_multiple_product_images(
     images: list[UploadFile],
     db: Session,
     current_seller: Seller,
-    color: str | None = None,
+    
     primary_index: int | None = None,
 ) -> list[ProductImageRead]:
     if not images:
@@ -213,7 +213,7 @@ def upload_multiple_product_images(
 
             row = ProductImage(
                 product_id=product_id,
-                color=color,
+                
                 image_url=f"/uploads/{filename}",
                 is_primary=(i == chosen_primary_index),
                 sort_order=start_sort + i,
@@ -422,6 +422,36 @@ def search_products(
     products = query.offset(skip).limit(limit).all()
     return [ProductRead.model_validate(product) for product in products]
 
+def is_primary_photo_change(
+    product_img_id:UUID,db:Session,current_seller_id
+    
+):
+    target_image = (
+        db.query(ProductImage)
+        .options(joinedload(ProductImage.product))
+        .filter(ProductImage.id == product_img_id)
+        .first()
+    )
+
+    if not target_image:
+        raise HTTPException(status_code=404, detail="Product image not found")
+
+    if not target_image.product or target_image.product.seller_id != current_seller_id:
+        raise HTTPException(status_code=403, detail="Not allowed to modify this image")
+
+    db.query(ProductImage).filter(
+        ProductImage.product_id == target_image.product_id
+    ).update(
+        {ProductImage.is_primary: False},
+        synchronize_session=False,
+    )
+
+    target_image.is_primary = True
+
+    db.commit()
+    db.refresh(target_image)
+
+    return target_image
 
 def view_all_product(
     *,
@@ -442,8 +472,12 @@ def view_all_product(
     if only_active:
         q = q.filter(Product.status == ProductStatus.ACTIVE)
 
-    if category is not None:
-        q = q.filter(Product.product_category == category)
+    if category and category.lower() != "all":
+        try:
+            q = q.filter(Product.product_category == ProductCategory(category))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid category")
+
 
     products = (
         q.order_by(Product.created_at.desc())

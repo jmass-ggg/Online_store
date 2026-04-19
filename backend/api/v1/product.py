@@ -20,7 +20,7 @@ from backend.schemas.product import (
     ProductVariantRead,
 )
 from backend.service.product_service import (
-    add_product_by_seller,
+    add_product_by_seller,is_primary_photo_change,
     add_product_variant,
     delete_product_by_admin,
     delete_product_by_seller,
@@ -137,13 +137,13 @@ def create_product(
         db=db,
         current_seller=current_seller,
     )
-
+from backend.models.product_img import ProductImage
 
 @router.post("/{product_id}/images", response_model=list[ProductImageRead], status_code=status.HTTP_201_CREATED)
 def upload_product_images(
     product_id: UUID,
     images: list[UploadFile] = File(...),
-    color: str | None = Form(None),
+    
     primary_index: int | None = Form(None),
     db: Session = Depends(get_db),
     current_seller: Seller = Depends(verify_seller_or_not),
@@ -151,18 +151,17 @@ def upload_product_images(
     return upload_multiple_product_images(
         product_id=product_id,
         images=images,
-        color=color,
+        
         primary_index=primary_index,
         db=db,
         current_seller=current_seller,
     )
 
-
 @router.post("/{product_id}/image", response_model=ProductImageRead, status_code=status.HTTP_201_CREATED)
 def upload_product_image(
     product_id: UUID,
     image: UploadFile = File(...),
-    color: str | None = Form(None),
+    
     is_primary: bool | None = Form(None),
     sort_order: int | None = Form(None),
     db: Session = Depends(get_db),
@@ -171,12 +170,21 @@ def upload_product_image(
     return upload_single_product_image(
         product_id=product_id,
         image=image,
-        color=color,
+        
         is_primary=is_primary,
         sort_order=sort_order,
         db=db,
         current_seller=current_seller,
     )
+    
+@router.patch("/images/{product_img_id}/primary", response_model=ProductImageRead)
+def change_the_primary_image(
+    product_img_id: UUID,
+    db: Session = Depends(get_db),
+    current_seller: Seller = Depends(verify_seller_or_not),
+):
+    return is_primary_photo_change(product_img_id,db,current_seller.id)
+    
 
 
 @router.patch("/images/{image_id}", response_model=ProductImageRead)

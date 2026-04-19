@@ -66,24 +66,27 @@ class ProductVariantRead(BaseModel):
 
 
 class ProductImageBase(BaseModel):
-    color: str | None = None
+    
     is_primary: bool = False
     sort_order: int = Field(0, ge=0)
 
 
-class ProductImageRead(ProductImageBase):
-    model_config = ConfigDict(from_attributes=True)
-
+class ProductImageRead(BaseModel):
     id: UUID
     product_id: UUID
+    
     image_url: str
+    is_primary: bool
+    sort_order: int
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductImageUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    color: Optional[str] = None
+   
     is_primary: Optional[bool] = None
     sort_order: Optional[int] = Field(None, ge=0)
 
