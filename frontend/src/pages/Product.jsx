@@ -414,9 +414,7 @@ export default function Product() {
                 {product?.product_category}
               </p>
               <p className="pprice">{formatMoney(displayPrice)}</p>
-              {chosenVariant?.id ? (
-                <p className="pnote">Variant ID: {chosenVariant.id}</p>
-              ) : null}
+              
             </div>
 
             <div className="psizeBlock">

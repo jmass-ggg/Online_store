@@ -55,7 +55,7 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
         if seller_id not in seller_delivery_map:
             charge=(
                 seller.delivery[0].delivery_charge
-                if seller.delivery else Decimal("0.00")
+                if seller.delivery_charges else Decimal("0.00")
             )
             seller_delivery_map[seller_id]=charge
     delivery_charge=sum(seller_delivery_map.values(),Decimal("0.00"))
@@ -64,7 +64,7 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
         
     return {
         "cart_id": str(loaded_cart.id),
-        "buyer_id": str(loaded_cart.buyer_id),
+        "buyer_id": str(loaded_cart.customer_id),
         "status": loaded_cart.status,
 
         "selected_count": len(select_items),
@@ -108,7 +108,10 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
                     "target_audience": item.variant.product.target_audience.value
                         if item.variant.product.target_audience else None,
                     "description": item.variant.product.description,
-                    "image_url": item.variant.product.image_url,
+                    "image_url": next(
+        (img.image_url for img in item.variant.product.images if img.is_primary),
+        None
+    ),
                     "status": item.variant.product.status.value
                         if item.variant.product.status else None,
                     "seller_id": str(item.variant.product.seller.id)
@@ -126,7 +129,7 @@ def serialize_cart(cart: Cart) -> CartOut:
 
     return CartOut(
         id=cart.id,
-        buyer_id=cart.buyer_id,
+        buyer_id=cart.customer_id,
         status=cart.status,
         created_at=cart.created_at,
         updated_at=cart.updated_at,

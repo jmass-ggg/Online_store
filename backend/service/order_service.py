@@ -148,14 +148,14 @@ def buy_from_cart_service(
 
         cart = (
             db.query(Cart)
-            .filter(Cart.id == cart_id, Cart.buyer_id == user_id)
+            .filter(Cart.id == cart_id, Cart.customer_id == user_id)
             .with_for_update()
             .options(
                 selectinload(Cart.items)
                 .selectinload(CartItem.variant)
                 .selectinload(ProductVariant.product)
                 .selectinload(Product.seller)
-                .selectinload(Seller.delivery)
+                .selectinload(Seller.delivery_charges)
             )
             .first()
         )
@@ -203,7 +203,7 @@ def buy_from_cart_service(
             if seller.id not in seller_delivery_map:
                 seller_delivery_map[seller.id] = (
                     seller.delivery[0].delivery_charge
-                    if seller.delivery else Decimal("0.00")
+                    if seller.delivery_charges else Decimal("0.00")
                 )
 
             prepared_items.append({
@@ -219,7 +219,7 @@ def buy_from_cart_service(
         grand_total = subtotal + delivery_charge
 
         order = Order(
-            buyer_id=user_id,
+            customer_id=user_id,
             status="PLACED",
             total_price=grand_total,
             payment_method=paymentmethod,

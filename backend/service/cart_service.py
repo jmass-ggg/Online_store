@@ -15,14 +15,14 @@ from backend.models.delivery_charge import DeliveryCharge
 
 
 def get_or_create_active_cart(db:Session,buyer_id:UUID)->Cart:
-    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStatus.ACTIVE).first()
+    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.customer_id ==  buyer_id,Cart.status == CartStatus.ACTIVE).first()
     if cart:
         return cart
-    cart=Cart(buyer_id=buyer_id,status=CartStatus.ACTIVE.value)
+    cart=Cart(customer_id=buyer_id,status=CartStatus.ACTIVE.value)
     db.add(cart)
     db.commit()
     db.refresh(cart)
-    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.buyer_id ==  buyer_id,Cart.status == CartStatus.ACTIVE).first()
+    cart=db.query(Cart).options(selectinload(Cart.items)).filter(Cart.customer_id ==  buyer_id,Cart.status == CartStatus.ACTIVE).first()
     return cart
 
 def add_to_cart_by_customer(
@@ -107,7 +107,7 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
         if seller_id not in seller_delivery_map:
             charge=(
                 seller.delivery[0].delivery_charge
-                if seller.delivery else Decimal("0.00")
+                if seller.delivery_charges else Decimal("0.00")
             )
             seller_delivery_map[seller_id]=charge
     delivery_charge=sum(seller_delivery_map.values(),Decimal("0.00"))
@@ -116,7 +116,7 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
         
     return {
         "cart_id": str(loaded_cart.id),
-        "buyer_id": str(loaded_cart.buyer_id),
+        "buyer_id": str(loaded_cart.customer_id),
         "status": loaded_cart.status,
 
         "selected_count": len(select_items),
@@ -160,7 +160,9 @@ def to_cart_out(db:Session,cart: Cart) -> dict:
                     "target_audience": item.variant.product.target_audience.value
                         if item.variant.product.target_audience else None,
                     "description": item.variant.product.description,
-                    "image_url": item.variant.product.image_url,
+                    "image_url": next(
+                        (img.image_url for img in item.variant.product.images if img.is_primary),None
+                     ),
                     "status": item.variant.product.status.value
                         if item.variant.product.status else None,
                     "seller_id": str(item.variant.product.seller.id)
@@ -187,7 +189,7 @@ def select_cart_item(
         .join(Cart, Cart.id == CartItem.cart_id)
         .filter(
             CartItem.id == cart_item_id,
-            Cart.buyer_id == buyer_id,
+            Cart.customer_id == buyer_id,
             Cart.status == "ACTIVE",
         )
         .options(
