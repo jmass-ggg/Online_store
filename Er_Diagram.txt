@@ -1,194 +1,120 @@
 erDiagram
+    USERS {
+        uuid id PK
+        string username UK
+        string email UK
+        string hashed_password
+        string account_status
+        boolean is_email_verified
+        datetime last_login_at
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
     ROLES {
         int id PK
         string role_name UK
         string descripted
     }
 
-    ADMIN {
-        int id PK
-        string username UK
-        string email UK
-        string hashed_password
-        datetime created_at
-        datetime updated_at
+    ADMIN_PROFILES {
+        uuid id PK
+        uuid user_id FK
         string role_name FK
-    }
-    CUSTOMER {
-        int id PK
-        string username
-        string email UK
-        string phone_number
-        string hashed_password
-        string address
         datetime created_at
         datetime updated_at
+    }
+
+    CUSTOMER_PROFILES {
+        uuid id PK
+        uuid user_id FK
         string status
         string role_name FK
-    }
-
-    SELLER {
-        int id PK
-        string username
-        string email UK
-        string phone_number UK
-        string hashed_password
-
-        string business_name
-        string business_type
-        string business_address
-
-        string kyc_document_type
-        bigint kyc_document_number
-
-        string bank_account_name
-        bigint bank_account_number
-        string bank_name
-        string bank_branch
-
         datetime created_at
         datetime updated_at
-
-        string status
-        boolean is_verified
-        string role_name FK
     }
 
-    ADDRESSES {
-        int id PK
-        int customer_id FK
-
+    ADDRESS_CUSTOMER {
+        uuid id PK
+        uuid customer_id FK
         string full_name
         string phone_number
-
         string region
         string line1
         string line2
         string postal_code
         string country
-
         float latitude
         float longitude
-
         boolean is_default_shipping
         boolean is_default_billing
-
         datetime created_at
         datetime updated_at
-    }
-
-    PRODUCTS {
-        int id PK
-        string product_name
-        string url_slug UK
-
-        string product_category
-        string target_audience
-        string description
-        string image_url
-        string status
-
-        int seller_id FK
-        datetime created_at
-        datetime updated_at
-    }
-
-    PRODUCT_VARIANTS {
-        int id PK
-        int product_id FK
-
-        string sku UK
-        string color
-        string size
-
-        decimal price
-        int stock_quantity
-        boolean is_active
-
-        datetime created_at
-        datetime updated_at
-    }
-
-    PRODUCT_IMAGES {
-        int id PK
-        int product_id FK
-
-        string color
-        string image_url
-
-        boolean is_primary
-        int sort_order
-
-        datetime created_at
     }
 
     CARTS {
-        int id PK
-        int buyer_id FK
+        uuid id PK
+        uuid customer_id FK
         string status
         datetime created_at
         datetime updated_at
     }
 
-    CART_ITEMS {
-        int id PK
-        int cart_id FK
-        int variant_id FK
+    CART_ITEM {
+        uuid id PK
+        uuid cart_id FK
+        uuid variant_id FK
         int quantity
+        numeric price
+        boolean selected
     }
-REFRESH_TOKENS {
-        int id PK
-        string token_hash UK
-        string role
-        int owner_id
-        datetime expires_at
-        boolean revoked
-    }
+
     ORDERS {
-        int id PK
-        int buyer_id FK
+        uuid id PK
+        uuid customer_id FK
         string status
-        decimal total_price
+        numeric total_price
+        string payment_method
         datetime order_placed
         datetime created_at
         datetime updated_at
     }
 
-    ORDER_ADDRESSES {
-        int id PK
-        int order_id FK  %% unique (1 order -> 1 shipping snapshot)
+    ORDER_ADDRESS {
+        uuid id PK
+        uuid order_id FK
         string full_name
         string phone_number
         string region
         string line1
         string line2
-        string postal_code
         string country
         float latitude
         float longitude
         datetime created_at
     }
 
-    ORDER_ITEMS {
-        int id PK
-        int order_id FK
-        int seller_id FK
-        int product_id FK
-        int variant_id FK
+    ORDER_ITEM {
+        uuid id PK
+        uuid order_id FK
+        uuid seller_id FK
+        uuid product_id FK
+        uuid variant_id FK
         int quantity
-        decimal unit_price
-        decimal line_total
+        numeric unit_price
+        numeric line_total
         string item_status
         datetime created_at
         datetime updated_at
     }
 
-    ORDER_FULFILLMENTS {
-        int id PK
-        int order_id FK
-        int seller_id FK
+    ORDER_FULFILLMENT {
+        uuid id PK
+        uuid order_id FK
+        uuid seller_id FK
         string fulfillment_status
-        decimal seller_subtotal
+        numeric seller_subtotal
         datetime accepted_at
         datetime packed_at
         datetime shipped_at
@@ -197,399 +123,153 @@ REFRESH_TOKENS {
         datetime updated_at
     }
 
-    PAYMENTS {
-        int id PK
-        int order_id FK
-        string method
+    PAYMENT {
+        uuid id PK
+        uuid order_id FK
+        string provider
         string status
-        decimal amount
-        string provider_ref
-        datetime created_at
-        datetime updated_at
-    }
-    SHIPMENTS {
-        int id PK
-        int order_id FK
-        string carrier
-        string tracking_number
-        string status
-        datetime shipped_at
-        datetime delivered_at
+        numeric amount
+        string ref_id
+        string transaction_uuid UK
+        datetime initiated_at
+        datetime verified_at
         datetime created_at
         datetime updated_at
     }
 
-    SELLER_VERIFICATIONS {
-        int id PK
-        int seller_id FK
+    SELLERS {
+        uuid id PK
+        uuid user_id FK
+        string account_type
         string status
-        int reviewed_by_admin_id FK
-        string review_note
+        boolean is_verified
+        string role_name FK
         datetime created_at
         datetime updated_at
     }
 
-    PRODUCT_APPROVALS {
-        int id PK
-        int product_id FK
+    SELLER_PERSONAL_INFORMATION {
+        uuid id PK
+        uuid seller_id FK
+        string legal_name
+        string pan_number
+        string business_document_photo
+        string account_name
+        string account_number
+        string bank_name
+        string branch_name
+        string cheque_photo
+    }
+
+    SELLER_BUSINESS_ADDRESS {
+        uuid id PK
+        uuid seller_id FK
+        string country
+        string province
+        string district
+        string area
+    }
+
+    DELIVERY_CHARGE {
+        uuid id PK
+        numeric delivery_charge
+        uuid seller_id FK
+    }
+
+    PRODUCT {
+        uuid id PK
+        string product_name
+        string url_slug UK
+        string product_category
+        string target_audience
+        string description
         string status
-        int reviewed_by_admin_id FK
-        string reason
+        uuid seller_id FK
         datetime created_at
         datetime updated_at
     }
 
-    AUDIT_LOGS {
-        int id PK
-        string actor_type
-        int actor_id
-        string action
-        string entity_type
-        int entity_id
-        string metadata_json
+    PRODUCT_IMAGE {
+        uuid id PK
+        uuid product_id FK
+        string image_url
+        boolean is_primary
+        int sort_order
         datetime created_at
     }
 
-
-    %% Role relationships
-    ROLES ||--o{ ADMIN : "role_name"
-    ROLES ||--o{ CUSTOMER : "role_name"
-    ROLES ||--o{ SELLER : "role_name"
-
-    %% Commerce relationships
-    CUSTOMER ||--o{ ORDERS : "places"
-    ORDERS ||--o{ ORDER_ITEM : "contains"
-    PRODUCTS ||--o{ ORDER_ITEM : "included_in"
-    SELLER ||--o{ PRODUCTS : "lists"
-
-    %% Reviews
-    PRODUCTS ||--o{ REVIEW : "receives"
-    CUSTOMER ||--o{ REVIEW : "writes"
-
-    %% Note: REFRESH_TOKENS.owner_id is polymorphic (Admin/Seller/Customer),
-    %% so it has no enforced FK relationship in the schema.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Optimized Database Design – Hotel Booking System
-
-This design reflects **production-grade optimization**, normalization, and booking-safety patterns used in real hotel platforms (Booking.com–style systems).
-
----
-
-## 1. Core Optimization Principles Applied
-
-1. **3NF normalization** (no redundant data)
-2. **Availability stored per room per date** (prevents double booking)
-3. **Minimal joins for search paths**
-4. **Write-heavy operations are transactional**
-5. **Read-heavy operations are index-optimized**
-6. **Money & pricing snapshotted at booking time**
-
----
-
-## 2. Final Entity List (Optimized)
-
-### 2.1 users
-
-```
-users
------
-id (PK)
-name
-email (UNIQUE)
-password_hash
-role  (USER | ADMIN | HOTEL_ADMIN)
-created_at
-```
-
-Indexes:
-
-* UNIQUE(email)
-
----
-
-### 2.2 hotels
-
-```
-hotels
-------
-id (PK)
-name
-city
-address
-latitude
-longitude
-rating
-owner_id (FK → users.id)
-created_at
-```
-
-Indexes:
-
-* city
-* owner_id
-
----
-
-### 2.3 room_types (Optimization: avoid enum rigidity)
-
-```
-room_types
-----------
-id (PK)
-name (Single, Double, Suite)
-max_occupancy
-```
-
----
-
-### 2.4 rooms
-
-```
-rooms
------
-id (PK)
-hotel_id (FK → hotels.id)
-room_type_id (FK → room_types.id)
-room_number
-floor
-base_price
-is_active
-```
-
-Constraints:
-
-* UNIQUE(hotel_id, room_number)
-
-Indexes:
-
-* hotel_id
-* room_type_id
-
----
-
-### 2.5 room_availability (MOST IMPORTANT TABLE)
-
-```
-room_availability
------------------
-id (PK)
-room_id (FK → rooms.id)
-available_date
-is_available
-price_override (nullable)
-```
-
-Constraints:
-
-* UNIQUE(room_id, available_date)
-
-Indexes:
-
-* room_id, available_date
-* available_date
-
-Purpose:
-
-* Prevents double booking
-* Enables fast availability search
-
----
-
-### 2.6 bookings
-
-```
-bookings
---------
-id (PK)
-user_id (FK → users.id)
-hotel_id (FK → hotels.id)
-status (PENDING | CONFIRMED | CANCELLED)
-check_in_date
-check_out_date
-total_amount
-created_at
-```
-
-Indexes:
-
-* user_id
-* hotel_id
-* status
-
----
-
-### 2.7 booking_rooms (Pricing snapshot)
-
-```
-booking_rooms
--------------
-id (PK)
-booking_id (FK → bookings.id)
-room_id (FK → rooms.id)
-price_per_night
-```
-
-Reason:
-
-* Preserves historical price even if room price changes
-
----
-
-### 2.8 payments
-
-```
-payments
---------
-id (PK)
-booking_id (FK → bookings.id)
-amount
-currency
-status (INITIATED | SUCCESS | FAILED | REFUNDED)
-payment_provider
-transaction_ref
-created_at
-```
-
-Indexes:
-
-* booking_id
-* transaction_ref
-
----
-
-## 3. FULL ER DIAGRAM (Textual – Interview Ready)
-
-```
-[USERS]
-   |
-   | 1
-   |------< owns
-   |           n
-[HOTELS]
-   |
-   | 1
-   |------< contains
-   |           n
-[ROOMS] >------ 1 [ROOM_TYPES]
-   |
-   | 1
-   |------< has
-   |           n
-[ROOM_AVAILABILITY]
-
-[USERS]
-   |
-   | 1
-   |------< makes
-   |           n
-[BOOKINGS] >------ 1 [HOTELS]
-   |
-   | 1
-   |------< includes
-   |           n
-[BOOKING_ROOMS] >------ 1 [ROOMS]
-
-[BOOKINGS]
-   |
-   | 1
-   |------< paid_by
-   |           n
-[PAYMENTS]
-```
-
----
-
-## 4. Booking Availability Algorithm (Optimized)
-
-### Search Query (Indexed)
-
-```sql
-SELECT r.id
-FROM rooms r
-JOIN room_availability ra ON r.id = ra.room_id
-WHERE r.hotel_id = :hotelId
-AND ra.available_date BETWEEN :checkIn AND :checkOut - INTERVAL '1 day'
-AND ra.is_available = true
-GROUP BY r.id
-HAVING COUNT(*) = :numberOfNights;
-```
-
-Why this is optimal:
-
-* Uses composite indexes
-* No joins on bookings table
-* Linear scan avoided
-
----
-
-## 5. Locking Strategy (Critical for Scale)
-
-During booking:
-
-```sql
-SELECT * FROM room_availability
-WHERE room_id = :roomId
-AND available_date BETWEEN :checkIn AND :checkOut
-FOR UPDATE;
-```
-
-Guarantees:
-
-* No race condition
-* No double booking
-
----
-
-## 6. Why This Design Is "Production Grade"
-
-| Concern        | How It’s Solved                 |
-| -------------- | ------------------------------- |
-| Double booking | Availability table + DB locking |
-| Price changes  | Snapshot in booking_rooms       |
-| Search speed   | Precomputed availability        |
-| Scalability    | Read-heavy tables indexed       |
-| Audit          | Immutable booking records       |
-
----
-
-## 7. How to Explain This in Interviews
-
-> "We model availability as a per-room per-day entity and lock rows transactionally during booking to guarantee consistency under concurrent access. Pricing is snapshotted at booking time to preserve historical accuracy."
-
-That explanation alone is **senior-backend level**.
-
----
-
-## 8. Recommended Next Steps
-
-1. Draw this ER diagram visually (Lucidchart / Draw.io)
-2. Implement schema in PostgreSQL
-3. Generate availability for 12 months ahead
-4. Build transactional booking service
-
----
-
-If you want next, I can:
-
-* Convert this into **SQL DDL**
-* Provide **Spring Boot JPA entities**
-* Optimize further for **multi-hotel chains**
-* Add **dynamic pricing & seasons**
-
-Tell me how far you want to push this.
+    PRODUCT_VARIANT {
+        uuid id PK
+        uuid product_id FK
+        string sku UK
+        string color
+        string size
+        numeric price
+        int stock_quantity
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
+    REVIEW {
+        uuid id PK
+        int rating
+        string comment
+        uuid product_id FK
+        uuid customer_id FK
+    }
+
+    EMAIL_TOKEN_VERIFICATION {
+        uuid id PK
+        uuid user_id FK
+        string token_hash
+        datetime expired_at
+        boolean used
+        datetime created_at
+    }
+
+    REFRESH_TOKENS {
+        uuid id PK
+        string token_hash UK
+        string role
+        uuid owner_id FK
+        datetime expires_at
+        boolean revoked
+    }
+
+    USERS ||--o| ADMIN_PROFILES : has
+    USERS ||--o| CUSTOMER_PROFILES : has
+    USERS ||--o| SELLERS : has
+    USERS ||--o{ EMAIL_TOKEN_VERIFICATION : has
+    USERS ||--o{ REFRESH_TOKENS : has
+
+    ROLES ||--o{ ADMIN_PROFILES : assigned_to
+    ROLES ||--o{ CUSTOMER_PROFILES : assigned_to
+    ROLES ||--o{ SELLERS : assigned_to
+
+    CUSTOMER_PROFILES ||--o{ ADDRESS_CUSTOMER : owns
+    CUSTOMER_PROFILES ||--o{ CARTS : has
+    CUSTOMER_PROFILES ||--o{ ORDERS : places
+    CUSTOMER_PROFILES ||--o{ REVIEW : writes
+
+    CARTS ||--o{ CART_ITEM : contains
+    PRODUCT_VARIANT ||--o{ CART_ITEM : selected_as
+
+    ORDERS ||--o| ORDER_ADDRESS : ships_to
+    ORDERS ||--o{ ORDER_ITEM : contains
+    ORDERS ||--o{ ORDER_FULFILLMENT : split_into
+    ORDERS ||--o{ PAYMENT : paid_by
+
+    SELLERS ||--o{ PRODUCT : owns
+    SELLERS ||--o{ DELIVERY_CHARGE : sets
+    SELLERS ||--o{ SELLER_PERSONAL_INFORMATION : has
+    SELLERS ||--o{ SELLER_BUSINESS_ADDRESS : has
+    SELLERS ||--o{ ORDER_ITEM : fulfills
+    SELLERS ||--o{ ORDER_FULFILLMENT : handles
+
+    PRODUCT ||--o{ PRODUCT_IMAGE : has
+    PRODUCT ||--o{ PRODUCT_VARIANT : has
+    PRODUCT ||--o{ REVIEW : receives
+    PRODUCT ||--o{ ORDER_ITEM : appears_in
+
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : purchased_as
