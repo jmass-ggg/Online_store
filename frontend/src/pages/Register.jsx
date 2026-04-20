@@ -63,7 +63,7 @@ export default function Register() {
           </div>
 
           <h1 className="login-title">Create Account</h1>
-          <p className="login-sub">Please fill in your details to register</p>
+          <p className="login-sub">Please fill in your details to Sign up</p>
 
           {error ? <p className="login-error">{error}</p> : null}
 

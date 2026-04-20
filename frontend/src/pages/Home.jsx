@@ -10,10 +10,10 @@ function isLoggedInNow() {
 
 export default function Home() {
   const nav = useNavigate();
+  const menuRef = useRef(null);
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => isLoggedInNow());
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
 
   useEffect(() => {
     const topbar = document.getElementById("topbar");
@@ -25,49 +25,57 @@ export default function Home() {
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
+
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    const sync = () => setIsLoggedIn(isLoggedInNow());
-    window.addEventListener("storage", sync);
-    window.addEventListener("auth:changed", sync);
+    const syncAuth = () => setIsLoggedIn(isLoggedInNow());
+
+    window.addEventListener("storage", syncAuth);
+    window.addEventListener("auth:changed", syncAuth);
 
     return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("auth:changed", sync);
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("auth:changed", syncAuth);
     };
   }, []);
 
   useEffect(() => {
-    const onDocDown = (e) => {
+    const handleOutsideClick = (e) => {
       if (!menuOpen) return;
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
     };
 
-    const onEsc = (e) => {
+    const handleEscape = (e) => {
       if (e.key === "Escape") setMenuOpen(false);
     };
 
-    document.addEventListener("mousedown", onDocDown);
-    document.addEventListener("keydown", onEsc);
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener("mousedown", onDocDown);
-      document.removeEventListener("keydown", onEsc);
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, [menuOpen]);
 
-  const avatarUrl = useMemo(() => localStorage.getItem("avatar_url") || "", [isLoggedIn]);
+  const avatarUrl = useMemo(() => {
+    return localStorage.getItem("avatar_url") || "";
+  }, [isLoggedIn]);
 
   const initials = useMemo(() => {
     const name = localStorage.getItem("username") || "";
     const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "👤";
-    const a = parts[0]?.[0] || "";
-    const b = parts[1]?.[0] || "";
-    return (a + b).toUpperCase();
+
+    if (!parts.length) return "👤";
+
+    const first = parts[0]?.[0] || "";
+    const second = parts[1]?.[0] || "";
+
+    return (first + second).toUpperCase();
   }, [isLoggedIn]);
 
   function logout() {
@@ -84,9 +92,15 @@ export default function Home() {
     <div className="frame">
       <header className="topbar" id="topbar">
         <nav className="nav" aria-label="Primary">
-          <button className="nav-btn" type="button">Catalog</button>
-          <button className="nav-btn" type="button">About Us</button>
-          <button className="nav-btn" type="button">Contact Us</button>
+          <button className="nav-btn" type="button">
+            Catalog
+          </button>
+          <button className="nav-btn" type="button">
+            About Us
+          </button>
+          <button className="nav-btn" type="button">
+            Contact Us
+          </button>
         </nav>
 
         <div className="logo-wrap">
@@ -122,7 +136,7 @@ export default function Home() {
                 aria-label="Profile menu"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((v) => !v)}
+                onClick={() => setMenuOpen((prev) => !prev)}
               >
                 <span className="profileAvatar" aria-hidden="true">
                   {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
@@ -235,6 +249,54 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-column">
+            <h4>Resources</h4>
+            <a href="/">Gift Cards</a>
+            <a href="/">Corporate Sales</a>
+            <a href="/">Find a Store</a>
+            <a href="/">Membership</a>
+            <a href="/">Site Feedback</a>
+          </div>
+
+          <div className="footer-column">
+            <h4>Help</h4>
+            <a href="/">Get Help</a>
+            <a href="/">Order Status</a>
+            <a href="/">Shipping & Delivery</a>
+            <a href="/">Returns</a>
+            <a href="/">Contact Us</a>
+          </div>
+
+          <div className="footer-column">
+            <h4>Company</h4>
+            <a href="/">About JAMES</a>
+            <a href="/">News</a>
+            <a href="/">Careers</a>
+            <a href="/">Investors</a>
+            <a href="/">Sustainability</a>
+          </div>
+
+          <div className="footer-column">
+            <h4>Promotions & Discounts</h4>
+            <a href="/">Student</a>
+            <a href="/">Military</a>
+            <a href="/">Teacher</a>
+            <a href="/">Birthday</a>
+          </div>
+        </div>
+
+        <div className="footer-bottom">
+          <p>© 2026 JAMES, Inc. All Rights Reserved</p>
+          <div className="footer-links">
+            <a href="/">Terms of Sale</a>
+            <a href="/">Terms of Use</a>
+            <a href="/">Privacy Policy</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
