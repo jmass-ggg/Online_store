@@ -37,7 +37,7 @@ a:focus-visible, button:focus-visible{
   border-radius: 12px;
 }
 .footer {
-  background-color: #111;
+  background-color: #ffffff;
   color: #ccc;
   padding: 40px 20px;
   font-family: Arial, sans-serif;
@@ -57,24 +57,24 @@ a:focus-visible, button:focus-visible{
 }
 
 .footer-column h4 {
-  color: #fff;
+  color: #000000;
   margin-bottom: 15px;
 }
 
 .footer-column a {
   display: block;
-  color: #ccc;
+  color: #a38787;
   text-decoration: none;
   margin-bottom: 8px;
   font-size: 14px;
 }
 
 .footer-column a:hover {
-  color: #fff;
+  color: #000000;
 }
 
 .footer-bottom {
-  border-top: 1px solid #333;
+    border-top: 1px solid #e2cbcb;
   margin-top: 30px;
   padding-top: 15px;
   text-align: center;
@@ -82,7 +82,7 @@ a:focus-visible, button:focus-visible{
 
 .footer-links a {
   margin: 0 10px;
-  color: #aaa;
+  color: #000000;
   text-decoration: none;
   font-size: 13px;
 }

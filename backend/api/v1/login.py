@@ -38,6 +38,7 @@ class LoginRequest(BaseModel):
 class AccessTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    role: str
 
 
 class LogoutResponse(BaseModel):
@@ -113,7 +114,7 @@ def find_user_by_id_and_role(db: Session, user_id: UUID, role: str):
 
 
 @router.post("/login", response_model=AccessTokenResponse)
-@limiter.limit("5/minute")
+# @limiter.limit("5/minute")
 def login(
     request: Request,
     response: Response,
@@ -146,9 +147,10 @@ def login(
     set_refresh_cookie(response, refresh_token)
 
     return AccessTokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-    )
+    access_token=access_token,
+    token_type="bearer",
+    role=role,
+)
 
 
 @router.post("/refresh", response_model=AccessTokenResponse)
@@ -202,6 +204,7 @@ def refresh_access_token(
     return AccessTokenResponse(
         access_token=new_access_token,
         token_type="bearer",
+        role=refresh_token_record.role
     )
 
 

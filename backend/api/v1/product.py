@@ -76,7 +76,7 @@ def product_search(
     q: str = Query(..., min_length=1),
     category: Optional[ProductCategory] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     return search_products(
@@ -151,7 +151,6 @@ def upload_product_images(
     return upload_multiple_product_images(
         product_id=product_id,
         images=images,
-        
         primary_index=primary_index,
         db=db,
         current_seller=current_seller,

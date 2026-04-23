@@ -645,7 +645,6 @@ def delete_product_by_seller(
 
     return {"message": "Product deleted successfully"}
 
-
 def view_all_product_seller(*, seller_id: UUID, db: Session) -> list[AllProduct]:
     products = (
         db.query(Product)
@@ -654,18 +653,15 @@ def view_all_product_seller(*, seller_id: UUID, db: Session) -> list[AllProduct]
             selectinload(Product.variants),
             selectinload(Product.images),
         )
-        .filter(
-            Product.status == ProductStatus.ACTIVE,
-            Product.seller_id == seller_id,
-        )
+        .filter(Product.seller_id == seller_id)
         .order_by(Product.created_at.desc())
         .all()
     )
-    
-    output:list[AllProduct]=[]
+
+    output: list[AllProduct] = []
     for product in products:
-        item=AllProduct.model_validate(product)
-        item.variants=[
+        item = AllProduct.model_validate(product)
+        item.variants = [
             ProductVariantRead.model_validate(variant)
             for variant in product.variants
             if variant.is_active

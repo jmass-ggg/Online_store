@@ -63,7 +63,7 @@ export default function Login() {
           </div>
 
           <h1 className="login-title">Welcome Back!</h1>
-          <p className="login-sub">Please enter your details to  Sign in</p>
+          <p className="login-sub">Please enter your details to sign in</p>
 
           {error ? <p className="login-error">{error}</p> : null}
 
@@ -83,7 +83,6 @@ export default function Login() {
 
             <div className="login-field">
               <label htmlFor="password">Password</label>
-
               <div className="login-passwordRow">
                 <input
                   id="password"

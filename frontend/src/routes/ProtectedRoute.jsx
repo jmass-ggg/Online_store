@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { apiFetch, getStoredAccessToken } from "../api";
+import { apiFetch, getStoredAccessToken, setStoredAccessToken } from "../api";
 
 export default function ProtectedRoute({ children }) {
   const [status, setStatus] = useState("loading");
@@ -19,13 +19,15 @@ export default function ProtectedRoute({ children }) {
       try {
         const data = await apiFetch("/auth/refresh", { method: "POST" });
 
-        if (data?.access_token && mounted) {
-          setStatus("authenticated");
+        if (data?.access_token) {
+          setStoredAccessToken(data.access_token);
+          if (mounted) setStatus("authenticated");
           return;
         }
 
         if (mounted) setStatus("unauthenticated");
-      } catch {
+      } catch (err) {
+        console.error("Authentication failed:", err);
         if (mounted) setStatus("unauthenticated");
       }
     }
@@ -37,13 +39,8 @@ export default function ProtectedRoute({ children }) {
     };
   }, []);
 
-  if (status === "loading") {
-    return <div>Loading...</div>;
-  }
-
-  if (status === "unauthenticated") {
-    return <Navigate to="/login" replace />;
-  }
+  if (status === "loading") return <div>Loading...</div>;
+  if (status === "unauthenticated") return <Navigate to="/login" replace />;
 
   return children;
 }
