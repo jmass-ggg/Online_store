@@ -1,6 +1,7 @@
 import pytest
 import requests
 import os
+
 BASE_URL = "http://localhost:8000"
 
 
@@ -57,7 +58,7 @@ def test_create_seller_product():
         ]
 
         form_data = {
-             "product_name": f"Nike {nike_models[i % len(nike_models)]} {100 + i}",
+            "product_name": f"Nike {nike_models[i % len(nike_models)]} {100 + i}",
             "target_audience": "Men",
             "product_category": "Footwear",
             "description": "Comfortable and stylish footwear designed for everyday use. Built with lightweight materials, breathable design, and cushioned sole for all-day comfort. Perfect for casual wear, walking, and daily activities with durable grip and modern style."

@@ -56,7 +56,7 @@ def product_cache_key_builder(
 
 
 @router.get("/", response_model=List[AllProduct])
-@cache(expire=120, key_builder=product_cache_key_builder)
+# @cache(expire=120, key_builder=product_cache_key_builder)
 def get_all_product(
     category: Optional[ProductCategory] = Query(None),
     skip: int = Query(0, ge=0),
