@@ -13,6 +13,8 @@ rough.txt
 project.txt
 # Environment variables
 .env
+backend/uploads/
+backend/important_document/
 rough.txt
 # Docker
 *.log

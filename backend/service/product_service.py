@@ -1,165 +1,221 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile,Query,File
-from sqlalchemy.orm import Session
-from typing import List
+from __future__ import annotations
+
 import os
 import shutil
-from sqlalchemy import select, and_
-from decimal import Decimal
-from sqlalchemy.exc import SQLAlchemyError
-from backend.database import get_db
-from backend.utils.verifyied import verify_seller_or_not
-from backend.models.product import Product,ProductStatus,ProductCategory,TargetAudience
-from backend.models.seller import Seller
+from uuid import UUID, uuid4
+from typing import Optional
+
+from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session, aliased, joinedload, selectinload
+
+from backend.core.error_handler import error_handler
+from backend.core.random_slang_url import generate_unique_url_slug
+from backend.core.settings import UPLOAD_DIR
+from backend.core.sku import generate_hybrid_sku
+from backend.models.admin import AdminProfile
+from backend.models.product import Product, ProductCategory, ProductStatus, TargetAudience
 from backend.models.product_img import ProductImage
 from backend.models.product_variant import ProductVariant
-from backend.schemas.product import ProductCreate,ProductRead,ProductUpdate,ProductVariantCreate,ProductVariantRead,AllProduct,ProductImageBase,ProductImageRead,ProductImageUpdate
-from backend.core.sku import  generate_hybrid_sku
-from backend.core.permission import check_permission
-from backend.core.error_handler import error_handler
-from backend.models.admin import AdminProfile
-from sqlalchemy import or_, func
-from typing import Optional
-from backend.core.random_slang_url import generate_unique_url_slug
-from datetime import datetime
-from uuid import uuid4
-from backend.core.settings import UPLOAD_DIR
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import aliased
-from uuid import UUID
+from backend.models.seller import Seller
+from backend.schemas.product import (
+    AllProduct,
+    ProductImageRead,
+    ProductImageUpdate,
+    ProductRead,
+    ProductUpdate,
+    ProductVariantCreate,ProductVariantRead
+)
 
-UPLOAD_FOLDER="backend/uploads/"
 
-def add_product_by_seller(
-    product_name: str,
-    targetAudience:TargetAudience,
-    product_category: ProductCategory,
-    description: str | None,
-    image: UploadFile,
-    db: Session,
-    current_seller: Seller,
-    upload_folder: str,
-) -> ProductRead:
+def _get_product_or_404(db: Session, product_id: UUID) -> Product:
+    product = (
+        db.query(Product)
+        .options(
+            joinedload(Product.seller),
+            selectinload(Product.images),
+            selectinload(Product.variants),
+        )
+        .filter(Product.id == product_id)
+        .one_or_none()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
 
-    os.makedirs(upload_folder, exist_ok=True)
 
-    filename = image.filename
-    file_path = os.path.join(upload_folder, filename)
+def _ensure_product_owner(product: Product, current_seller: Seller) -> None:
+    if product.seller_id != current_seller.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+
+def _save_upload_file(image: UploadFile) -> tuple[str, str]:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    ext = os.path.splitext(image.filename or "")[1].lower()
+    filename = f"{uuid4().hex}{ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
 
     with open(file_path, "wb") as f:
         shutil.copyfileobj(image.file, f)
 
+    return filename, file_path
+
+
+def _next_sort_order(db: Session, product_id: UUID) -> int:
+    last_sort = (
+        db.query(func.max(ProductImage.sort_order))
+        .filter(ProductImage.product_id == product_id)
+        .scalar()
+    )
+    return 0 if last_sort is None else int(last_sort) + 1
+
+
+def _unset_existing_primary(db: Session, product_id: UUID) -> None:
+    (
+        db.query(ProductImage)
+        .filter(
+            ProductImage.product_id == product_id,
+            ProductImage.is_primary.is_(True),
+        )
+        .update({"is_primary": False}, synchronize_session=False)
+    )
+
+
+def add_product_by_seller(
+    *,
+    product_name: str,
+    target_audience: TargetAudience,
+    product_category: ProductCategory,
+    description: str | None,
+    db: Session,
+    current_seller: Seller,
+) -> ProductRead:
     url_slug = generate_unique_url_slug(db, product_name)
 
     new_product = Product(
         product_name=product_name,
         url_slug=url_slug,
-        target_audience=targetAudience,
+        target_audience=target_audience,
         product_category=product_category,
         description=description,
-        image_url=f"/uploads/{filename}",
-        status=ProductStatus.inactive,
+        status=ProductStatus.INACTIVE,
         seller_id=current_seller.id,
     )
 
     db.add(new_product)
-    db.flush()  
     db.commit()
     db.refresh(new_product)
 
     return ProductRead.model_validate(new_product)
 
+
 def upload_single_product_image(
+    *,
     product_id: UUID,
     image: UploadFile,
-    is_primary: bool,
-    sort_order: int,
     db: Session,
     current_seller: Seller,
-):
-    product = db.query(Product).filter(Product.id == product_id).one_or_none()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+   
+    is_primary: bool | None = None,
+    sort_order: int | None = None,
+) -> ProductImageRead:
+    product = _get_product_or_404(db, product_id)
+    _ensure_product_owner(product, current_seller)
 
-    if product.seller_id != current_seller.id:
-        raise HTTPException(status_code=403, detail="Not allowed")
+    existing_primary = (
+        db.query(ProductImage)
+        .filter(
+            ProductImage.product_id == product_id,
+            ProductImage.is_primary.is_(True),
+        )
+        .first()
+    )
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)  
+    make_primary = is_primary if is_primary is not None else existing_primary is None
+    sort_value = sort_order if sort_order is not None else _next_sort_order(db, product_id)
 
-    ext = os.path.splitext(image.filename)[1].lower()
-    filename = f"{uuid4().hex}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)  
-
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(image.file, f)
+    filename, saved_path = _save_upload_file(image)
 
     try:
-        with db.begin_nested():
-            if is_primary:
-                db.query(ProductImage).filter(
-                    ProductImage.product_id == product_id,
-                    ProductImage.is_primary == True
-                ).update({"is_primary": False})
+        if make_primary:
+            _unset_existing_primary(db, product_id)
 
-            row = ProductImage(
-                product_id=product_id,
-                image_url=f"/uploads/{filename}",
-                is_primary=is_primary,
-                sort_order=sort_order,
-            )
-            db.add(row)
-            db.flush()
+        row = ProductImage(
+            product_id=product_id,
+            
+            image_url=f"/uploads/{filename}",
+            is_primary=make_primary,
+            sort_order=sort_value,
+        )
+        db.add(row)
         db.commit()
         db.refresh(row)
+
         return ProductImageRead.model_validate(row)
 
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="sort_order already exists for this product")
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
+        raise HTTPException(status_code=400, detail="Only one primary image and unique sort_order are allowed per product")
 
     except SQLAlchemyError:
         db.rollback()
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
         raise HTTPException(status_code=500, detail="Failed to save product image")
 
+
 def upload_multiple_product_images(
+    *,
     product_id: UUID,
-    color:str,
-    images: List[UploadFile],
+    images: list[UploadFile],
     db: Session,
     current_seller: Seller,
-):
-    product = db.query(Product).filter(Product.id == product_id).one_or_none()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    if product.seller_id != current_seller.id:
-        raise HTTPException(status_code=403, detail="Not allowed")
+    
+    primary_index: int | None = None,
+) -> list[ProductImageRead]:
+    if not images:
+        raise HTTPException(status_code=400, detail="Please upload at least one image")
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    product = _get_product_or_404(db, product_id)
+    _ensure_product_owner(product, current_seller)
 
+    existing_primary = (
+        db.query(ProductImage)
+        .filter(
+            ProductImage.product_id == product_id,
+            ProductImage.is_primary.is_(True),
+        )
+        .first()
+    )
+
+    if primary_index is not None and (primary_index < 0 or primary_index >= len(images)):
+        raise HTTPException(status_code=400, detail="primary_index is out of range")
+
+    chosen_primary_index = primary_index
+    if existing_primary is None and chosen_primary_index is None:
+        chosen_primary_index = 0
+
+    start_sort = _next_sort_order(db, product_id)
+    saved_files: list[str] = []
     saved_rows: list[ProductImage] = []
 
     try:
-        last_sort = (
-            db.query(ProductImage.sort_order)
-            .filter(ProductImage.product_id == product_id)
-            .order_by(ProductImage.sort_order.desc())
-            .first()
-        )
-        start_sort = (last_sort[0] + 1) if last_sort else 0
+        if chosen_primary_index is not None:
+            _unset_existing_primary(db, product_id)
 
         for i, img in enumerate(images):
-            ext = os.path.splitext(img.filename)[1].lower()
-            filename = f"{uuid4().hex}{ext}"
-            file_path = os.path.join(UPLOAD_DIR, filename)
-
-            with open(file_path, "wb") as f:
-                shutil.copyfileobj(img.file, f)
+            filename, file_path = _save_upload_file(img)
+            saved_files.append(file_path)
 
             row = ProductImage(
-                
                 product_id=product_id,
-                color=color,
+                
                 image_url=f"/uploads/{filename}",
-                is_primary=False,
+                is_primary=(i == chosen_primary_index),
                 sort_order=start_sort + i,
             )
             db.add(row)
@@ -167,49 +223,112 @@ def upload_multiple_product_images(
 
         db.commit()
 
-        for r in saved_rows:
-            db.refresh(r)
+        for row in saved_rows:
+            db.refresh(row)
 
-        return [ProductImageRead.model_validate(r) for r in saved_rows]
+        return [ProductImageRead.model_validate(row) for row in saved_rows]
 
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Duplicate sort_order for this product")
+        for file_path in saved_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        raise HTTPException(status_code=400, detail="Only one primary image and unique sort_order are allowed per product")
 
     except SQLAlchemyError:
         db.rollback()
+        for file_path in saved_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
         raise HTTPException(status_code=500, detail="Failed to upload product images")
 
 
+def update_product_image(
+    *,
+    image_id: UUID,
+    data: ProductImageUpdate,
+    db: Session,
+    current_seller: Seller,
+) -> ProductImageRead:
+    image = (
+        db.query(ProductImage)
+        .join(Product, Product.id == ProductImage.product_id)
+        .filter(ProductImage.id == image_id)
+        .one_or_none()
+    )
+    if not image:
+        raise HTTPException(status_code=404, detail="Product image not found")
+
+    product = _get_product_or_404(db, image.product_id)
+    _ensure_product_owner(product, current_seller)
+
+    update_data = data.model_dump(exclude_unset=True)
+
+    if update_data.get("is_primary") is True:
+        _unset_existing_primary(db, image.product_id)
+
+    if update_data.get("is_primary") is False:
+        other_primary = (
+            db.query(ProductImage)
+            .filter(
+                ProductImage.product_id == image.product_id,
+                ProductImage.id != image.id,
+                ProductImage.is_primary.is_(True),
+            )
+            .first()
+        )
+        if not other_primary:
+            raise HTTPException(status_code=400, detail="A product must have at least one primary image")
+
+    for key, value in update_data.items():
+        setattr(image, key, value)
+
+    try:
+        db.commit()
+        db.refresh(image)
+        return ProductImageRead.model_validate(image)
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Only one primary image and unique sort_order are allowed per product")
+
 
 def add_product_variant(
+    *,
     db: Session,
     product_id: UUID,
     variants: list[ProductVariantCreate],
     current_seller: Seller,
 ) -> list[ProductVariant]:
+    product = _get_product_or_404(db, product_id)
+    _ensure_product_owner(product, current_seller)
+
+    seen_combinations: set[tuple[str | None, str | None]] = set()
+    created_variants: list[ProductVariant] = []
 
     try:
-        product = db.query(Product).filter(Product.id == product_id).one_or_none()
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
-
-        if product.seller_id != current_seller.id:
-            raise HTTPException(status_code=403, detail="Not authorized")
-
-        created_variants: list[ProductVariant] = []
-
         for v in variants:
-            exists = db.query(ProductVariant.id).filter(
-                ProductVariant.product_id == product_id,
-                ProductVariant.color == v.color,
-                ProductVariant.size == v.size,
-            ).first()
+            key = (v.color, v.size)
+            if key in seen_combinations:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Duplicate variant in request: color={v.color}, size={v.size}",
+                )
+            seen_combinations.add(key)
 
+            exists = (
+                db.query(ProductVariant.id)
+                .filter(
+                    ProductVariant.product_id == product_id,
+                    ProductVariant.color == v.color,
+                    ProductVariant.size == v.size,
+                )
+                .first()
+            )
             if exists:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Variant already exists (color={v.color}, size={v.size})"
+                    detail=f"Variant already exists: color={v.color}, size={v.size}",
                 )
 
             sku = generate_hybrid_sku(db, product.url_slug, v.color, v.size)
@@ -222,47 +341,56 @@ def add_product_variant(
                 price=v.price,
                 stock_quantity=v.stock_quantity,
                 is_active=(v.stock_quantity > 0),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
             )
-
             db.add(variant)
             created_variants.append(variant)
 
-        product.status = ProductStatus.active
+        if created_variants:
+            product.status = ProductStatus.ACTIVE
+
         db.commit()
 
-        for var in created_variants:
-            db.refresh(var)
+        for variant in created_variants:
+            db.refresh(variant)
 
         return created_variants
 
     except HTTPException:
+        db.rollback()
         raise
 
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="Duplicate variant detected (same product_id + color + size)."
-        )
+        raise HTTPException(status_code=400, detail="Duplicate variant detected")
 
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error while creating variants")
-
+    
+    
 def view_product(db: Session, product_id: UUID) -> AllProduct:
-    product = db.query(Product).filter(Product.id == product_id).one_or_none()
-
+    product = (
+        db.query(Product)
+        .options(selectinload(Product.variants), selectinload(Product.images))
+        .filter(Product.id == product_id, Product.status == ProductStatus.ACTIVE)
+        .one_or_none()
+    )
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-    return AllProduct.from_orm(product)
+    return AllProduct.model_validate(product)
+
 
 def view_product_by_slug(db: Session, slug: str) -> AllProduct:
-    product = db.query(Product).filter(Product.url_slug == slug).one_or_none()
+    product = (
+        db.query(Product)
+        .options(selectinload(Product.variants), selectinload(Product.images))
+        .filter(Product.url_slug == slug, Product.status == ProductStatus.ACTIVE)
+        .one_or_none()
+    )
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
-    return AllProduct.from_orm(product)
+    return AllProduct.model_validate(product)
+
 
 def search_products(
     *,
@@ -271,19 +399,14 @@ def search_products(
     skip: int,
     limit: int,
     db: Session,
-) -> AllProduct:
-    
+) -> list[ProductRead]:
     term = q.strip()
     if not term:
         return []
 
     like = f"%{term.lower()}%"
-    active_value = getattr(ProductStatus.active, "value", ProductStatus.active)
 
-    query = (
-        db.query(Product)
-        .filter(Product.status == active_value)
-    )
+    query = db.query(Product).filter(Product.status == ProductStatus.ACTIVE)
 
     if category is not None:
         query = query.filter(Product.product_category == category)
@@ -292,76 +415,103 @@ def search_products(
         or_(
             func.lower(func.trim(Product.product_name)).like(like),
             func.lower(func.trim(Product.url_slug)).like(like),
-            func.lower(func.trim(Product.description)).like(like),
+            func.lower(func.trim(func.coalesce(Product.description, ""))).like(like),
         )
     ).order_by(Product.created_at.desc())
 
     products = query.offset(skip).limit(limit).all()
-    return [ProductRead.model_validate(p) for p in products]
+    return [ProductRead.model_validate(product) for product in products]
+
+def is_primary_photo_change(
+    product_img_id:UUID,db:Session,current_seller_id
+    
+):
+    target_image = (
+        db.query(ProductImage)
+        .options(joinedload(ProductImage.product))
+        .filter(ProductImage.id == product_img_id)
+        .first()
+    )
+
+    if not target_image:
+        raise HTTPException(status_code=404, detail="Product image not found")
+
+    if not target_image.product or target_image.product.seller_id != current_seller_id:
+        raise HTTPException(status_code=403, detail="Not allowed to modify this image")
+
+    db.query(ProductImage).filter(
+        ProductImage.product_id == target_image.product_id
+    ).update(
+        {ProductImage.is_primary: False},
+        synchronize_session=False,
+    )
+
+    target_image.is_primary = True
+
+    db.commit()
+    db.refresh(target_image)
+
+    return target_image
+
 def view_all_product(
+    *,
     db: Session,
     category: Optional[ProductCategory] = None,
     skip: int = 0,
     limit: int = 20,
     only_active: bool = True,
-):
-    V = aliased(ProductVariant)
-
-    first_variant_sq = (
-        db.query(
-            ProductVariant.product_id.label("pid"),
-            func.min(ProductVariant.created_at).label("first_created_at"),
-        )
-        .filter(ProductVariant.is_active == True)
-        .group_by(ProductVariant.product_id)
-        .subquery()
-    )
-
+) -> list[AllProduct]:
     q = (
-        db.query(
-            Product,
-            V.id.label("default_variant_id"),
-            V.price.label("default_price"),
-        )
-        .outerjoin(first_variant_sq, first_variant_sq.c.pid == Product.id)
-        .outerjoin(
-            V,
-            and_(
-                V.product_id == first_variant_sq.c.pid,
-                V.created_at == first_variant_sq.c.first_created_at,
-                V.is_active == True,
-            ),
+        db.query(Product)
+        .options(
+            selectinload(Product.variants),
+            selectinload(Product.images),
         )
     )
 
     if only_active:
-        q = q.filter(Product.status == ProductStatus.active)
+        q = q.filter(Product.status == ProductStatus.ACTIVE)
 
-    if category:
-        q = q.filter(Product.product_category == category)
+    if category and category.lower() != "all":
+        try:
+            q = q.filter(Product.product_category == ProductCategory(category))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid category")
 
-    rows = (
+
+    products = (
         q.order_by(Product.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
 
-    out = []
-    for product, default_variant_id, default_price in rows:
-        base = ProductRead.model_validate(product).model_dump()
-        base["default_variant_id"] = default_variant_id
-        base["default_price"] = default_price
-        out.append(base)
+    output: list[AllProduct] = []
+    for product in products:
+        item = AllProduct.model_validate(product)
 
-    return out
-from sqlalchemy import select
+ 
+        item.variants = [
+            ProductVariantRead.model_validate(variant)
+            for variant in product.variants
+            if variant.is_active
+        ]
+
+ 
+        item.images = [
+            ProductImageRead.model_validate(image)
+            for image in sorted(product.images, key=lambda x: (x.sort_order, x.created_at))
+        ]
+
+        output.append(item)
+
+    return output
 
 def get_product_options(db: Session, product_id: UUID):
     variants = db.execute(
         select(ProductVariant).where(
             ProductVariant.product_id == product_id,
-            ProductVariant.is_active == True
+            ProductVariant.is_active.is_(True),
         )
     ).scalars().all()
 
@@ -376,14 +526,13 @@ def get_product_options(db: Session, product_id: UUID):
             "images_by_color": {},
         }
 
- 
-    variants_sorted = sorted(variants, key=lambda v: v.id)
+    variants_sorted = sorted(variants, key=lambda v: str(v.id))
     default_variant = variants_sorted[0]
 
     images = (
         db.query(ProductImage)
         .filter(ProductImage.product_id == product_id)
-        .order_by(ProductImage.sort_order)
+        .order_by(ProductImage.sort_order.asc())
         .all()
     )
 
@@ -402,7 +551,7 @@ def get_product_options(db: Session, product_id: UUID):
         variant_map.setdefault(c, {})
         variant_map[c][s] = {
             "id": v.id,
-            "price": v.price,                
+            "price": v.price,
             "stock_quantity": v.stock_quantity,
             "sku": v.sku,
         }
@@ -414,12 +563,14 @@ def get_product_options(db: Session, product_id: UUID):
     for img in images:
         c = img.color or "DEFAULT"
         images_by_color.setdefault(c, [])
-        images_by_color[c].append({
-            "id": img.id,
-            "image_url": img.image_url,
-            "is_primary": img.is_primary,
-            "sort_order": img.sort_order,
-        })
+        images_by_color[c].append(
+            {
+                "id": img.id,
+                "image_url": img.image_url,
+                "is_primary": img.is_primary,
+                "sort_order": img.sort_order,
+            }
+        )
 
     return {
         "product_id": product_id,
@@ -433,12 +584,12 @@ def get_product_options(db: Session, product_id: UUID):
 
 
 def edit_product_by_seller(
+    *,
     db: Session,
     product_id: UUID,
     product_update: ProductUpdate,
     current_seller: Seller,
 ) -> ProductRead:
-
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
 
     if not product:
@@ -447,7 +598,7 @@ def edit_product_by_seller(
     if product.seller_id != current_seller.id:
         raise error_handler(status.HTTP_403_FORBIDDEN, "Not authorized")
 
-    for key, value in product_update.dict(exclude_unset=True).items():
+    for key, value in product_update.model_dump(exclude_unset=True).items():
         setattr(product, key, value)
 
     db.commit()
@@ -457,16 +608,15 @@ def edit_product_by_seller(
 
 
 def delete_product_by_admin(
+    *,
     db: Session,
     product_id: UUID,
     current_admin: AdminProfile,
 ) -> dict:
-
-    if current_admin.role != "Admin":
+    if current_admin.role_name != "Admin":
         raise error_handler(status.HTTP_403_FORBIDDEN, "Admin only")
 
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
-
     if not product:
         raise error_handler(status.HTTP_404_NOT_FOUND, "Product not found")
 
@@ -475,12 +625,13 @@ def delete_product_by_admin(
 
     return {"message": "Product deleted successfully"}
 
+
 def delete_product_by_seller(
+    *,
     db: Session,
     product_id: UUID,
     current_seller: Seller,
 ) -> dict:
-
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
 
     if not product:
@@ -494,11 +645,30 @@ def delete_product_by_seller(
 
     return {"message": "Product deleted successfully"}
 
-def view_all_product_seller(seller_id: UUID, db: Session) -> List[ProductRead]:
+def view_all_product_seller(*, seller_id: UUID, db: Session) -> list[AllProduct]:
     products = (
         db.query(Product)
+        .options(
+            joinedload(Product.seller),
+            selectinload(Product.variants),
+            selectinload(Product.images),
+        )
         .filter(Product.seller_id == seller_id)
         .order_by(Product.created_at.desc())
         .all()
     )
-    return [ProductRead.model_validate(p) for p in products]
+
+    output: list[AllProduct] = []
+    for product in products:
+        item = AllProduct.model_validate(product)
+        item.variants = [
+            ProductVariantRead.model_validate(variant)
+            for variant in product.variants
+            if variant.is_active
+        ]
+        item.images = [
+            ProductImageRead.model_validate(image)
+            for image in sorted(product.images, key=lambda x: (x.sort_order, x.created_at))
+        ]
+        output.append(item)
+    return output

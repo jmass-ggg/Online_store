@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from backend.utils.jwt import create_access_token, verify_token, create_refresh_token
+from backend.utils.jwt import create_access_token
 from backend.utils.hashed import verify_password
 from backend.models.role import Role
 from backend.models.user import User

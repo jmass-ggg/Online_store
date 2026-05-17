@@ -36,7 +36,60 @@ a:focus-visible, button:focus-visible{
   outline-offset: 3px;
   border-radius: 12px;
 }
+.footer {
+  background-color: #ffffff;
+  color: #ccc;
+  padding: 40px 20px;
+  font-family: Arial, sans-serif;
+}
 
+.footer-container {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.footer-column {
+  flex: 1 1 200px;
+  margin: 10px;
+}
+
+.footer-column h4 {
+  color: #000000;
+  margin-bottom: 15px;
+}
+
+.footer-column a {
+  display: block;
+  color: #a38787;
+  text-decoration: none;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.footer-column a:hover {
+  color: #000000;
+}
+
+.footer-bottom {
+    border-top: 1px solid #e2cbcb;
+  margin-top: 30px;
+  padding-top: 15px;
+  text-align: center;
+}
+
+.footer-links a {
+  margin: 0 10px;
+  color: #000000;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.footer-links a:hover {
+  color: #fff;
+}
 .frame{
   width: 100vw;
   min-height: 100vh;

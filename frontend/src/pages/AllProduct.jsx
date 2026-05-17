@@ -4,12 +4,12 @@ import { useNavigate } from "react-router-dom";
 import "./AllProduct.css";
 import { apiFetch, joinUrl } from "../api";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 100;
 const CART_KEY = "cart_items";
 
 function money(n) {
   const num = Number(n || 0);
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "NPR" }).format(num);
 }
 
 function safeJsonParse(value, fallback) {
@@ -40,7 +40,11 @@ function normalizeProduct(p) {
     category,
     subLabel,
     price: Number(p?.default_price ?? 0),
-    image: joinUrl(p?.image_url || ""),
+    image: joinUrl(
+  p?.images?.find((img) => img.is_primary)?.image_url ||
+  p?.images?.[0]?.image_url ||
+  ""
+),
     status: p?.status ?? "active",
   };
 }

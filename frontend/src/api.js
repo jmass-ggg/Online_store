@@ -1,64 +1,88 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const ASSET_ORIGIN = import.meta.env.VITE_ASSET_ORIGIN || "";
 
 const ACCESS_TOKEN_KEY = "access_token";
-const AUTH_TOKEN_KEY = "auth_token";
+export const BUY_NOW_KEY = "buy_now_item";
 
+// Get the stored access token from localStorage
 export function getStoredAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  return localStorage.getItem(ACCESS_TOKEN_KEY) || "";
 }
 
+// Set the access token in localStorage
 export function setStoredAccessToken(token) {
+  if (!token) return;
   localStorage.setItem(ACCESS_TOKEN_KEY, token);
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
   window.dispatchEvent(new Event("auth:changed"));
 }
 
+// Clear the stored access token from localStorage
 export function clearStoredAccessToken() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(AUTH_TOKEN_KEY);
   window.dispatchEvent(new Event("auth:changed"));
 }
 
+// Join the base API URL with the given path
 export function joinUrl(u) {
   if (!u) return "";
   if (/^https?:\/\//i.test(u)) return u;
 
-  if (!ASSET_ORIGIN) return u.startsWith("/") ? u : `/${u}`;
+  if (!ASSET_ORIGIN) {
+    return u.startsWith("/") ? u : `/${u}`;
+  }
+
   return `${ASSET_ORIGIN}${u.startsWith("/") ? u : `/${u}`}`;
 }
 
+// Parse the response body based on content type
+async function parseResponse(res) {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return await res.json();
+  }
+  return await res.text();
+}
+
+// Parse the error from the response body
 async function parseError(res) {
   try {
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-      const j = await res.json();
-      return j?.detail || j?.message || JSON.stringify(j);
+    const data = await parseResponse(res);
+    if (typeof data === "string") {
+      return data || `Request failed (${res.status})`;
     }
-    return await res.text();
+    return data?.detail || data?.message || `Request failed (${res.status})`;
   } catch {
     return `Request failed (${res.status})`;
   }
 }
 
+// This variable ensures that only one refresh request is made at a time
 let refreshPromise = null;
 
+// Handle token refresh and retry the failed request
 async function refreshAccessTokenOnce() {
+  console.log("Attempting to refresh token...");
+
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
-    const res = await fetch(`${API_BASE_URL}/login/refresh`, {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
       credentials: "include",
     });
 
+    console.log("Refresh token response status:", res.status);
+
     if (!res.ok) {
+      clearStoredAccessToken();
       throw new Error(await parseError(res));
     }
 
-    const data = await res.json();
+    const data = await parseResponse(res);
+    console.log("Refresh token data:", data);
 
     if (!data?.access_token) {
+      clearStoredAccessToken();
       throw new Error("Refresh did not return access_token");
     }
 
@@ -73,11 +97,14 @@ async function refreshAccessTokenOnce() {
   }
 }
 
+// Handle API requests and trigger token refresh if necessary
 export async function apiFetch(path, options = {}) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = `${API_BASE_URL}${normalizedPath}`;
-  const isRefreshRequest = normalizedPath === "/login/refresh";
+  const isRefreshRequest = normalizedPath === "/auth/refresh";
+  const isLoginRequest = normalizedPath === "/auth/login";
 
+  // Create headers for the request
   const makeHeaders = (token) => {
     const headers = new Headers(options.headers || {});
     const isFormData = options.body instanceof FormData;
@@ -87,33 +114,36 @@ export async function apiFetch(path, options = {}) {
       headers.set("Content-Type", "application/json");
     }
 
-    // do not attach Authorization header to refresh endpoint
-    if (token && !headers.has("Authorization") && !isRefreshRequest) {
+    if (token && !headers.has("Authorization") && !isRefreshRequest && !isLoginRequest) {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
     return headers;
   };
 
-  const doFetch = async (token) => {
-    return fetch(url, {
+  // Perform the fetch request
+  const doFetch = (token) =>
+    fetch(url, {
       ...options,
       headers: makeHeaders(token),
       credentials: "include",
     });
-  };
 
   let token = getStoredAccessToken();
   let res = await doFetch(token);
 
-  // only auto-refresh for NON-refresh endpoints
-  if (res.status === 401 && !isRefreshRequest) {
+  // If the response is 401 (Unauthorized), refresh the token and retry
+  if (res.status === 401 && !isRefreshRequest && !isLoginRequest) {
+    console.log("Token expired, attempting to refresh...");
     try {
       token = await refreshAccessTokenOnce();
       res = await doFetch(token);
-    } catch (e) {
+    } catch (err) {
+      console.error("Token refresh failed:", err);
       clearStoredAccessToken();
-      throw e instanceof Error ? e : new Error("Session expired. Please login again.");
+      throw err instanceof Error
+        ? err
+        : new Error("Session expired. Please login again.");
     }
   }
 
@@ -121,7 +151,5 @@ export async function apiFetch(path, options = {}) {
     throw new Error(await parseError(res));
   }
 
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return res.json();
-  return res.text();
+  return await parseResponse(res);
 }
